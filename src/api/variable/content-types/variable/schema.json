@@ -1,0 +1,76 @@
+{
+  "kind": "collectionType",
+  "collectionName": "variables",
+  "info": {
+    "singularName": "variable",
+    "pluralName": "variables",
+    "displayName": "variable",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "basePrice": {
+      "type": "decimal",
+      "default": 0
+    },
+    "resistance1": {
+      "type": "decimal",
+      "default": 0
+    },
+    "resistance2": {
+      "type": "decimal",
+      "default": 0
+    },
+    "support1": {
+      "type": "decimal",
+      "default": 0
+    },
+    "support2": {
+      "type": "decimal",
+      "default": 0
+    },
+    "targetStep": {
+      "type": "integer",
+      "default": 20
+    },
+    "index": {
+      "type": "string",
+      "unique": true
+    },
+    "token": {
+      "type": "integer",
+      "unique": true
+    },
+    "amount": {
+      "type": "decimal",
+      "default": 0
+    },
+    "callOptionBought": {
+      "type": "boolean",
+      "default": false
+    },
+    "putOptionBought": {
+      "type": "boolean",
+      "default": false
+    },
+    "callBoughtAt": {
+      "type": "decimal",
+      "default": 0
+    },
+    "putBoughtAt": {
+      "type": "decimal",
+      "default": 0
+    },
+    "initialSpectatorMode": {
+      "type": "boolean",
+      "default": true
+    },
+    "previousTradedPrice": {
+      "type": "decimal",
+      "default": 0
+    }
+  }
+}

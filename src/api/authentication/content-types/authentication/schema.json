@@ -1,0 +1,19 @@
+{
+  "kind": "collectionType",
+  "collectionName": "authentications",
+  "info": {
+    "singularName": "authentication",
+    "pluralName": "authentications",
+    "displayName": "authentication",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "requestToken": {
+      "type": "string"
+    }
+  }
+}
