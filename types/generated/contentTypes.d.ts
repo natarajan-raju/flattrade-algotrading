@@ -402,6 +402,7 @@ export interface ApiAuthenticationAuthentication
 export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
   collectionName: 'orders';
   info: {
+    description: '';
     displayName: 'order';
     pluralName: 'orders';
     singularName: 'order';
@@ -410,9 +411,7 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
-    actid: Schema.Attribute.String &
-      Schema.Attribute.Unique &
-      Schema.Attribute.DefaultTo<'FT048819'>;
+    actid: Schema.Attribute.String & Schema.Attribute.DefaultTo<'FT048819'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -428,9 +427,7 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     ret: Schema.Attribute.String;
     trantype: Schema.Attribute.String;
     tysm: Schema.Attribute.String;
-    uid: Schema.Attribute.String &
-      Schema.Attribute.Unique &
-      Schema.Attribute.DefaultTo<'FT048819'>;
+    uid: Schema.Attribute.String & Schema.Attribute.DefaultTo<'FT048819'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -478,6 +475,37 @@ export interface ApiVariableVariable extends Struct.CollectionTypeSchema {
     support2: Schema.Attribute.Decimal & Schema.Attribute.DefaultTo<0>;
     targetStep: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<20>;
     token: Schema.Attribute.Integer & Schema.Attribute.Unique;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiWebSocketWebSocket extends Struct.CollectionTypeSchema {
+  collectionName: 'web_sockets';
+  info: {
+    description: '';
+    displayName: 'webSocket';
+    pluralName: 'web-sockets';
+    singularName: 'web-socket';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    customServerUrl: Schema.Attribute.String;
+    flattradeClientUrl: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::web-socket.web-socket'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    scripList: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -996,6 +1024,7 @@ declare module '@strapi/strapi' {
       'api::authentication.authentication': ApiAuthenticationAuthentication;
       'api::order.order': ApiOrderOrder;
       'api::variable.variable': ApiVariableVariable;
+      'api::web-socket.web-socket': ApiWebSocketWebSocket;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
       'plugin::i18n.locale': PluginI18NLocale;

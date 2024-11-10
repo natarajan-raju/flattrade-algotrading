@@ -94,7 +94,7 @@ const handleTouchlineFeed= async (feedData) => {
       'Authorization': `Bearer ${env('SPECIAL_TOKEN')}`, // Including the special token in the Authorization header
       
     };
-    const response = await fetch('http://localhost:1337/api/variables/handleFeed', {
+    const response = await fetch(`${env('SERVER_URL')}/api/variables/handleFeed`, {
       method: 'POST',
       headers,
       body: JSON.stringify({

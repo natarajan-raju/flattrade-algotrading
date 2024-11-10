@@ -1,0 +1,25 @@
+{
+  "kind": "collectionType",
+  "collectionName": "web_sockets",
+  "info": {
+    "singularName": "web-socket",
+    "pluralName": "web-sockets",
+    "displayName": "webSocket",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "flattradeClientUrl": {
+      "type": "string"
+    },
+    "customServerUrl": {
+      "type": "string"
+    },
+    "scripList": {
+      "type": "string"
+    }
+  }
+}

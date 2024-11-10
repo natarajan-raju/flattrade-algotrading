@@ -1,7 +1,8 @@
 'use strict';
 const { env } = require('@strapi/utils');
 const { sha256 } = require('js-sha256');
-const {fetchRequestToken } = require('../../../../config/functions/fetchRequestToken');
+// const {fetchRequestToken } = require('../../../../config/functions/fetchRequestToken');
+// const { fetchRequestToken } = strapi.service('api::authentication.authentication');
 
 /**
  * authentication controller
@@ -50,19 +51,7 @@ module.exports = createCoreController('api::authentication.authentication',({str
 
           
           // Retrieve all tokens (without any conditions) from database
-          const requestTokenResponse = await fetchRequestToken()
-                          .then((data) => {return {
-                            requestToken: data.requestToken,
-                            id: data.id
-                            }
-                          })
-                          .catch((err) => {
-                            console.log({err});
-                            return {
-                              requestToken: false,
-                              id: '',
-                            };
-                          });;
+          const requestTokenResponse = await strapi.service('api::authentication.authentication').fetchRequestToken();
 
           // Check if any tokens exist
           const existingRequestToken = requestTokenResponse.requestToken;

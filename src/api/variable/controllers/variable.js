@@ -1,7 +1,7 @@
 'use strict';
 const { env } = require('@strapi/utils');
-const { connectFlattradeWebSocket } = require('../../../../config/functions/websocketClient.js');
-const { fetchRequestToken } = require('../../../../config/functions/fetchRequestToken.js');
+// const { connectFlattradeWebSocket } = require('../../../../config/functions/websocketClient.js');
+
 const fs = require( 'fs' );
 /**
  * variable controller
@@ -14,19 +14,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
     //Handle Update request
     async handleInvestmentVariables(ctx) {        
         const userId = env('FLATTRADE_USER_ID');
-        const requestTokenResponse = await fetchRequestToken()
-                          .then((data) => {return {
-                            requestToken: data.requestToken,
-                            id: data.id
-                            }
-                          })
-                          .catch((err) => {
-                            console.log({err});
-                            return {
-                              requestToken: false,
-                              id: '',
-                            };
-                          });;
+        const requestTokenResponse = await strapi.service('api::authentication.authentication').fetchRequestToken();
         if(!requestTokenResponse.requestToken){
             return ctx.send({ error: 'Request token not found' });
         }
@@ -59,15 +47,14 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             resistance2,
             support1,
             support2,
-            amount, // Store the investment amount
-            lastTradedPrice: 0,
+            amount, // Store the investment amount           
             initialSpectatorMode: true,
             previousTradedPrice: 0,
             },
         });
         
         // Step 3: Connect to Flattrade WebSocket        
-        connectFlattradeWebSocket(userId, sessionToken, accountId);
+        await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(userId, sessionToken, accountId);
         return {
             message: "Investment variables updated successfully",
             updatedIndex,
