@@ -12,38 +12,22 @@
   },
   "pluginOptions": {},
   "attributes": {
-    "uid": {
-      "type": "string",
-      "unique": false,
-      "default": "FT048819"
-    },
-    "actid": {
-      "type": "string",
-      "unique": false,
-      "default": "FT048819"
-    },
-    "exch": {
+    "index": {
       "type": "string"
     },
-    "tysm": {
+    "orderType": {
       "type": "string"
     },
-    "qty": {
-      "type": "integer"
-    },
-    "prc": {
-      "type": "decimal"
-    },
-    "prd": {
+    "contractType": {
       "type": "string"
     },
-    "trantype": {
+    "contractTsym": {
       "type": "string"
     },
-    "prctyp": {
+    "contractToken": {
       "type": "string"
     },
-    "ret": {
+    "boughtAtLtp": {
       "type": "string"
     }
   }

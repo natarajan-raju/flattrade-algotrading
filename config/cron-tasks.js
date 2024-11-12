@@ -11,5 +11,14 @@ module.exports = {
         tz: "Asia/Kolkata",  // Set to your desired timezone
       },
     },
+    dailyStopJob: {
+      task: async ({ strapi }) => {
+        await strapi.service('api::variable.variable').stopTrading();
+      },
+      options: {
+        rule: "15 15 * * *", // Every day at 3:15 PM
+        tz: "Asia/Kolkata",  // Set to your desired timezone
+      },
+    },
   };
   

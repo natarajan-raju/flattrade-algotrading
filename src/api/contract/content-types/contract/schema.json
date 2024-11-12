@@ -1,0 +1,24 @@
+{
+  "kind": "collectionType",
+  "collectionName": "contracts",
+  "info": {
+    "singularName": "contract",
+    "pluralName": "contracts",
+    "displayName": "contract"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "sampleContractTsym": {
+      "type": "string"
+    },
+    "index": {
+      "type": "string"
+    },
+    "symbols": {
+      "type": "json"
+    }
+  }
+}

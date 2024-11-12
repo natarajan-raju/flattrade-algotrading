@@ -71,6 +71,9 @@
     "previousTradedPrice": {
       "type": "decimal",
       "default": 0
+    },
+    "expiry": {
+      "type": "date"
     }
   }
 }

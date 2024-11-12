@@ -31,7 +31,7 @@ module.exports = ({ strapi }) => ({
 
     this.flattradeWs.on('close', () => {
       console.log('Flattrade WebSocket connection closed. Attempting reconnect...');
-      setTimeout(() => this.connectFlattradeWebSocket(userId, sessionToken, accountId), 5000);
+      setTimeout(() => this.connectFlattradeWebSocket(userId, sessionToken, accountId), 3000);
     });
 
     this.flattradeWs.on('error', (error) => {
@@ -92,21 +92,9 @@ module.exports = ({ strapi }) => ({
   },
 
   async handleTouchlineFeed(feedData) {
-    try {
-    //   const headers = {
-    //     Authorization: `Bearer ${env('SPECIAL_TOKEN')}`,
-    //   };
-    //   const response = await fetch(`${env('SERVER_URL')}/api/variables/handleFeed`, {
-    //     method: 'POST',
-    //     headers,
-    //     body: JSON.stringify({ feedData }),
-    //   });
-    //   const result = await response.json();
-    // Call the `handleFeed` function directly from the `variable` controller
-        const result = await strapi.controller('api::variable.variable').handleFeed({
-            request: { body: { feedData } }, // Pass feedData in the request body format
-        });
-        console.log('Feed processed by controller:', result);
+    try {    
+      const result = await strapi.service('api::variable.variable').handleFeed(feedData);
+      console.log('Feed processed by controller:', result);
     } catch (error) {
       console.error('Error processing feed:', error);
     }

@@ -399,6 +399,36 @@ export interface ApiAuthenticationAuthentication
   };
 }
 
+export interface ApiContractContract extends Struct.CollectionTypeSchema {
+  collectionName: 'contracts';
+  info: {
+    displayName: 'contract';
+    pluralName: 'contracts';
+    singularName: 'contract';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    index: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::contract.contract'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    sampleContractTsym: Schema.Attribute.String;
+    symbols: Schema.Attribute.JSON;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
   collectionName: 'orders';
   info: {
@@ -411,23 +441,19 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
-    actid: Schema.Attribute.String & Schema.Attribute.DefaultTo<'FT048819'>;
+    boughtAtLtp: Schema.Attribute.String;
+    contractToken: Schema.Attribute.String;
+    contractTsym: Schema.Attribute.String;
+    contractType: Schema.Attribute.String;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    exch: Schema.Attribute.String;
+    index: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::order.order'> &
       Schema.Attribute.Private;
-    prc: Schema.Attribute.Decimal;
-    prctyp: Schema.Attribute.String;
-    prd: Schema.Attribute.String;
+    orderType: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
-    qty: Schema.Attribute.Integer;
-    ret: Schema.Attribute.String;
-    trantype: Schema.Attribute.String;
-    tysm: Schema.Attribute.String;
-    uid: Schema.Attribute.String & Schema.Attribute.DefaultTo<'FT048819'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -454,6 +480,7 @@ export interface ApiVariableVariable extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    expiry: Schema.Attribute.Date;
     index: Schema.Attribute.String & Schema.Attribute.Unique;
     initialSpectatorMode: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<true>;
@@ -1022,6 +1049,7 @@ declare module '@strapi/strapi' {
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
       'api::authentication.authentication': ApiAuthenticationAuthentication;
+      'api::contract.contract': ApiContractContract;
       'api::order.order': ApiOrderOrder;
       'api::variable.variable': ApiVariableVariable;
       'api::web-socket.web-socket': ApiWebSocketWebSocket;
