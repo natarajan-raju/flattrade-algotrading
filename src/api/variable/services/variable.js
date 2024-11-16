@@ -11,276 +11,343 @@ const { createCoreService } = require('@strapi/strapi').factories;
 
 module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   //Process option chain and retrieve relevant Contracts for the given Expiry date
-  async processOptionChain(sampleContractTsym,sessionToken){
-    try{
+  async processOptionChain(sampleContractTsym, sessionToken) {
+    try {
+      // Prepare the payload for the option chain request
       const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","tsym":"${sampleContractTsym}","exch":"NFO","strprc":"${sampleContractTsym.slice(-5)}","cnt":"500"}&jKey=${sessionToken}`;
-      const optionChainResponse = await fetch(`${env('FLATTRADE_OPTION_CHAIN_URL')}`,{
+      const optionChainResponse = await fetch(`${env('FLATTRADE_OPTION_CHAIN_URL')}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-                  },
+        },
         body: payload,
-        });
-        const optionChain = await optionChainResponse.json();
-        const contracts = {
-          call: [],
-          put: [],
-        };
-        optionChain.values.forEach(option => {
-          if (option.optt === 'CE') {
-            contracts.call.push(option.tsym);
-          } else if (option.optt === 'PE') {
-            contracts.put.push(option.tsym);
-          }
-        });
-        console.log(contracts);
-        await strapi.db.query('api::contract.contract').update({
-          where: { sampleContractTsym },
-          data: {
-            symbols: contracts,
-          },
-        });
-        return { message: 'Option chain processed successfully',status: true };
-    }catch(error){
-      return { message: error, status: false }
-    }  
+      });
+
+      // Parse the response JSON
+      const optionChain = await optionChainResponse.json();
+      if(!optionChain){
+        return { message: 'Option chain not found', status: false };
+      }
+      // Initialize the contractTokens structure with objects holding token and initial lp as 0
+      const contractTokens = {
+        call: [],
+        put: [],
+      };
+
+      // Iterate over the option chain values to populate call and put objects
+      optionChain.values.forEach(option => {
+        const tokenData = { token: option.token, lp: 0, tsym: option.tsym }; // Initialize lp as 0
+
+        if (option.optt === 'CE') {
+          contractTokens.call.push(tokenData);
+        } else if (option.optt === 'PE') {
+          contractTokens.put.push(tokenData);
+        }
+      });
       
+      // Update the contract in the database with contractTokens including token and lp
+      await strapi.db.query('api::contract.contract').update({
+        where: { sampleContractTsym },
+        data: {
+          contractTokens,
+        },
+      });
+
+      return { contractTokens, message: 'Option chain processed successfully', status: true };
+
+    } catch (error) {
+      console.error("Error processing option chain:", error);
+      return { message: error.message || 'An error occurred while processing the option chain.', status: false };
+    }
   },
 
   //Custom service function to handle trade logic basis Flattrade touchline feed
   async handleFeed(feedData) {
-    
-    const { lp, tk } = feedData;
+
+    const { lp, tk, e } = feedData;
     if(!lp){
       return { message: 'Not a LTP message' };
-    }   
-    const headers = {
-      Authorization: `Bearer ${env('SPECIAL_TOKEN')}`, // Including the special token in the Authorization header
-    };  
-    const indexItem = await strapi.db.query('api::variable.variable').findOne({
-      where: { token: tk },
-      headers,
-    });
-  
-    if (!indexItem) {
-      return { error: 'Index not found for the provided token' };
-    }
-  
-    // Extract variables of the index
-    let {
-      basePrice, resistance1, resistance2, support1, support2, targetStep,
-      callOptionBought, putOptionBought,callBoughtAt, putBoughtAt, index,initialSpectatorMode,previousTradedPrice
-    } = indexItem;
-
-    if (basePrice === 0 || resistance1 === 0 || resistance2 === 0 || support1 === 0 || support2 === 0){        
-      return { message: `Investment variables not defined for ${index}`};
-    }
-    // Initialize a message collection
-    let message = '';
-
-    //Check if initialSpectatorMode is active
-    if(initialSpectatorMode){
-      if((lp <= basePrice + targetStep && lp >= basePrice - targetStep)
-        || (lp <= resistance1 + targetStep && lp >= resistance1 - targetStep)
-        || (lp <= resistance2 + targetStep && lp >= resistance2 - targetStep)
-        || (lp <= support1 + targetStep && lp >= support1 - targetStep)
-        || (lp <= support2 + targetStep && lp >= support2 - targetStep)
-      ){
-        //LP in investment hot zone. Turn off Spectator mode
-        initialSpectatorMode = false;
-        await strapi.db.query('api::variable.variable').update({
-          where: {token: tk},
-          data: {initialSpectatorMode},
+    } 
+    // Tokens for buy/sell operations
+    const buySellTokens = new Set(['26000', '26009', '26013', '26014', '26037']);
+    if (!buySellTokens.has(tk)) {
+      //NFO Price update received. Update lp for contract token
+      try {
+        // Retrieve all contracts
+        const contracts = await strapi.db.query('api::contract.contract').findMany();
+    
+        // Find the contract with the token in either call or put arrays
+        const contract = contracts.find(contract => {
+          return contract.contractTokens.call.some(call => call.token === tk) ||
+                 contract.contractTokens.put.some(put => put.token === tk);
         });
-      } else {
-        //LP in Passive zone. No action
-        await strapi.db.query('api::variable.variable').update({
-          where: {token: tk},
-          data: {
-            previousTradedPrice: lp,
+    
+        if (contract) {
+          // Determine if the token is in CALL or PUT and update lp
+          const tokenData = contract.contractTokens.call.find(call => call.token === tk) ||
+                            contract.contractTokens.put.find(put => put.token === tk);
+    
+          if (tokenData) {
+            tokenData.lp = lp;
+    
+            // Update the contract in the database
+            await strapi.db.query('api::contract.contract').update({
+              where: { id: contract.id },
+              data: { contractTokens: contract.contractTokens },
+            });
+    
+            return `Updated lp for token ${tk} in contract ID ${contract.id}`;
           }
-        });
-        message = `No actions taken at LTP ${lp}`;
-        message += '\n';
-        fs.appendFile('D:/output.txt',message,(err) => {
-          if(err) throw err;
-            console.log('Data written to output.txt');
-        });
-        return {message};
-      }
-    }
+        } else {
+          return `Token ${tk} not found in any contract.`;
+        }
     
-    let orderType;
-    let contractType;   
-    
-    //Buy CALL
-    if(!callOptionBought && !putOptionBought && !initialSpectatorMode ){
-      
-      if(((lp >= basePrice + targetStep && lp < resistance1 - targetStep) 
-        || (lp >= resistance1 + targetStep && lp < resistance2 - targetStep)
-        || (lp>= resistance2 + targetStep)
-        || (lp >= support1 + targetStep && lp < basePrice - targetStep)
-        || (lp >= support2 + targetStep && lp < support1 - targetStep))
-        && (previousTradedPrice === 0 || previousTradedPrice < lp)
-      ){
-        message = `Buying call at ${lp}.`;
-        console.log(message);
-        message += '\n';
-        fs.appendFile('D:/output.txt',message,(err) => {
-          if(err) throw err;
-          console.log('Data written to output.txt');
-        });
-
-        //call buy Flattrade API code here
-
-        orderType = 'BUY';
-        contractType = 'CALL';
-        const createdOrder = await strapi.service('api::order.order').placeOrder({orderType,contractType,index,lp});
+      } catch (error) {
+        return `Error updating contract token lp: ${error}`;        
+      }            
+    } else {
+        const headers = {
+            Authorization: `Bearer ${env('SPECIAL_TOKEN')}`, // Including the special token in the Authorization header
+          };  
+          const indexItem = await strapi.db.query('api::variable.variable').findOne({
+            where: { token: tk },
+            headers,
+          });
         
-        callOptionBought = true;
-        callBoughtAt = lp;
-        previousTradedPrice = lp;
-        const updatedVariable = await strapi.db.query('api::variable.variable').update({
-          where: {token : tk},
-          data: {
-            callOptionBought,
-            callBoughtAt,
-            previousTradedPrice,
+          if (!indexItem) {
+            return { error: 'Index not found for the provided token' };
           }
-        });
-        return {
-          message,
-          createdOrder,
-          updatedVariable
-        };
-      } else if(((lp <= basePrice - targetStep && lp > support1 + targetStep) 
-        || (lp <= support1 - targetStep && lp > support2 + targetStep)
-        || (lp <= support2 - targetStep)
-        || (lp <= resistance1 - targetStep && lp > basePrice + targetStep)
-        || (lp <= resistance2 - targetStep && lp > resistance1 + targetStep))
-        && (previousTradedPrice === 0 || previousTradedPrice > lp)
-      ){
-        message = `Buying PUT at ${lp}`;
-        console.log(message);
-        message += '\n';
-        fs.appendFile('D:/output.txt',message,(err) => {
-          if(err) throw err;
-          console.log('Data written to output.txt');
-        });
-        //PUT buy API
-        orderType = 'BUY';
-        contractType = 'PUT'
-        const createdOrder = await strapi.service('api::order.order').placeOrder({orderType,contractType,index,lp});
-        putOptionBought = true;
-        putBoughtAt = lp;
-        previousTradedPrice = lp;
-        const updatedVariable = await strapi.db.query('api::variable.variable').update({
-          where: {token : tk},
-          data: {              
-            putOptionBought,
-            putBoughtAt,
-            previousTradedPrice,
+        
+          // Extract variables of the index
+          let {
+            basePrice, resistance1, resistance2, support1, support2, targetStep,
+            callOptionBought, putOptionBought,callBoughtAt, putBoughtAt, token, index,initialSpectatorMode,previousTradedPrice, amount
+          } = indexItem;
+      
+          if (basePrice === 0 || resistance1 === 0 || resistance2 === 0 || support1 === 0 || support2 === 0){        
+            return { message: `Investment variables not defined for ${index}`};
           }
-        });
-        return{
-          message,
-          createdOrder,
-          updatedVariable
-        };
-      }
-    }
+          // Initialize a message collection
+          let message = '';
 
-    //Sell CALL
-    if(callOptionBought){
-      if(
-        ((lp >= basePrice && (callBoughtAt >= support1 + targetStep && callBoughtAt < basePrice)) || (lp <= basePrice && (callBoughtAt >= basePrice + targetStep &&callBoughtAt < resistance1)))
-        || ((lp >= resistance1 && (callBoughtAt >= basePrice + targetStep && callBoughtAt < resistance1)) || (lp <= resistance1 && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2)))
-        || ((lp >= support1 && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1)) || (lp <= support1 && (callBoughtAt >= support1 + targetStep && callBoughtAt < basePrice)))
-        || ((lp >=resistance2 && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2)) || (lp <= resistance2 && callBoughtAt  >= resistance2 + targetStep)) 
-        || ((lp >= support2 && callBoughtAt < support2) || (lp <= support2 && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1))) //Stop loss at Support 2
-      ){ 
-        message=`Selling CALL: Bought at ${callBoughtAt} Sold at ${lp}`;
-        console.log(message);
-        message += '\n';
-        fs.appendFile('D:/output.txt',message,(err) => {
-          if(err) throw err;
-          console.log('Data written to output.txt');
-        });
-        //call sell API
-        orderType = 'SELL';
-        contractType = 'CALL'
-        const createdOrder = await strapi.service('api::order.order').placeOrder({orderType,contractType,index,lp});
-        callOptionBought = false;
-        callBoughtAt = 0;
-        previousTradedPrice = lp;
-        const updatedVariable = await strapi.db.query('api::variable.variable').update({
-          where: {token : tk},
-          data: {
-            callOptionBought,
-            callBoughtAt,
-            previousTradedPrice,
+          //Fetch the relevant contract for the given token
+          const contract = await strapi.db.query('api::contract.contract').findOne({
+            where: { indexToken : token }
+          });
+          if(!contract || contract.token != token){
+            return "Some error fetching relevant contracts";
           }
-        });
-        return {
-          message,
-          createdOrder,
-          updatedVariable
-        };          
-      }
-    }
-
-    //Sell PUT
-    if(putOptionBought){
-      if(
-        ((lp <= basePrice && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)) || (lp >= basePrice && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)))
-        || ((lp <= support1 && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)) || (lp >= support1 && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)))
-        || ((lp <= resistance1 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1)) || (lp >= resistance1 && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)))
-        || ((lp <= support2 && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)) || (lp >= support2 && putBoughtAt <= support2 - targetStep))
-        || ((lp <= resistance2 && putBoughtAt > resistance2) || (lp >= resistance2 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1))) //Stop loss at Resistance 2
-      ){
-        message = `Selling PUT: Bought at ${putBoughtAt} Sold at ${lp}`;
-        console.log(message);
-        message += '\n';
-        fs.appendFile('D:/output.txt',message,(err) => {
-          if(err) throw err;
-          console.log('Data written to output.txt');
-        });
-        //PUT sell API
-        orderType = 'SELL';
-        contractType = 'PUT'
-        const createdOrder = await strapi.service('api::order.order').placeOrder({orderType,contractType,index,lp});
-        putOptionBought = false;
-        putBoughtAt = 0;
-        previousTradedPrice = lp;
-        const updatedVariable = await strapi.db.query('api::variable.variable').update({
-          where: {token: tk},
-          data: {
-            putOptionBought,
-            putBoughtAt,
-            previousTradedPrice,
-          }           
-        });
-        return {
-          message,
-          createdOrder,
-          updatedVariable
-        };
-      }
-    }
-
-    message = `No actions taken at LTP ${lp}`;
-    message += '\n';
-    await strapi.db.query('api::variable.variable').update({
-      where: {token: tk},
-      data: {
-        previousTradedPrice: lp,
-      }
-    });
-    fs.appendFile('D:/output.txt',message,(err) => {
-      if(err) throw err;
-      console.log('Data written to output.txt');
-    });      
-    return {message};
+          
+          const sessionToken = await strapi.service('api::authentication.authentication').fetchRequestToken();
+          //Check if initialSpectatorMode is active
+          if(initialSpectatorMode){
+            if((lp <= basePrice + targetStep && lp >= basePrice - targetStep)
+              || (lp <= resistance1 + targetStep && lp >= resistance1 - targetStep)
+              || (lp <= resistance2 + targetStep && lp >= resistance2 - targetStep)
+              || (lp <= support1 + targetStep && lp >= support1 - targetStep)
+              || (lp <= support2 + targetStep && lp >= support2 - targetStep)
+            ){
+              //LP in investment hot zone. Turn off Spectator mode
+              initialSpectatorMode = false;
+              await strapi.db.query('api::variable.variable').update({
+                where: {token: tk},
+                data: {initialSpectatorMode},
+              });
+            } else {
+              //LP in Passive zone. No action
+              await strapi.db.query('api::variable.variable').update({
+                where: {token: tk},
+                data: {
+                  previousTradedPrice: lp,
+                }
+              });
+              message = `No actions taken at LTP ${lp}`;
+              message += '\n';
+              fs.appendFile('D:/output.txt',message,(err) => {
+                if(err) throw err;
+                  console.log('Data written to output.txt');
+              });
+              return {message};
+            }
+          }
+          
+          
+          let contractType;   
+          
+          //Buy CALL
+          if(!callOptionBought && !putOptionBought && !initialSpectatorMode ){
+            
+            if(((lp >= basePrice + targetStep && lp < resistance1 - targetStep) 
+              || (lp >= resistance1 + targetStep && lp < resistance2 - targetStep)
+              || (lp>= resistance2 + targetStep)
+              || (lp >= support1 + targetStep && lp < basePrice - targetStep)
+              || (lp >= support2 + targetStep && lp < support1 - targetStep))
+              && (previousTradedPrice === 0 || previousTradedPrice < lp)
+            ){
+              
+              contractType = 'CALL';
+              const orderResponse = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,contract,sessionToken,amount});
+              if(!orderResponse.status){
+                message = `Buy order creation failed at ${lp}`;
+              }
+              message = `Buying call at ${lp}.`;
+              console.log(message);
+              message += '\n';
+              fs.appendFile('D:/output.txt',message,(err) => {
+                if(err) throw err;
+                console.log('Data written to output.txt');
+              });
+      
+              //call buy Flattrade API code here
+      
+              
+              // const createdOrder = await strapi.service('api::order.order').placeOrder({orderType,contractType,index,lp});
+              
+              callOptionBought = true;
+              callBoughtAt = lp;
+              previousTradedPrice = lp;
+              const updatedVariable = await strapi.db.query('api::variable.variable').update({
+                where: {token : tk},
+                data: {
+                  callOptionBought,
+                  callBoughtAt,
+                  previousTradedPrice,
+                }
+              });
+              return {
+                message,
+                // createdOrder,
+                updatedVariable
+              };
+            } else if(((lp <= basePrice - targetStep && lp > support1 + targetStep) 
+              || (lp <= support1 - targetStep && lp > support2 + targetStep)
+              || (lp <= support2 - targetStep)
+              || (lp <= resistance1 - targetStep && lp > basePrice + targetStep)
+              || (lp <= resistance2 - targetStep && lp > resistance1 + targetStep))
+              && (previousTradedPrice === 0 || previousTradedPrice > lp)
+            ){
+              message = `Buying PUT at ${lp}`;
+              console.log(message);
+              message += '\n';
+              fs.appendFile('D:/output.txt',message,(err) => {
+                if(err) throw err;
+                console.log('Data written to output.txt');
+              });
+              //PUT buy API
+              // orderType = 'BUY';
+              contractType = 'PUT'
+              // const createdOrder = await strapi.service('api::order.order').placeOrder({orderType,contractType,index,lp})
+              putOptionBought = true;
+              putBoughtAt = lp;
+              previousTradedPrice = lp;
+              const updatedVariable = await strapi.db.query('api::variable.variable').update({
+                where: {token : tk},
+                data: {              
+                  putOptionBought,
+                  putBoughtAt,
+                  previousTradedPrice,
+                }
+              });
+              return{
+                message,
+                // createdOrder,
+                updatedVariable
+              };
+            }
+          }
+      
+          //Sell CALL
+          if(callOptionBought){
+            if(
+              ((lp >= basePrice && (callBoughtAt >= support1 + targetStep && callBoughtAt < basePrice)) || (lp <= basePrice && (callBoughtAt >= basePrice + targetStep &&callBoughtAt < resistance1)))
+              || ((lp >= resistance1 && (callBoughtAt >= basePrice + targetStep && callBoughtAt < resistance1)) || (lp <= resistance1 && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2)))
+              || ((lp >= support1 && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1)) || (lp <= support1 && (callBoughtAt >= support1 + targetStep && callBoughtAt < basePrice)))
+              || ((lp >=resistance2 && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2)) || (lp <= resistance2 && callBoughtAt  >= resistance2 + targetStep)) 
+              || ((lp >= support2 && callBoughtAt < support2) || (lp <= support2 && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1))) //Stop loss at Support 2
+            ){ 
+              message=`Selling CALL: Bought at ${callBoughtAt} Sold at ${lp}`;
+              console.log(message);
+              message += '\n';
+              fs.appendFile('D:/output.txt',message,(err) => {
+                if(err) throw err;
+                console.log('Data written to output.txt');
+              });
+              //call sell API
+              // orderType = 'SELL';
+              contractType = 'CALL'
+              // const createdOrder = await strapi.service('api::order.order').placeOrder({orderType,contractType,index,lp});
+              callOptionBought = false;
+              callBoughtAt = 0;
+              previousTradedPrice = lp;
+              const updatedVariable = await strapi.db.query('api::variable.variable').update({
+                where: {token : tk},
+                data: {
+                  callOptionBought,
+                  callBoughtAt,
+                  previousTradedPrice,
+                }
+              });
+              return {
+                message,
+                // createdOrder,
+                updatedVariable
+              };          
+            }
+          }
+      
+          //Sell PUT
+          if(putOptionBought){
+            if(
+              ((lp <= basePrice && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)) || (lp >= basePrice && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)))
+              || ((lp <= support1 && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)) || (lp >= support1 && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)))
+              || ((lp <= resistance1 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1)) || (lp >= resistance1 && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)))
+              || ((lp <= support2 && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)) || (lp >= support2 && putBoughtAt <= support2 - targetStep))
+              || ((lp <= resistance2 && putBoughtAt > resistance2) || (lp >= resistance2 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1))) //Stop loss at Resistance 2
+            ){
+              message = `Selling PUT: Bought at ${putBoughtAt} Sold at ${lp}`;
+              console.log(message);
+              message += '\n';
+              fs.appendFile('D:/output.txt',message,(err) => {
+                if(err) throw err;
+                console.log('Data written to output.txt');
+              });
+              //PUT sell API
+              // orderType = 'SELL';
+              contractType = 'PUT'
+              // const createdOrder = await strapi.service('api::order.order').placeOrder({orderType,contractType,index,lp});
+              putOptionBought = false;
+              putBoughtAt = 0;
+              previousTradedPrice = lp;
+              const updatedVariable = await strapi.db.query('api::variable.variable').update({
+                where: {token: tk},
+                data: {
+                  putOptionBought,
+                  putBoughtAt,
+                  previousTradedPrice,
+                }           
+              });
+              return {
+                message,
+                // createdOrder,
+                updatedVariable
+              };
+            }
+          }
+      
+          message = `No actions taken at LTP ${lp}`;
+          message += '\n';
+          await strapi.db.query('api::variable.variable').update({
+            where: {token: tk},
+            data: {
+              previousTradedPrice: lp,
+            }
+          });
+          fs.appendFile('D:/output.txt',message,(err) => {
+            if(err) throw err;
+            console.log('Data written to output.txt');
+          });      
+          return {message};
+      }   
   },
   // Custom function to reset investment variables
   async resetInvestmentVariables() {

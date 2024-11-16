@@ -4,7 +4,8 @@
   "info": {
     "singularName": "contract",
     "pluralName": "contracts",
-    "displayName": "contract"
+    "displayName": "contract",
+    "description": ""
   },
   "options": {
     "draftAndPublish": false
@@ -17,8 +18,11 @@
     "index": {
       "type": "string"
     },
-    "symbols": {
+    "contractTokens": {
       "type": "json"
+    },
+    "indexToken": {
+      "type": "string"
     }
   }
 }

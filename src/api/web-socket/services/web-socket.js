@@ -1,16 +1,17 @@
 const WebSocket = require('ws');
 const { env } = require('@strapi/utils');
+const fs = require( 'fs' );
 
 module.exports = ({ strapi }) => ({
   flattradeWs: null,
 
-  async connectFlattradeWebSocket(userId, sessionToken, accountId) {
+  async connectFlattradeWebSocket(userId, sessionToken, accountId, scripList) {
     // Fetch all WebSocket configuration entries and get the first one
     const webSocketConfigs = await strapi.entityService.findMany('api::web-socket.web-socket', {
       limit: 1, // Fetch only the first entry
     });
     const flattradeWsUrl = webSocketConfigs[0]?.flattradeClientUrl || env('FLATTRAD_WS_URL');
-    const scripList = webSocketConfigs[0]?.scripList || 'NSE|26000#NSE|26009#NSE|26013#NSE|26037#NSE|26074';
+    
 
     if (!flattradeWsUrl) {
       throw new Error('WebSocket URL not found in database or environment.');
@@ -31,7 +32,7 @@ module.exports = ({ strapi }) => ({
 
     this.flattradeWs.on('close', () => {
       console.log('Flattrade WebSocket connection closed. Attempting reconnect...');
-      setTimeout(() => this.connectFlattradeWebSocket(userId, sessionToken, accountId), 3000);
+      setTimeout(() => this.connectFlattradeWebSocket(userId, sessionToken, accountId,scripList), 3000);
     });
 
     this.flattradeWs.on('error', (error) => {
@@ -66,6 +67,11 @@ module.exports = ({ strapi }) => ({
 
       case 'tk':
         console.log('Subscription acknowledged:', message);
+        let text = message;
+        text += '\n';
+        fs.appendFile('D:/output.txt',text,(err) => {
+          if(err) throw err;            
+        });
         break;
 
       case 'tf':

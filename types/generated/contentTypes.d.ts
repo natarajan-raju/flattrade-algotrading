@@ -402,6 +402,7 @@ export interface ApiAuthenticationAuthentication
 export interface ApiContractContract extends Struct.CollectionTypeSchema {
   collectionName: 'contracts';
   info: {
+    description: '';
     displayName: 'contract';
     pluralName: 'contracts';
     singularName: 'contract';
@@ -410,10 +411,12 @@ export interface ApiContractContract extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
+    contractTokens: Schema.Attribute.JSON;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     index: Schema.Attribute.String;
+    indexToken: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -422,7 +425,6 @@ export interface ApiContractContract extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
     sampleContractTsym: Schema.Attribute.String;
-    symbols: Schema.Attribute.JSON;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
