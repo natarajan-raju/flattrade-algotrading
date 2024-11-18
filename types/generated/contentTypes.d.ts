@@ -411,6 +411,7 @@ export interface ApiContractContract extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
+    contractBought: Schema.Attribute.JSON;
     contractTokens: Schema.Attribute.JSON;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -443,7 +444,7 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
-    boughtAtLtp: Schema.Attribute.String;
+    contractLp: Schema.Attribute.Decimal;
     contractToken: Schema.Attribute.String;
     contractTsym: Schema.Attribute.String;
     contractType: Schema.Attribute.String;
@@ -451,10 +452,13 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     index: Schema.Attribute.String;
+    indexLtp: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::order.order'> &
       Schema.Attribute.Private;
+    lotSize: Schema.Attribute.Integer;
     orderType: Schema.Attribute.String;
+    price: Schema.Attribute.Decimal;
     publishedAt: Schema.Attribute.DateTime;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -498,6 +502,7 @@ export interface ApiVariableVariable extends Struct.CollectionTypeSchema {
     putBoughtAt: Schema.Attribute.Decimal & Schema.Attribute.DefaultTo<0>;
     putOptionBought: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<false>;
+    quantity: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
     resistance1: Schema.Attribute.Decimal & Schema.Attribute.DefaultTo<0>;
     resistance2: Schema.Attribute.Decimal & Schema.Attribute.DefaultTo<0>;
     support1: Schema.Attribute.Decimal & Schema.Attribute.DefaultTo<0>;

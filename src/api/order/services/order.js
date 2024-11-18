@@ -1,5 +1,6 @@
 'use strict';
 const { env } = require('@strapi/utils');
+const contract = require('../../contract/controllers/contract');
 // @ts-ignore
 const { createCoreService } = require('@strapi/strapi').factories;
 
@@ -21,38 +22,49 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 smallestDifference = difference;
                 closestTokenData = tokenData;
             }
-          }  
-          
-        });
-      
-        return closestTokenData ? closestTokenData.token : null; // Return token ID or null if not found
-    },
-      
-    
+          }         
+        });      
+        return closestTokenData; // Return token ID or null if not found
+    }, 
 
-    // Place Order service
+    // Place BUY Order service
     async placeBuyOrder(orderData) {
         try {
-            const {  contractType, lp, contract, sessionToken, amount } = orderData;
+            const {  contractType, lp, contract, sessionToken, amount,quantity } = orderData;
             if (!contract ) {
                 return {
                     status: false,
-                    message: 'Error setting initial values. Please try again'
+                    message: 'No Contract passed to placeBuyOrder. Check HandleFeed..',
                 };
             }
+            console.log('test');
             const preferredToken = await this.getPreferredToken(contract.contractTokens, contractType, amount);
             console.log(preferredToken,preferredToken.lp);
             if(preferredToken.token){
+                const lotSize = quantity * preferredToken.ls;
+                const price = lotSize * preferredToken.lp;
+                const contractBought = {
+                    token: preferredToken.token,
+                    contractType,
+                    contractTsym: preferredToken.tsym,
+                    contractId: contract.id,
+                    lotSize,
+                }
                 const createdOrder = await strapi.db.query('api::order.order').create({
                     data: {
                         index: contract.index,
                         orderType: 'BUY',
                         contractType,                       
                         contractToken: preferredToken.token,
-                        boughtAtLtp: preferredToken.lp,
+                        indexLtp: lp,
                         contractTsym: preferredToken.tsym,
+                        lotSize,
+                        price,
+                        contractLp: preferredToken.lp,                        
                     }
+                
                 });
+                await strapi.db.query('api::contract.contract').update({ where: { id: contract.id }, data: { contractBought } });
                 return {
                     status: true,
                     message: 'Order placed successfully',
@@ -67,9 +79,46 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         } catch (error) {
             return {
                 status: false,
-                message: error.message || 'An error occurred while placing the order.'
+                message: error.message || 'An error occurred while placing the BUY order.'
             };
         }
     },
+
+    //Place SELL order Service
+    async placeSellOrder(orderData) {
+        try{
+            const { contractType, lp, sessionToken, index } = orderData;
+            const contractToBeSold = await strapi.db.query('api::contract.contract').findOne({
+                where: { index },
+            });
+            const contractLp = await strapi.service('api::contract.contract').getLpForOptionToken(contractToBeSold.contractBought.token, index);
+            //Insert Flattrade Sell Execution code here
+            const createdOrder = await strapi.db.query('api::order.order').create({
+                data: {
+                    index,
+                    orderType: 'SELL',
+                    contractType,
+                    contractTsym: contractToBeSold.contractBought.contractTsym,
+                    contractToken: contractToBeSold.contractBought.token,
+                    indexLtp: lp,
+                    lotSize: contractToBeSold.contractBought.lotSize,
+                    contractLp,
+                    price: contractLp * contractToBeSold.contractBought.lotSize,                                       
+                }
+            });
+            await strapi.db.query('api::contract.contract').update({ where: { id: contractToBeSold.id }, data: {
+                contractBought: {},
+            } });
+            return {
+                status: true,
+                message: 'Order placed successfully',
+            }
+        }catch(error){
+            return {
+                status: false,
+                message: error.message || 'An error occurred while placing the SELL order.'
+            };
+        }
+    }
 
 }));

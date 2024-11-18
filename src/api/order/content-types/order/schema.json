@@ -27,8 +27,17 @@
     "contractToken": {
       "type": "string"
     },
-    "boughtAtLtp": {
+    "indexLtp": {
       "type": "string"
+    },
+    "lotSize": {
+      "type": "integer"
+    },
+    "price": {
+      "type": "decimal"
+    },
+    "contractLp": {
+      "type": "decimal"
     }
   }
 }

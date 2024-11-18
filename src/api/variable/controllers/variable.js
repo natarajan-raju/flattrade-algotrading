@@ -16,7 +16,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         const accountId = env('FLATTRADE_ACCOUNT_ID');
         const requestTokenResponse = await strapi.service('api::authentication.authentication').fetchRequestToken();
         if(!requestTokenResponse.requestToken){
-            return ctx.send({ error: 'Request token not found' });
+            return ctx.send({ error: 'Request token not found', status: false });
         }
         const sessionToken = requestTokenResponse.requestToken;
         
@@ -28,15 +28,20 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
           support2,
           token,
           amount,
-          expiry
+          expiry,
+          quantity
         } = ctx.request.body;
     
         const index = await strapi.db.query('api::variable.variable').findOne({
             where: { token },  // Filter by token
         });       
         
-        if (!index) {
-            return ctx.send({ error: 'Index not found for the provided token' });
+        if (!index || !quantity || !expiry || !amount || !token || !basePrice || !resistance1 || !resistance2 || !support1 || !support2) {
+            return ctx.send({ error: 'Either Index not found for the provided token or invalid payload provided', status: false, });
+        }
+
+        if(quantity <= 0 || amount <= 0){
+            return ctx.send({ error: 'Invalid amount or quantity', status: false });
         }
         
         let existingContract;
@@ -52,7 +57,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                 body: payload, 
             });
             const contracts = await contractsResponse.json();  
-            console.log(contracts.values)          
+                      
             if(contracts.values && contracts.values.length > 0 ){                         
                 existingContract = await strapi.db.query('api::contract.contract').findOne(
                     {
@@ -69,25 +74,32 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                             indexToken: index.token,                            
                         },
                     });
+                }
+                
+                const orderData = {
+                    contractType: 'CALL',
+                    lp: basePrice,                    
+                    sessionToken,
+                    index: index.index,
                 }                
-                
+                await strapi.service('api::order.order').placeSellOrder(orderData);
                
-                const optionChainResponse = await strapi.service('api::variable.variable').processOptionChain(existingContract.sampleContractTsym,sessionToken);     
+                // const optionChainResponse = await strapi.service('api::variable.variable').processOptionChain(existingContract.sampleContractTsym,sessionToken);     
                 
-                if(!optionChainResponse.status){
-                    return {"updatedData": null, "emsg": "There is some error fetching relevant scrips. Please try again with proper data", "message": optionChainResponse.message};
-                } else {
-                    // Destructure contractTokens from the response
-                    const { contractTokens } = optionChainResponse;
+                // if(!optionChainResponse.status){
+                //     return {"updatedData": null, status: false, "emsg": "There is some error fetching relevant scrips. Please try again with proper data", "message": optionChainResponse.message};
+                // } else {
+                //     // Destructure contractTokens from the response
+                //     const { contractTokens } = optionChainResponse;
 
-                    // Prepare the scripList string for WebSocket subscription
-                    scripList += [
-                        ...contractTokens.call.map(tokenObj => `NFO|${tokenObj.token}`),
-                        ...contractTokens.put.map(tokenObj => `NFO|${tokenObj.token}`)
-                    ].join('#');
+                //     // Prepare the scripList string for WebSocket subscription
+                //     scripList += [
+                //         ...contractTokens.call.map(tokenObj => `NFO|${tokenObj.token}`),
+                //         ...contractTokens.put.map(tokenObj => `NFO|${tokenObj.token}`)
+                //     ].join('#');
 
                     
-                } 
+                // } 
                  
             } else {
                 return {"updatedData": null, "message": "Either the expiry data provided is wrong or there is some error fetching relevant scrips. Please try again with proper data"};
@@ -97,22 +109,14 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         }catch(error){
             return {
                 error,                
-                updatedIndex: null
+                updatedIndex: null,
+                status: false,
             }
         }
         
 
-        // //Sample order trigger
-        // await strapi.service('api::order.order').placeOrder({
-        //     orderType: 'BUY',
-        //     contractType: 'CALL',
-        //     index: index.index,
-        //     lp: 24000,
-        //     contractId: existingContract.id,
-        //     sessionToken,
-        //     amount
-        // });
-        // //Retrieve relevant contracts with the given expiry dates
+       
+        //Retrieve relevant contracts with the given expiry dates
            
         
         // Step 2: Update values for the found index
@@ -125,7 +129,8 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             support1,
             support2,
             expiry,
-            amount, // Store the investment amount           
+            amount, // Store the investment amount
+            quantity,           
             initialSpectatorMode: true,
             previousTradedPrice: 0,
             },
@@ -133,7 +138,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         
                 
         // Step 3: Connect to Flattrade WebSocket        
-        await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(userId, sessionToken, accountId, scripList);
+        // await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(userId, sessionToken, accountId, scripList);
         return {
             message: "Investment variables updated successfully",
             updatedIndex,            

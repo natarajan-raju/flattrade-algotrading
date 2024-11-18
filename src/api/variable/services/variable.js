@@ -36,7 +36,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
       // Iterate over the option chain values to populate call and put objects
       optionChain.values.forEach(option => {
-        const tokenData = { token: option.token, lp: 0, tsym: option.tsym }; // Initialize lp as 0
+        const tokenData = { token: option.token, lp: 0, tsym: option.tsym, ls: option.ls }; // Initialize lp as 0
 
         if (option.optt === 'CE') {
           contractTokens.call.push(tokenData);
@@ -121,7 +121,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           // Extract variables of the index
           let {
             basePrice, resistance1, resistance2, support1, support2, targetStep,
-            callOptionBought, putOptionBought,callBoughtAt, putBoughtAt, token, index,initialSpectatorMode,previousTradedPrice, amount
+            callOptionBought, putOptionBought,callBoughtAt, putBoughtAt, token, index,initialSpectatorMode,previousTradedPrice, amount, quantity
           } = indexItem;
       
           if (basePrice === 0 || resistance1 === 0 || resistance2 === 0 || support1 === 0 || support2 === 0){        
@@ -134,7 +134,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           const contract = await strapi.db.query('api::contract.contract').findOne({
             where: { indexToken : token }
           });
-          if(!contract || contract.token != token){
+          if(!contract){
             return "Some error fetching relevant contracts";
           }
           
@@ -185,28 +185,20 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               && (previousTradedPrice === 0 || previousTradedPrice < lp)
             ){
               
-              contractType = 'CALL';
-              const orderResponse = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,contract,sessionToken,amount});
-              if(!orderResponse.status){
-                message = `Buy order creation failed at ${lp}`;
-              }
+              
               message = `Buying call at ${lp}.`;
               console.log(message);
               message += '\n';
               fs.appendFile('D:/output.txt',message,(err) => {
                 if(err) throw err;
                 console.log('Data written to output.txt');
-              });
-      
-              //call buy Flattrade API code here
-      
+              });     
               
-              // const createdOrder = await strapi.service('api::order.order').placeOrder({orderType,contractType,index,lp});
               
               callOptionBought = true;
               callBoughtAt = lp;
               previousTradedPrice = lp;
-              const updatedVariable = await strapi.db.query('api::variable.variable').update({
+              let updatedVariable = await strapi.db.query('api::variable.variable').update({
                 where: {token : tk},
                 data: {
                   callOptionBought,
@@ -214,11 +206,30 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   previousTradedPrice,
                 }
               });
-              return {
-                message,
-                // createdOrder,
-                updatedVariable
-              };
+              contractType = 'CALL';
+              const orderResponse = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,contract,sessionToken,amount,quantity});
+              if(!orderResponse.status){
+                message = `Buy order creation failed at ${lp}`;
+                updatedVariable = await strapi.db.query('api::variable.variable').update({
+                  where: { token:tk },
+                  data: {
+                    callOptionBought: false,
+                    callBoughtAt: 0,
+                  },                
+                });
+                return {
+                  message,
+                  status: false,
+                  updatedVariable,
+                }
+              } else {
+                  return {
+                    message,
+                    status: true,
+                    updatedVariable
+                  };
+              }
+              
             } else if(((lp <= basePrice - targetStep && lp > support1 + targetStep) 
               || (lp <= support1 - targetStep && lp > support2 + targetStep)
               || (lp <= support2 - targetStep)

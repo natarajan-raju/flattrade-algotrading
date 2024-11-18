@@ -74,6 +74,10 @@
     },
     "expiry": {
       "type": "date"
+    },
+    "quantity": {
+      "type": "integer",
+      "default": 0
     }
   }
 }

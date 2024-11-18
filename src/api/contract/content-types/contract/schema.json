@@ -23,6 +23,9 @@
     },
     "indexToken": {
       "type": "string"
+    },
+    "contractBought": {
+      "type": "json"
     }
   }
 }
