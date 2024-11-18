@@ -14,10 +14,7 @@ module.exports = createCoreService('api::contract.contract', ({ strapi }) => ({
         console.log('Contract variables cleared');
     },
 
-    async getLpForOptionToken(token, index){
-        const contract = await strapi.db.query('api::contract.contract').findOne({
-            where: { index },
-        });
+    async getLpForOptionToken(token, contract){        
         if(!contract){
             return {
                 status: false,
@@ -46,7 +43,7 @@ module.exports = createCoreService('api::contract.contract', ({ strapi }) => ({
         // Token not found in either array
         return {
             status: false,
-            message: `Token: ${token} not found in contractTokens for index: ${index}`,
+            message: `Token: ${token} not found in contractTokens for index: ${contract.index}`,
         }        
     },
 

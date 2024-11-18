@@ -76,30 +76,24 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                     });
                 }
                 
-                const orderData = {
-                    contractType: 'CALL',
-                    lp: basePrice,                    
-                    sessionToken,
-                    index: index.index,
-                }                
-                await strapi.service('api::order.order').placeSellOrder(orderData);
-               
-                // const optionChainResponse = await strapi.service('api::variable.variable').processOptionChain(existingContract.sampleContractTsym,sessionToken);     
                 
-                // if(!optionChainResponse.status){
-                //     return {"updatedData": null, status: false, "emsg": "There is some error fetching relevant scrips. Please try again with proper data", "message": optionChainResponse.message};
-                // } else {
-                //     // Destructure contractTokens from the response
-                //     const { contractTokens } = optionChainResponse;
+               //Generate Option chain for the sample contract
+                const optionChainResponse = await strapi.service('api::variable.variable').processOptionChain(existingContract.sampleContractTsym,sessionToken);     
+                
+                if(!optionChainResponse.status){
+                    return {"updatedData": null, status: false, "emsg": "There is some error fetching relevant scrips. Please try again with proper data", "message": optionChainResponse.message};
+                } else {
+                    // Destructure contractTokens from the response
+                    const { contractTokens } = optionChainResponse;
 
-                //     // Prepare the scripList string for WebSocket subscription
-                //     scripList += [
-                //         ...contractTokens.call.map(tokenObj => `NFO|${tokenObj.token}`),
-                //         ...contractTokens.put.map(tokenObj => `NFO|${tokenObj.token}`)
-                //     ].join('#');
+                    // Prepare the scripList string for WebSocket subscription
+                    scripList += [
+                        ...contractTokens.call.map(tokenObj => `NFO|${tokenObj.token}`),
+                        ...contractTokens.put.map(tokenObj => `NFO|${tokenObj.token}`)
+                    ].join('#');
 
                     
-                // } 
+                } 
                  
             } else {
                 return {"updatedData": null, "message": "Either the expiry data provided is wrong or there is some error fetching relevant scrips. Please try again with proper data"};
@@ -138,7 +132,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         
                 
         // Step 3: Connect to Flattrade WebSocket        
-        // await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(userId, sessionToken, accountId, scripList);
+        await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(userId, sessionToken, accountId, scripList);
         return {
             message: "Investment variables updated successfully",
             updatedIndex,            

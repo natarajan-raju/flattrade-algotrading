@@ -87,11 +87,11 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     //Place SELL order Service
     async placeSellOrder(orderData) {
         try{
-            const { contractType, lp, sessionToken, index } = orderData;
+            const { contractType, lp,contract, sessionToken, index } = orderData;
             const contractToBeSold = await strapi.db.query('api::contract.contract').findOne({
                 where: { index },
             });
-            const contractLp = await strapi.service('api::contract.contract').getLpForOptionToken(contractToBeSold.contractBought.token, index);
+            const contractLp = await strapi.service('api::contract.contract').getLpForOptionToken(contractToBeSold.contractBought.token,contract);
             //Insert Flattrade Sell Execution code here
             const createdOrder = await strapi.db.query('api::order.order').create({
                 data: {
