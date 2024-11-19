@@ -119,6 +119,27 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 message: error.message || 'An error occurred while placing the SELL order.'
             };
         }
-    }
+    },
+
+    async handleOrderbookFeed(feedData){
+        try{
+            const { norenordno,prc,status } = feedData;
+            const order = await strapi.db.query('api::order.order').findOne({
+                where: { norenordno },
+            });
+            if(order){
+                await strapi.db.query('api::order.order').update({ where: { id: order.id }, data: {
+                    orderStatus: status,
+                    prc,
+                } 
+                });
+            }else{
+                return {'status': false, message: 'Order not found'};
+            }
+            return {'status': true, message: 'Orderbook feed processed successfully'};
+             }catch(error){
+                return {status: false, message: error || 'An error occurred while processing the orderbook feed.'};
+        }
+    },
 
 }));

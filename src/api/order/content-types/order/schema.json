@@ -38,6 +38,15 @@
     },
     "contractLp": {
       "type": "decimal"
+    },
+    "norenordno": {
+      "type": "string"
+    },
+    "orderStatus": {
+      "type": "string"
+    },
+    "remarks": {
+      "type": "string"
     }
   }
 }

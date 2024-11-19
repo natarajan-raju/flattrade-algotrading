@@ -1,6 +1,7 @@
 const WebSocket = require('ws');
 const { env } = require('@strapi/utils');
 const fs = require( 'fs' );
+const { subscribe } = require('diagnostics_channel');
 
 module.exports = ({ strapi }) => ({
   flattradeWs: null,
@@ -60,6 +61,7 @@ module.exports = ({ strapi }) => ({
         if (message.s === 'OK') {
           console.log('Connection acknowledged for user:', message.uid);
           this.subscribeTouchline(scripList);
+          this.subscribeOrderbook();
         } else {
           console.error('Connection failed: Invalid user ID or session token.');
         }
@@ -77,6 +79,10 @@ module.exports = ({ strapi }) => ({
       case 'tf':
         console.log('Touchline feed:', message);
         this.handleTouchlineFeed(message);
+        break;
+      
+      case 'om':
+        this.handleOrderbookFeed(message);
         break;
 
       case 'uk':
@@ -97,9 +103,26 @@ module.exports = ({ strapi }) => ({
     this.flattradeWs.send(JSON.stringify(subscribePayload));
   },
 
+  subscribeOrderbook(){
+    const subscribePayload = {
+      t: 'o',
+      actid: `${env('FLATTRADE_ACCOUNT_ID')}`,
+    };
+    this.flattradeWs.send(JSON.stringify(subscribePayload));
+  },
+
   async handleTouchlineFeed(feedData) {
     try {    
       const result = await strapi.service('api::variable.variable').handleFeed(feedData);
+      console.log('Feed processed by controller:', result);
+    } catch (error) {
+      console.error('Error processing feed:', error);
+    }
+  },
+
+  async handleOrderbookFeed(feedData) {
+    try {    
+      const result = await strapi.service('api::order.order').handleOrderbookFeed(feedData);
       console.log('Feed processed by controller:', result);
     } catch (error) {
       console.error('Error processing feed:', error);
