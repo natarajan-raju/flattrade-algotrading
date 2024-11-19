@@ -18,15 +18,15 @@ module.exports = {
               middlewares: [],
             },
         },
-        // {
-        //     method: 'POST',
-        //     path: '/variables/handleFeed',
-        //     handler: 'api::variable.variable.handleFeed', // Your custom token handling logic
-        //     config: {
-        //       policies: [],
-        //       middlewares: [],
-        //     },
-        // },
+        {
+            method: 'GET',
+            path: '/variables/stopTrading',
+            handler: 'api::variable.variable.stopTrading', // Your custom token handling logic
+            config: {
+              policies: [],
+              middlewares: [],
+            },
+        },
         {
             method: 'GET',
             path: '/variables',
