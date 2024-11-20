@@ -437,6 +437,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       }
 
       console.log("Investment variables reset for Market Stop");
+      if(strapi.webSocket && strapi.webSocket.broadcast){
+        strapi.webSocket.broadcast({action: 'stopTrading'});
+      }
     } catch (error) {
       console.error("Error resetting investment variables:", error);
     }
