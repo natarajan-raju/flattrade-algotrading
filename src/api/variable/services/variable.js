@@ -379,7 +379,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         callOptionBought: false,
         putOptionBought: false,
         callBoughtAt: 0,
-        putBoughtAt: 0
+        putBoughtAt: 0,
+        quantity: 0,        
       };
 
       const headers = {
@@ -414,7 +415,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         resistance2: 0,
         support1: 0,
         support2: 0,
-        amount: 0,                        
+        amount: 0,
+        quantity: 0,                        
       };
 
       const headers = {

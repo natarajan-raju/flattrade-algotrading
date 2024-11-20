@@ -141,9 +141,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
 
     //Stop Trading
     async stopTrading(ctx) {
-        await strapi.service('api::variable.variable').stopTrading();
-        await strapi.service('api::contract.contract').clearContractVariables();
-        await strapi.service('api::variable.variable').resetInvestmentVariables();
+        await strapi.service('api::variable.variable').stopTrading();        
         return ctx.send({ message: "Application is stopped now. ", status: true, });
     }    
     
