@@ -68,12 +68,7 @@ module.exports = ({ strapi }) => ({
         break;
 
       case 'tk':
-        console.log('Subscription acknowledged:', message);
-        let text = message;
-        text += '\n';
-        fs.appendFile('D:/output.txt',text,(err) => {
-          if(err) throw err;            
-        });
+        console.log('Subscription acknowledged:', message);        
         break;
 
       case 'tf':

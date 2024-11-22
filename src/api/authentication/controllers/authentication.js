@@ -83,4 +83,5 @@ module.exports = createCoreController('api::authentication.authentication',({str
         return ctx.redirect(302, redirectUrl);
       },
 
+
 }));

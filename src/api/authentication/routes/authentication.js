@@ -19,7 +19,7 @@ module.exports = {
         policies: [],
         middlewares: [],
       },
-  },
+    },    
     {
       method: 'GET',
       path: '/authentications',
