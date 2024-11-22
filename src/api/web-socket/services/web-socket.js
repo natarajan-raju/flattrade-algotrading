@@ -71,8 +71,7 @@ module.exports = ({ strapi }) => ({
         console.log('Subscription acknowledged:', message);        
         break;
 
-      case 'tf':
-        console.log('Touchline feed:', message);
+      case 'tf':        
         this.handleTouchlineFeed(message);
         break;
       

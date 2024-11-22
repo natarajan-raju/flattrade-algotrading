@@ -57,6 +57,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                 body: payload, 
             });
             const contracts = await contractsResponse.json();  
+            
                       
             if(contracts.values && contracts.values.length > 0 ){                         
                 existingContract = await strapi.db.query('api::contract.contract').findOne(

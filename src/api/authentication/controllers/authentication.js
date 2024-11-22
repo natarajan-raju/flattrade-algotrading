@@ -1,8 +1,7 @@
 'use strict';
 const { env } = require('@strapi/utils');
 const { sha256 } = require('js-sha256');
-// const {fetchRequestToken } = require('../../../../config/functions/fetchRequestToken');
-// const { fetchRequestToken } = strapi.service('api::authentication.authentication');
+
 
 /**
  * authentication controller

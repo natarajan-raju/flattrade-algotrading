@@ -176,43 +176,35 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               || (lp >= support1 + targetStep && lp < basePrice - targetStep)
               || (lp >= support2 + targetStep && lp < support1 - targetStep))
               && (previousTradedPrice === 0 || previousTradedPrice < lp)
-            ){ 
-              //Buy CALL
-              callOptionBought = true;
-              callBoughtAt = lp;
-              previousTradedPrice = lp;
-              let updatedVariable = await strapi.db.query('api::variable.variable').update({
-                where: {token : tk},
-                data: {
-                  callOptionBought,
-                  callBoughtAt,
-                  previousTradedPrice,
-                }
-              });
-              contractType = 'CALL';
-              const orderResponse = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,contract,sessionToken,amount,quantity});
-              if(!orderResponse.status){
-                let message = `Buy order creation failed at ${lp}`;
-                updatedVariable = await strapi.db.query('api::variable.variable').update({
-                  where: { token:tk },
+            ){
+              try{
+                //Buy CALL
+                callOptionBought = true;
+                callBoughtAt = lp;
+                previousTradedPrice = lp;
+                let updatedVariable = await strapi.db.query('api::variable.variable').update({
+                  where: {token : tk},
                   data: {
-                    callOptionBought: false,
-                    callBoughtAt: 0,
-                  },                
+                    callOptionBought,
+                    callBoughtAt,
+                    previousTradedPrice,
+                  }
                 });
+                contractType = 'CALL';
+                await strapi.service('api::order.order').placeBuyOrder({contractType,lp,contract,sessionToken,amount,quantity});
                 return {
-                  message,
-                  status: false,
+                  status: true,
+                  message: 'CALL buy Order placed successfully',
                   updatedVariable,
                 }
-              } else {
-                  return {
-                    message: 'Buy order created successfully',
-                    status: true,
-                    updatedVariable
-                  };
-              }
-              
+              }catch(error){
+                console.log(error);
+                return {
+                  status: false,
+                  message: 'Error placing CALL buy order',
+                  error,
+                }                
+              }            
             } else if(((lp <= basePrice - targetStep && lp > support1 + targetStep) 
               || (lp <= support1 - targetStep && lp > support2 + targetStep)
               || (lp <= support2 - targetStep)
@@ -220,41 +212,35 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               || (lp <= resistance2 - targetStep && lp > resistance1 + targetStep))
               && (previousTradedPrice === 0 || previousTradedPrice > lp)
             ){
-              //Buy PUT                            
-              contractType = 'PUT';
-              putOptionBought = true;
-              putBoughtAt = lp;
-              previousTradedPrice = lp;
-              let updatedVariable = await strapi.db.query('api::variable.variable').update({
-                where: {token : tk},
-                data: {              
-                  putOptionBought,
-                  putBoughtAt,
-                  previousTradedPrice,
-                }
+              //Buy PUT 
+              try{
+                contractType = 'PUT';
+                putOptionBought = true;
+                putBoughtAt = lp;
+                previousTradedPrice = lp;
+                let updatedVariable = await strapi.db.query('api::variable.variable').update({
+                  where: {token : tk},
+                  data: {              
+                    putOptionBought,
+                    putBoughtAt,
+                    previousTradedPrice,
+                  }
               });
-              const orderResponse = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,contract,sessionToken,amount,quantity});
-              if(!orderResponse.status){
-                let message = `Buy order creation failed at ${lp}`;
-                updatedVariable = await strapi.db.query('api::variable.variable').update({
-                  where: { token:tk },
-                  data: {
-                    putOptionBought: false,
-                    putBoughtAt: 0, 
-                  },
-                });
+              await strapi.service('api::order.order').placeBuyOrder({contractType,lp,contract,sessionToken,amount,quantity});
+              return {
+                status: true,
+                message: 'PUT buy Order placed successfully',
+                updatedVariable,              
+              }
+              }catch(error){
+                console.log(error);
                 return {
-                  message,
                   status: false,
-                  updatedVariable
-                };
-              } else {
-                return {
-                  message: 'Buy order created successfully',
-                  status: true,
-                  updatedVariable
+                  message: 'Error placing PUT buy order',
+                  error,
                 }
-              }              
+              }                           
+                            
             }
           }
       
@@ -267,46 +253,34 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               || ((lp >=resistance2 && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2)) || (lp <= resistance2 && callBoughtAt  >= resistance2 + targetStep)) 
               || ((lp >= support2 && callBoughtAt < support2) || (lp <= support2 && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1))) //Stop loss at Support 2
             ){              
-              //call sell API              
-              contractType = 'CALL';              
-              callOptionBought = false;              
-              previousTradedPrice = lp;
-              let updatedVariable = await strapi.db.query('api::variable.variable').update({
-                where: {token : tk},
-                data: {
-                  callOptionBought,                  
-                  previousTradedPrice,
-                }
-              });
-              const orderResponse = await strapi.service('api::order.order').placeSellOrder({contractType,lp,contract,sessionToken,index});
-              if(!orderResponse.status){
-                let message = `Sell order creation failed at ${lp}`;
-                updatedVariable = await strapi.db.query('api::variable.variable').update({
-                  where: { token:tk },
+              //call sell API
+              try{
+                contractType = 'CALL';              
+                callOptionBought = false; 
+                callBoughtAt = 0;             
+                previousTradedPrice = lp;
+                let updatedVariable = await strapi.db.query('api::variable.variable').update({
+                  where: {token : tk},
                   data: {
-                    callOptionBought: true, 
-                  },
+                    callOptionBought,                  
+                    previousTradedPrice,
+                    callBoughtAt,
+                  }
                 });
+                await strapi.service('api::order.order').placeSellOrder({contractType,lp,contract,sessionToken,index});
+                return {
+                  status: true,
+                  message: 'CALL sell Order placed successfully',
+                  updatedVariable,              
+                }
+              }catch(error){
+                console.log(error);
                 return {
                   status: false,
-                  message,
-                  updatedVariable
+                  message: 'Error placing CALL sell order',
+                  error,
                 }
-              } else{
-                let message = `Sell order created successfully at ${lp}`;
-                updatedVariable = await strapi.db.query('api::variable.variable').update({
-                  where: { token:tk },
-                  data: {
-                    callOptionBought: false,
-                    callBoughtAt: 0, 
-                  },
-                });
-                return {
-                  message,
-                  status: true,
-                  updatedVariable
-                }
-              };                       
+              }                                    
             }
           }
       
@@ -319,47 +293,35 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               || ((lp <= support2 && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)) || (lp >= support2 && putBoughtAt <= support2 - targetStep))
               || ((lp <= resistance2 && putBoughtAt > resistance2) || (lp >= resistance2 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1))) //Stop loss at Resistance 2
             ){              
-              //PUT sell API              
-              contractType = 'PUT';             
-              putOptionBought = false;              
-              previousTradedPrice = lp;
-              let updatedVariable = await strapi.db.query('api::variable.variable').update({
-                where: {token: tk},
-                data: {
-                  putOptionBought,                  
-                  previousTradedPrice,
-                }           
-              });
-              const orderResponse = await strapi.service('api::order.order').placeSellOrder({contractType,lp,contract,sessionToken,index});
-              if(!orderResponse.status){
-                let message = `Sell order creation failed at ${lp}`;
-                updatedVariable = await strapi.db.query('api::variable.variable').update({
-                  where: { token:tk },
+              //PUT sell API 
+              try{
+                contractType = 'PUT';             
+                putOptionBought = false;  
+                putBoughtAt = 0;            
+                previousTradedPrice = lp;
+                let updatedVariable = await strapi.db.query('api::variable.variable').update({
+                  where: {token: tk},
                   data: {
-                    putOptionBought: true, 
-                  },
+                    putOptionBought,                  
+                    previousTradedPrice,
+                    putBoughtAt
+                  }           
                 });
+                await strapi.service('api::order.order').placeSellOrder({contractType,lp,contract,sessionToken,index});
+                return {
+                  status: true,
+                  message: 'PUT sell Order placed successfully',
+                  updatedVariable,
+                }
+              }catch(error){
+                console.log(error);
                 return {
                   status: false,
-                  message,
-                  updatedVariable
+                  message: 'Error placing PUT sell order',
+                  error,
                 }
-              }else{
-                let message = `Sell order created successfully at ${lp}`;
-                updatedVariable = await strapi.db.query('api::variable.variable').update({
-                  where: { token:tk },
-                  data: {
-                    putOptionBought: false,
-                    putBoughtAt: 0, 
-                  },
-                });
-                return {
-                  message,
-                  status: true,
-                  updatedVariable
-                }
-              }
-              
+              }             
+                            
             }
           }         
       }   
