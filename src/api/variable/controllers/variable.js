@@ -16,7 +16,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         const accountId = env('FLATTRADE_ACCOUNT_ID');
         const requestTokenResponse = await strapi.service('api::authentication.authentication').fetchRequestToken();
         if(!requestTokenResponse.requestToken){
-            return ctx.send({ error: 'Request token not found', status: false });
+            return ctx.send({ message: 'Request token not found', status: false });
         }
         const sessionToken = requestTokenResponse.requestToken;
         
@@ -37,11 +37,11 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         });       
         
         if (!index || !quantity || !expiry || !amount || !token || !basePrice || !resistance1 || !resistance2 || !support1 || !support2) {
-            return ctx.send({ error: 'Either Index not found for the provided token or invalid payload provided', status: false, });
+            return ctx.send({ message: 'Either Index not found for the provided token or invalid payload provided', status: false, });
         }
 
         if(quantity <= 0 || amount <= 0){
-            return ctx.send({ error: 'Invalid amount or quantity', status: false });
+            return ctx.send({ message: 'Invalid amount or quantity', status: false });
         }
         
         let existingContract;
@@ -57,7 +57,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                 body: payload, 
             });
             const contracts = await contractsResponse.json();  
-            
+             
                       
             if(contracts.values && contracts.values.length > 0 ){                         
                 existingContract = await strapi.db.query('api::contract.contract').findOne(
@@ -82,7 +82,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                 const optionChainResponse = await strapi.service('api::variable.variable').processOptionChain(existingContract.sampleContractTsym,sessionToken);     
                 
                 if(!optionChainResponse.status){
-                    return {"updatedData": null, status: false, "emsg": "There is some error fetching relevant scrips. Please try again with proper data", "message": optionChainResponse.message};
+                    return {"updatedData": null, status: false, "message":optionChainResponse.message};
                 } else {
                     // Destructure contractTokens from the response
                     const { contractTokens } = optionChainResponse;
@@ -97,13 +97,13 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                 } 
                  
             } else {
-                return {"updatedData": null, "message": "Either the expiry data provided is wrong or there is some error fetching relevant scrips. Please try again with proper data"};
+                return {"status": false, "updatedData": null, "message": "Either the expiry data provided is wrong or there is some error fetching relevant scrips. Please try again with proper data"};
             }
                          
             
         }catch(error){
             return {
-                error,                
+                message: error,                
                 updatedIndex: null,
                 status: false,
             }
@@ -135,15 +135,15 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         // Step 3: Connect to Flattrade WebSocket        
         await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(userId, sessionToken, accountId, scripList);
         return {
-            message: "Investment variables updated successfully",
+            message: "Investment variables updated successfully. Market watching started.",
+            status: true,
             updatedIndex,            
         }
     },
 
     //Stop Trading
-    async stopTrading(ctx) {
-        await strapi.service('api::variable.variable').stopTrading();        
-        return ctx.send({ message: "Application is stopped now. ", status: true, });
+    async stopTrading(ctx) {       
+        return ctx.send(await strapi.service('api::variable.variable').stopTrading());
     }    
     
 }));
@@ -158,5 +158,5 @@ function convertDateFormat(inputDate) {
     const monthIndex = parseInt(month, 10) - 1; // Convert month from 1-based to 0-based index
     
     const formattedDate = `${day}${monthNames[monthIndex]}${year.toString().slice(-2)}C`;
-    return formattedDate;
+    return formattedDate;    
 }

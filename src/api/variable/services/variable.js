@@ -106,6 +106,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         return `Error updating contract token lp: ${error}`;        
       }            
     } else {
+        strapi.webSocket.broadcast({
+          type: 'index',
+          data: feedData,          
+          status: true
+        })
         const headers = {
             Authorization: `Bearer ${env('SPECIAL_TOKEN')}`, // Including the special token in the Authorization header
           };  
@@ -177,6 +182,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               || (lp >= support2 + targetStep && lp < support1 - targetStep))
               && (previousTradedPrice === 0 || previousTradedPrice < lp)
             ){
+              
+              strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy CALL at LTP ${lp}`, status: true});
               try{
                 //Buy CALL
                 callOptionBought = true;
@@ -211,7 +218,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               || (lp <= resistance1 - targetStep && lp > basePrice + targetStep)
               || (lp <= resistance2 - targetStep && lp > resistance1 + targetStep))
               && (previousTradedPrice === 0 || previousTradedPrice > lp)
-            ){
+            ){             
+              strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`, status: true});
               //Buy PUT 
               try{
                 contractType = 'PUT';
@@ -253,6 +261,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               || ((lp >=resistance2 && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2)) || (lp <= resistance2 && callBoughtAt  >= resistance2 + targetStep)) 
               || ((lp >= support2 && callBoughtAt < support2) || (lp <= support2 && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1))) //Stop loss at Support 2
             ){              
+              strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell CALL at LTP ${lp}`, status: true});     
               //call sell API
               try{
                 contractType = 'CALL';              
@@ -292,7 +301,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               || ((lp <= resistance1 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1)) || (lp >= resistance1 && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)))
               || ((lp <= support2 && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)) || (lp >= support2 && putBoughtAt <= support2 - targetStep))
               || ((lp <= resistance2 && putBoughtAt > resistance2) || (lp >= resistance2 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1))) //Stop loss at Resistance 2
-            ){              
+            ){                            
+              strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell PUT at LTP ${lp}`, status: true}); 
               //PUT sell API 
               try{
                 contractType = 'PUT';             
@@ -361,10 +371,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           data: defaultValues,
         });
       }
-
-      console.log("All investment variables have been reset to default values.");
+      strapi.webSocket.broadcast({ type: 'action',message: "Investment variables reset", status: true, });
+         
     } catch (error) {
-      console.error("Error resetting investment variables:", error);
+      strapi.webSocket.broadcast({ type: 'action',message: "Error resetting investment variables. Please reset all variables", status: false, });
+        
     }
   },
 
@@ -396,14 +407,14 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         await strapi.entityService.update('api::variable.variable', entry.id, {
           data: defaultValues,
         });
-      }
-
-      console.log("Investment variables reset for Market Stop");
-      if(strapi.webSocket && strapi.webSocket.broadcast){
-        strapi.webSocket.broadcast({action: 'stopTrading'});
-      }
+      }    
+      
+      strapi.webSocket.broadcast({type: 'action', message: 'Application is stopped now.Please sell all positions before starting to trade again.', status: true});
+      return {status: true, message: 'Application stopped now..'};
     } catch (error) {
-      console.error("Error resetting investment variables:", error);
+      console.error("Error resetting investment variables:", error);      
+      strapi.webSocket.broadcast({ type: 'action',message: `Error stopping the applcation with error: ${error}`, status: false });      
+      return {status: false, message: `Error stopping the applcation with error: ${error}`};
     }
   },
   

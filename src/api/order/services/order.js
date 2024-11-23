@@ -37,7 +37,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     message: 'No Contract passed to placeBuyOrder. Check HandleFeed..',
                 };
             }
-            console.log('test');
+            
             const preferredToken = await this.getPreferredToken(contract.contractTokens, contractType, amount);
             console.log(preferredToken,preferredToken.lp);
             if(preferredToken.token){
@@ -65,6 +65,12 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 
                 });
                 await strapi.db.query('api::contract.contract').update({ where: { id: contract.id }, data: { contractBought } });
+                strapi.webSocket.broadcast({
+                    type: 'order',
+                    data: createdOrder,
+                    message: `Buy order for index ${contract.index} with contract ${preferredToken.tsym} placed`,
+                    status: true,
+                });
                 return {
                     status: true,
                     message: 'Order placed successfully',
@@ -77,6 +83,11 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 }
             }           
         } catch (error) {
+            strapi.webSocket.broadcast({
+                type: 'order',                
+                message: `Error: ${error.message || 'An error occurred while placing the BUY order.'}`,
+                status: false,
+            });
             return {
                 status: false,
                 message: error.message || 'An error occurred while placing the BUY order.'
@@ -109,11 +120,22 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             await strapi.db.query('api::contract.contract').update({ where: { id: contractToBeSold.id }, data: {
                 contractBought: {},
             } });
+            strapi.webSocket.broadcast({
+                type: 'order',
+                data: createdOrder,
+                message: `Sell order for index ${index} with contract ${contractToBeSold.contractBought.contractTsym} placed`,
+                status: true,
+            });
             return {
                 status: true,
                 message: 'Order placed successfully',
             }
         }catch(error){
+            strapi.webSocket.broadcast({
+                type: 'order',                
+                message: `Error: ${error.message || 'An error occurred while placing the SELL order.'}`,
+                status: false,
+            });
             return {
                 status: false,
                 message: error.message || 'An error occurred while placing the SELL order.'
