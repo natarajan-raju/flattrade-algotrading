@@ -14,7 +14,7 @@ module.exports = {
     },
     dailyStopJob: {
       task: async ({ strapi }) => {
-        await strapi.service('api::variable.variable').stopTrading();
+        await strapi.service('api::variable.variable').stopTrading(1);
       },
       options: {
         rule: "15 15 * * *", // Every day at 3:15 PM

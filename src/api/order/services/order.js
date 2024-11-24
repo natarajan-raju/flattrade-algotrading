@@ -150,10 +150,16 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 where: { norenordno },
             });
             if(order){
-                await strapi.db.query('api::order.order').update({ where: { id: order.id }, data: {
+                const updatedOrder = await strapi.db.query('api::order.order').update({ where: { id: order.id }, data: {
                     orderStatus: status,
                     prc,
                 } 
+                });
+                strapi.webSocket.broadcast({                
+                    type: 'order',
+                    data: updatedOrder,
+                    message: `Your order for index ${order.index} with contract ${order.contractTsym} has now a new status of ${status}`,
+                    status: true,                   
                 });
             }else{
                 return {'status': false, message: 'Order not found'};

@@ -19,7 +19,7 @@ module.exports = {
             },
         },
         {
-            method: 'GET',
+            method: 'POST',
             path: '/variables/stopTrading',
             handler: 'api::variable.variable.stopTrading', // Your custom token handling logic
             config: {

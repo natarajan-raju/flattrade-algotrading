@@ -142,10 +142,10 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
     },
 
     //Stop Trading
-    async stopTrading(ctx) {       
-        return ctx.send(await strapi.service('api::variable.variable').stopTrading());
-    }    
-    
+    async stopTrading(ctx) {
+        const { token } = ctx.request.body;   
+        return ctx.send(await strapi.service('api::variable.variable').stopTrading(token));
+    }   
 }));
 
 //Local function to convert date to string for Scrip search

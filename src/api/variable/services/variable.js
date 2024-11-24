@@ -380,41 +380,61 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   },
 
   //Cron function to stop market at 3.15pm daily
-  async stopTrading() {
-    try {
-      const defaultValues = {
-        basePrice: 0,
-        resistance1: 0,
-        resistance2: 0,
-        support1: 0,
-        support2: 0,
-        amount: 0,
-        quantity: 0,                        
-      };
-
-      const headers = {
-        Authorization: `Bearer ${env('SPECIAL_TOKEN')}`,
-      };
-
-      // Fetch all entries in the variable collection
-      const variableEntries = await strapi.entityService.findMany('api::variable.variable', {
-        headers,
-        fields: ['id'],
-      });
-
-      // Iterate over each entry and update it with default values
-      for (const entry of variableEntries) {
-        await strapi.entityService.update('api::variable.variable', entry.id, {
-          data: defaultValues,
+  async stopTrading(token) {
+    if(!token){
+        return {status: false, message: 'No token passed to stopTrading'};
+    }
+    const defaultValues = {
+      basePrice: 0,
+      resistance1: 0,
+      resistance2: 0,
+      support1: 0,
+      support2: 0,
+      amount: 0,
+      quantity: 0,                        
+    };
+    const headers = {
+      Authorization: `Bearer ${env('SPECIAL_TOKEN')}`,
+    };
+    if(token === 1){
+      try {  
+        // Fetch all variable entries
+        const variableEntries = await strapi.db.query('api::variable.variable').findMany({
+          select: ['id'], // Select only the 'id' field
         });
-      }    
-      
-      strapi.webSocket.broadcast({type: 'action', message: 'Application is stopped now.Please sell all positions before starting to trade again.', status: true});
-      return {status: true, message: 'Application stopped now..'};
-    } catch (error) {
-      console.error("Error resetting investment variables:", error);      
-      strapi.webSocket.broadcast({ type: 'action',message: `Error stopping the applcation with error: ${error}`, status: false });      
-      return {status: false, message: `Error stopping the applcation with error: ${error}`};
+
+        // Iterate over each entry and update it with default values
+        for (const entry of variableEntries) {
+          await strapi.db.query('api::variable.variable').update({
+            where: { id: entry.id },
+            data: defaultValues,
+          });
+        }   
+        
+        strapi.webSocket.broadcast({type: 'action', message: 'Application is stopped now.Please sell all positions before starting to trade again.', status: true});
+        return {status: true, message: 'Application stopped now..'};
+      } catch (error) {
+        console.error("Error resetting investment variables:", error);      
+        strapi.webSocket.broadcast({ type: 'action',message: `Error stopping the applcation with error: ${error}`, status: false });      
+        return {status: false, message: `Error stopping the applcation with error: ${error}`};
+      }
+    }else{
+      const variable = await strapi.db.query('api::variable.variable').findOne({
+        where: { token },
+      });
+      if(variable){
+        try {
+          await strapi.entityService.update('api::variable.variable', variable.id, {
+            data: defaultValues,
+          });
+          strapi.webSocket.broadcast({type: 'action', message: `Application is stopped now for index ${variable.token}.Please sell all positions before starting to trade again.`, status: true});
+          return {status: true, message: `Application stopped now for index ${variable.token}...`};
+        } catch (error) {
+          console.error("Error resetting investment variables:", error);      
+          strapi.webSocket.broadcast({ type: 'action',message: `Error stopping the applcation for index ${variable.token} with error: ${error}`, status: false });      
+          return {status: false, message: `Error stopping the applcation for index ${variable.token} with error: ${error}`};
+        }
+      }
     }
   },
   
