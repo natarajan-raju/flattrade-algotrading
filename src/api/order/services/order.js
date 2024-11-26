@@ -28,8 +28,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     }, 
 
     // Place BUY Order service
-    async placeBuyOrder(orderData) {
-        try {
+    async placeBuyOrder(orderData) {        
             const {  contractType, lp, contract, sessionToken, amount,quantity } = orderData;
             if (!contract ) {
                 return {
@@ -39,7 +38,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             }
             
             const preferredToken = await this.getPreferredToken(contract.contractTokens, contractType, amount);
-            console.log(preferredToken,preferredToken.lp);
+            
             if(preferredToken.token){
                 const lotSize = quantity * preferredToken.ls;
                 const price = lotSize * preferredToken.lp;
@@ -63,7 +62,9 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                         contractLp: preferredToken.lp,                        
                     }
                 
+                
                 });
+                
                 await strapi.db.query('api::contract.contract').update({ where: { id: contract.id }, data: { contractBought } });
                 strapi.webSocket.broadcast({
                     type: 'order',
@@ -81,23 +82,13 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     status: false,
                     message: 'No suitable tokens found for the order.'
                 }
-            }           
-        } catch (error) {
-            strapi.webSocket.broadcast({
-                type: 'order',                
-                message: `Error: ${error.message || 'An error occurred while placing the BUY order.'}`,
-                status: false,
-            });
-            return {
-                status: false,
-                message: error.message || 'An error occurred while placing the BUY order.'
-            };
-        }
+            }          
+        
     },
 
     //Place SELL order Service
     async placeSellOrder(orderData) {
-        try{
+        
             const { contractType, lp,contract, sessionToken, index } = orderData;
             const contractToBeSold = await strapi.db.query('api::contract.contract').findOne({
                 where: { index },
@@ -117,6 +108,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     price: contractLp * contractToBeSold.contractBought.lotSize,                                       
                 }
             });
+            console.log(`Created order: ${createdOrder}`);
             await strapi.db.query('api::contract.contract').update({ where: { id: contractToBeSold.id }, data: {
                 contractBought: {},
             } });
@@ -129,22 +121,11 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             return {
                 status: true,
                 message: 'Order placed successfully',
-            }
-        }catch(error){
-            strapi.webSocket.broadcast({
-                type: 'order',                
-                message: `Error: ${error.message || 'An error occurred while placing the SELL order.'}`,
-                status: false,
-            });
-            return {
-                status: false,
-                message: error.message || 'An error occurred while placing the SELL order.'
-            };
-        }
+            }        
     },
 
     async handleOrderbookFeed(feedData){
-        try{
+        
             const { norenordno,prc,status } = feedData;
             const order = await strapi.db.query('api::order.order').findOne({
                 where: { norenordno },
@@ -165,9 +146,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 return {'status': false, message: 'Order not found'};
             }
             return {'status': true, message: 'Orderbook feed processed successfully'};
-             }catch(error){
-                return {status: false, message: error || 'An error occurred while processing the orderbook feed.'};
-        }
+            
     },
 
 }));

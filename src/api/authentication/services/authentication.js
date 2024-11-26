@@ -9,7 +9,7 @@ module.exports = createCoreService('api::authentication.authentication', ({ stra
   
   
   async fetchRequestToken() {
-    try {
+    
       const headers = {
         Authorization: `Bearer ${env('SPECIAL_TOKEN')}`, // Use the special token in the Authorization header
       };
@@ -23,15 +23,8 @@ module.exports = createCoreService('api::authentication.authentication', ({ stra
       return {
         requestToken: existingTokens[0]?.requestToken || false,
         id: existingTokens[0]?.id || "",
-      };
-      
-    } catch (err) {
-      strapi.log.error('Error fetching request token:', err);
-      return {
-        requestToken: false,
-        id: '',
-      };
-    }
+      };    
+    
   },
 
   // Other authentication-related service functions can go here

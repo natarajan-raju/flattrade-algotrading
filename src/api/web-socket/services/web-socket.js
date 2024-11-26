@@ -54,7 +54,7 @@ module.exports = ({ strapi }) => ({
   },
 
   handleIncomingMessage(message, scripList) {
-    console.log('Received message:', message);
+    // console.log('Received message:', message);
 
     switch (message.t) {
       case 'ck':
@@ -93,7 +93,7 @@ module.exports = ({ strapi }) => ({
       t: 't',
       k: scripList,
     };
-    console.log('Subscribing to touchline data for:', scripList);
+    // console.log('Subscribing to touchline data for:', scripList);
     this.flattradeWs.send(JSON.stringify(subscribePayload));
   },
 
@@ -108,7 +108,7 @@ module.exports = ({ strapi }) => ({
   async handleTouchlineFeed(feedData) {
     try {    
       const result = await strapi.service('api::variable.variable').handleFeed(feedData);
-      console.log('Feed processed by controller:', result);
+      // console.log('Feed processed by controller:', result);
     } catch (error) {
       console.error('Error processing feed:', error);
     }
@@ -117,7 +117,7 @@ module.exports = ({ strapi }) => ({
   async handleOrderbookFeed(feedData) {
     try {    
       const result = await strapi.service('api::order.order').handleOrderbookFeed(feedData);
-      console.log('Feed processed by controller:', result);
+      // console.log('Feed processed by controller:', result);
     } catch (error) {
       console.error('Error processing feed:', error);
     }
