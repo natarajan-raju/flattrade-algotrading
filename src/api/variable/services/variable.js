@@ -158,8 +158,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 data: {initialSpectatorMode},
               });
               strapi.webSocket.broadcast({ type: 'variable', message: `Reaching strategic position.Spectator mode turned off for index ${index}`, status: true});
+              console.log('Reaching strategic position.Spectator mode turned off');
             } else {
-              //LP in Passive zone. No action
+              //LP in Passive zone. Do not take any action
               await strapi.db.query('api::variable.variable').update({
                 where: {token: tk},
                 data: {
@@ -303,7 +304,13 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   updatedVariable,
                 }                          
             }
-          }         
+          }  
+          await strapi.db.query('api::variable.variable').update({
+            where: {token: tk},
+            data: {
+              previousTradedPrice: lp,
+            }
+          })       
       }   
   },
   // Custom function to reset investment variables
@@ -364,7 +371,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       amount: 0,
       quantity: 0,
       previousTradedPrice: 0,
-                          
+      callOptionBought: false,
+      putOptionBought: false,
+      callBoughtAt: 0,
+      putBoughtAt: 0,
+      initialSpectatorMode: true,                          
     };
     const headers = {
       Authorization: `Bearer ${env('SPECIAL_TOKEN')}`,

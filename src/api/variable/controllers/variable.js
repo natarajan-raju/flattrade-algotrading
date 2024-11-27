@@ -125,7 +125,9 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             support2,
             expiry,
             amount, // Store the investment amount
-            quantity,           
+            quantity,
+            callOptionBought: false,
+            putOptionBought: false,           
             initialSpectatorMode: true,
             previousTradedPrice: 0,
             },

@@ -1,10 +1,10 @@
 const WebSocket = require('ws');
 const { env } = require('@strapi/utils');
-const fs = require( 'fs' );
-const { subscribe } = require('diagnostics_channel');
 
 module.exports = ({ strapi }) => ({
   flattradeWs: null,
+  processingTokens: new Set(),
+  
 
   async connectFlattradeWebSocket(userId, sessionToken, accountId, scripList) {
     // Fetch all WebSocket configuration entries and get the first one
@@ -12,7 +12,6 @@ module.exports = ({ strapi }) => ({
       limit: 1, // Fetch only the first entry
     });
     const flattradeWsUrl = webSocketConfigs[0]?.flattradeClientUrl || env('FLATTRAD_WS_URL');
-    
 
     if (!flattradeWsUrl) {
       throw new Error('WebSocket URL not found in database or environment.');
@@ -33,7 +32,7 @@ module.exports = ({ strapi }) => ({
 
     this.flattradeWs.on('close', () => {
       console.log('Flattrade WebSocket connection closed. Attempting reconnect...');
-      setTimeout(() => this.connectFlattradeWebSocket(userId, sessionToken, accountId,scripList), 3000);
+      setTimeout(() => this.connectFlattradeWebSocket(userId, sessionToken, accountId, scripList), 3000);
     });
 
     this.flattradeWs.on('error', (error) => {
@@ -54,8 +53,23 @@ module.exports = ({ strapi }) => ({
   },
 
   handleIncomingMessage(message, scripList) {
-    // console.log('Received message:', message);
-
+    // Define the specific touchline tokens to deduplicate
+    const touchlineTokens = ['26000', '26014', '26037', '26013', '26019'];
+  
+    // Apply deduplication only if the message is a touchline feed and the token matches one of the specified ones
+    if (message.t === 'tf' && touchlineTokens.includes(message.token)) {
+      if (this.processingTokens.has(message.token)) {
+        // Token is already in processing, ignore the message (duplicate)
+        strapi.webSocket.broadcast({ type: 'variable', message: `No action taken at ${message.lp} for ${message.ts}`, status: true });
+        strapi.db.query('api::variable.variable').update({ where: { token: message.token }, data: { previousTradedPrice: message.lp } });
+        console.log(`Duplicate message ignored for token: ${message.token}`);
+        return;
+      }
+      // Add token to processing set to mark it as being processed
+      this.processingTokens.add(message.token);
+    }
+  
+    // Handle message types
     switch (message.t) {
       case 'ck':
         if (message.s === 'OK') {
@@ -66,23 +80,31 @@ module.exports = ({ strapi }) => ({
           console.error('Connection failed: Invalid user ID or session token.');
         }
         break;
-
+  
       case 'tk':
-        console.log('Subscription acknowledged:', message);        
+        // Subscription acknowledged: message
         break;
-
-      case 'tf':        
-        this.handleTouchlineFeed(message);
+  
+      case 'tf':
+        // Handle Touchline Feed and after it's processed, remove the token
+        this.handleTouchlineFeed(message)
+          .finally(() => {
+            // Remove token from processing set after feed handling
+            if (this.processingTokens.has(message.token)) {
+              this.processingTokens.delete(message.token);
+              console.log(`Token ${message.token} removed from processingTokens set.`);
+            }
+          });
         break;
-      
+  
       case 'om':
         this.handleOrderbookFeed(message);
         break;
-
+  
       case 'uk':
         console.log('Unsubscription acknowledged:', message);
         break;
-
+  
       default:
         console.log('Unknown message type:', message);
     }
@@ -93,11 +115,10 @@ module.exports = ({ strapi }) => ({
       t: 't',
       k: scripList,
     };
-    // console.log('Subscribing to touchline data for:', scripList);
     this.flattradeWs.send(JSON.stringify(subscribePayload));
   },
 
-  subscribeOrderbook(){
+  subscribeOrderbook() {
     const subscribePayload = {
       t: 'o',
       actid: `${env('FLATTRADE_ACCOUNT_ID')}`,
@@ -106,18 +127,17 @@ module.exports = ({ strapi }) => ({
   },
 
   async handleTouchlineFeed(feedData) {
-    try {    
+    try {
       const result = await strapi.service('api::variable.variable').handleFeed(feedData);
-      // console.log('Feed processed by controller:', result);
     } catch (error) {
       console.error('Error processing feed:', error);
+      throw error;
     }
   },
 
   async handleOrderbookFeed(feedData) {
-    try {    
+    try {
       const result = await strapi.service('api::order.order').handleOrderbookFeed(feedData);
-      // console.log('Feed processed by controller:', result);
     } catch (error) {
       console.error('Error processing feed:', error);
     }
