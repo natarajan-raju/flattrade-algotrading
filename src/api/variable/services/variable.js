@@ -157,6 +157,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 where: {token: tk},
                 data: {initialSpectatorMode},
               });
+              strapi.webSocket.broadcast({ type: 'variable', message: `Reaching strategic position.Spectator mode turned off for index ${index}`, status: true});
             } else {
               //LP in Passive zone. No action
               await strapi.db.query('api::variable.variable').update({
@@ -165,6 +166,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   previousTradedPrice: lp,
                 }
               });              
+              strapi.webSocket.broadcast({ type: 'variable', message: `No actions taken for index ${index} at LTP ${lp}`, status: true});
               return `No actions taken at LTP ${lp}`;
             }
           }
@@ -183,22 +185,23 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               && (previousTradedPrice === 0 || previousTradedPrice < lp)
             ){
               
-              strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy CALL at LTP ${lp}`, status: true});
               
-                //Buy CALL
-                callOptionBought = true;
-                callBoughtAt = lp;
-                previousTradedPrice = lp;
-                let updatedVariable = await strapi.db.query('api::variable.variable').update({
-                  where: {token : tk},
-                  data: {
-                    callOptionBought,
-                    callBoughtAt,
-                    previousTradedPrice,
-                  }
-                });
-                contractType = 'CALL';
-                await strapi.service('api::order.order').placeBuyOrder({contractType,lp,contract,sessionToken,amount,quantity});
+              //Buy CALL
+              callOptionBought = true;
+              callBoughtAt = lp;
+              previousTradedPrice = lp;
+              let updatedVariable = await strapi.db.query('api::variable.variable').update({
+                where: {token : tk},
+                data: {
+                  callOptionBought: true,
+                  callBoughtAt,
+                  previousTradedPrice,
+                }
+              });
+              console.log(updatedVariable);
+              strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy CALL at LTP ${lp}`, status: true});
+              contractType = 'CALL';
+              await strapi.service('api::order.order').placeBuyOrder({contractType,lp,contract,sessionToken,amount,quantity});
                 return {
                   status: true,
                   message: 'CALL buy Order placed successfully',
@@ -211,21 +214,22 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               || (lp <= resistance2 - targetStep && lp > resistance1 + targetStep))
               && (previousTradedPrice === 0 || previousTradedPrice > lp)
             ){             
-              strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`, status: true});
               //Buy PUT 
               
-                contractType = 'PUT';
-                putOptionBought = true;
-                putBoughtAt = lp;
-                previousTradedPrice = lp;
-                let updatedVariable = await strapi.db.query('api::variable.variable').update({
-                  where: {token : tk},
-                  data: {              
-                    putOptionBought,
-                    putBoughtAt,
-                    previousTradedPrice,
-                  }
+              contractType = 'PUT';
+              putOptionBought = true;
+              putBoughtAt = lp;
+              previousTradedPrice = lp;
+              let updatedVariable = await strapi.db.query('api::variable.variable').update({
+                where: {token : tk},
+                data: {              
+                  putOptionBought: true,
+                  putBoughtAt,
+                  previousTradedPrice,
+                }
               });
+              console.log(updatedVariable);
+              strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`, status: true});
               await strapi.service('api::order.order').placeBuyOrder({contractType,lp,contract,sessionToken,amount,quantity});
               return {
                 status: true,

@@ -1,3 +1,4 @@
+// @ts-ignore
 const { mergeConfig } = require('vite');
 
 module.exports = (config) => {
