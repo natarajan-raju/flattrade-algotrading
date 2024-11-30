@@ -29,8 +29,14 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
 
     // Place BUY Order service
     async placeBuyOrder(orderData) {        
-            const {  contractType, lp, contract, sessionToken, amount,quantity } = orderData;
+            const {  contractType, lp, contract, sessionToken, amount,quantity,token } = orderData;
+            const indexVariable = await strapi.service('api::variable.variable').readLocalIndexVariables(token);
             if (!contract ) {
+                indexVariable.awaitingOrderConfirmation = false;
+                indexVariable.initialSpectatorMode = true;                                   
+                await strapi.service('api::variable.variable').saveIndexVariables(token, indexVariable);
+                await strapi.db.query('api::variable.variable').update({ where: { token }, data: { awaitingOrderConfirmation: false, initialSpectatorMode: true } });
+                strapi.webSocket.broadcast({type: 'order', message: 'No relevant contract found.Buy order failed..', status: false});
                 return {
                     status: false,
                     message: 'No Contract passed to placeBuyOrder. Check HandleFeed..',
@@ -60,17 +66,18 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                         lotSize,
                         price,
                         contractLp: preferredToken.lp,                        
-                    }
-                
-                
-                });
-                
+                    }               
+                });               
                 await strapi.db.query('api::contract.contract').update({ where: { id: contract.id }, data: { contractBought } });
+                indexVariable.awaitingOrderConfirmation = false;                                   
+                await strapi.service('api::variable.variable').saveIndexVariables(token, indexVariable);
+                strapi.db.query('api::variable.variable').update({ where: { token }, data: { awaitingOrderConfirmation: false } });
+
                 strapi.webSocket.broadcast({
                     type: 'order',
                     data: createdOrder,
                     message: `Buy order for index ${contract.index} with contract ${preferredToken.tsym} placed`,
-                    status: true,
+                    status: 'success',
                 });
                 return {
                     status: true,

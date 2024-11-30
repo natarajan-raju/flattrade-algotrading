@@ -1,4 +1,5 @@
 'use strict';
+const index = require('@strapi/plugin-users-permissions/strapi-admin');
 const { env } = require('@strapi/utils');
 
 
@@ -11,15 +12,9 @@ const { createCoreController } = require('@strapi/strapi').factories;
 
 module.exports = createCoreController('api::variable.variable', ({ strapi }) => ({
     //Handle Update request
-    async handleInvestmentVariables(ctx) {        
-        const userId = env('FLATTRADE_USER_ID');
-        const accountId = env('FLATTRADE_ACCOUNT_ID');
-        const requestTokenResponse = await strapi.service('api::authentication.authentication').fetchRequestToken();
-        if(!requestTokenResponse.requestToken){
-            return ctx.send({ message: 'Request token not found', status: false });
-        }
-        const sessionToken = requestTokenResponse.requestToken;
-        
+    async handleInvestmentVariables(ctx) {
+
+        //Check input values        
         const {
           basePrice,          
           resistance1,
@@ -30,93 +25,95 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
           amount,
           expiry,
           quantity
-        } = ctx.request.body;
-    
-        const index = await strapi.db.query('api::variable.variable').findOne({
-            where: { token },  // Filter by token
-        });       
-        
-        if (!index || !quantity || !expiry || !amount || !token || !basePrice || !resistance1 || !resistance2 || !support1 || !support2) {
-            return ctx.send({ message: 'Either Index not found for the provided token or invalid payload provided', status: false, });
+        } = ctx.request.body;        
+        if (!quantity || !expiry || !amount || !token || !basePrice || !resistance1 || !resistance2 || !support1 || !support2) {
+            return ctx.send({ message: 'Invalid Payload provided. Please fill all the fields...', status: false, });
+        } else if(quantity <= 0 || amount <= 0 || basePrice <=0 || resistance1 <=0 || resistance2 <=0 || support1 <=0 || support2 <=0){
+            return ctx.send({ message: 'Cannot provide zero or negative values for mandatory fields...', status: false });
         }
 
-        if(quantity <= 0 || amount <= 0){
-            return ctx.send({ message: 'Invalid amount or quantity', status: false });
-        }
+
         
-        let existingContract;
-        let scripList = 'NSE|26000#NSE|26009#NSE|26013#NSE|26037#NSE|26014#';
-        try{
-            let payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","stext":"${index.index+convertDateFormat(expiry)}","exch":"NFO"}&jKey=${sessionToken}`;
-            
+        //Check if a variable row exist in the database for the given token
+        const indexItem = await strapi.db.query('api::variable.variable').findOne({
+            where: { token },  
+        });
+        if(!indexItem){
+            return ctx.send({ message: 'Please check the token number provided...', status: false });
+        }
+        let contracts;
+
+        
+        
+        //Check if a session Token exist in            
+        const requestTokenResponse = await strapi.service('api::authentication.authentication').fetchRequestToken();
+        if(!requestTokenResponse.requestToken){
+            return ctx.send({ message: 'Request token not found', status: false });
+        }
+        const sessionToken = requestTokenResponse.requestToken;
+        //Check expiry data by submitting a random contract detail fetch with the given expiry date to Flattrade
+        try{            
+            const date = await strapi.service('api::variable.variable').convertDateFormat(expiry);
+            const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","stext":"${indexItem.index + date}","exch":"NFO"}&jKey=${sessionToken}`;
             const contractsResponse = await fetch(`${env('FLATTRADE_SEARCH_SCRIP_URL')}`,{
+                method: 'POST',
+                headers: {
+                          'Content-Type': 'application/json'
+                        },
+                body: payload, 
+            });
+            contracts = await contractsResponse.json();                                    
+            if(!contracts.values || contracts.values.length == 0 ){
+                return ctx.send({ message: contracts.emsg, status: false });
+            }
+        } catch (error) {
+            return ctx.send({ message: 'Either expiry data provided is wrong or Session token expired', status: false });
+        }
+
+
+
+
+        let scripList;
+        //Find if a scripList is already subscribed for the given token or generate scripList and subscribe to Flattrade websocket
+        let scripLists = await strapi.db.query('api::web-socket.web-socket').findMany();        
+        if(scripLists.find((scrip) => scrip.indexToken === indexItem.token && (scrip.scripList === '' || scrip.scripList === null ))){
+            try{
+                scripList = await strapi.service('api::variable.variable').processScripList(indexItem.token,indexItem.index,contracts.values[0].tsym, sessionToken);
+                //Subscribe touchline with the new scriplist
+                await strapi.service('api::web-socket.web-socket').subscribeTouchline(scripList);    
+            }catch(error){
+                return ctx.send({ message: `Error in processing scrip list with error:  ${error}`, status: false });
+            }
+        } 
+
+
+        
+       
+        //Fetch and create previousTradedPrice which is beneficial for initialSpectatorMode decisions
+        let previousTradedPrice;
+        try{
+            const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","exch":"NSE","token":"${sessionToken}"}&jKey=${sessionToken}`;
+            const quoteReponse = await fetch(`${env('FLATTRADE_GET_QUOTES_URL')}`,{
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: payload, 
             });
-            const contracts = await contractsResponse.json();  
-             
-                      
-            if(contracts.values && contracts.values.length > 0 ){                         
-                existingContract = await strapi.db.query('api::contract.contract').findOne(
-                    {
-                        where: {
-                            index: index.index,
-                        }
-                    }
-                );                
-                if(!existingContract){
-                    existingContract =await strapi.db.query('api::contract.contract').create({
-                        data:{
-                            sampleContractTsym: contracts.values[0].tsym,
-                            index: index.index,
-                            indexToken: index.token,                            
-                        },
-                    });
-                }
-                
-                
-               //Generate Option chain for the sample contract
-                const optionChainResponse = await strapi.service('api::variable.variable').processOptionChain(existingContract.sampleContractTsym,sessionToken);     
-                
-                if(!optionChainResponse.status){
-                    return {"updatedData": null, status: false, "message":optionChainResponse.message};
-                } else {
-                    // Destructure contractTokens from the response
-                    const { contractTokens } = optionChainResponse;
-
-                    // Prepare the scripList string for WebSocket subscription
-                    scripList += [
-                        ...contractTokens.call.map(tokenObj => `NFO|${tokenObj.token}`),
-                        ...contractTokens.put.map(tokenObj => `NFO|${tokenObj.token}`)
-                    ].join('#');
-
-                    
-                } 
-                 
-            } else {
-                return {"status": false, "updatedData": null, "message": "Either the expiry data provided is wrong or there is some error fetching relevant scrips. Please try again with proper data"};
-            }
-                         
+            const quote = await quoteReponse.json();                        
+            previousTradedPrice = quote.lp || 0;
             
         }catch(error){
-            return {
-                message: error,                
-                updatedIndex: null,
-                status: false,
-            }
+            return ctx.send({ message: `Error in fetching LTP of the index from Flattrade with error:  ${error}`, status: false });            
         }
-        
 
        
-        //Retrieve relevant contracts with the given expiry dates
+        
            
         
         // Step 2: Update values for the found index
-        const updatedIndex = await strapi.db.query('api::variable.variable').update({
-            where: { id: index.id },  // Update based on index ID
+        const updatedIndexItem = await strapi.db.query('api::variable.variable').update({
+            where: { token },  
             data: {
             basePrice,
             resistance1,
@@ -129,36 +126,24 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             callOptionBought: false,
             putOptionBought: false,           
             initialSpectatorMode: true,
-            previousTradedPrice: 0,
+            previousTradedPrice,
+            callBoughtAt: 0,
+            putBoughtAt: 0,
+            awaitingOrderConfirmation: false,
             },
-        });
-        
-                
-        // Step 3: Connect to Flattrade WebSocket        
-        await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(userId, sessionToken, accountId, scripList);
+        });     
         return {
-            message: "Investment variables updated successfully. Market watching started.",
+            message: `Investment variables updated successfully. Market watching started for index ${indexItem.index}.`,
             status: true,
-            updatedIndex,            
+            updatedIndexItem,            
         }
     },
 
     //Stop Trading
     async stopTrading(ctx) {
-        const { token } = ctx.request.body;   
+        const { token } = ctx.request.body;
+        const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken: token }});    
         return ctx.send(await strapi.service('api::variable.variable').stopTrading(token));
     }   
 }));
 
-//Local function to convert date to string for Scrip search
-
-function convertDateFormat(inputDate) {
-    const dateParts = inputDate.split('-'); // Split YYYY-MM-DD into [YYY,MM,DD]
-    const [year, month, day] = dateParts;
-    
-    const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-    const monthIndex = parseInt(month, 10) - 1; // Convert month from 1-based to 0-based index
-    
-    const formattedDate = `${day}${monthNames[monthIndex]}${year.toString().slice(-2)}C`;
-    return formattedDate;    
-}

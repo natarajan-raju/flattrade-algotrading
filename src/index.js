@@ -20,44 +20,16 @@ module.exports = {
    */
   bootstrap({ strapi }) {
     
-    // Initialize WebSocket server
-    const server = strapi.server.httpServer;
-
-    // Create a new WebSocket server attached to the Strapi HTTP server
-    const wss = new WebSocket.Server({ server });
-
-    // Store connected clients
-    const clients = new Set();
-
-    // When a new WebSocket connection is made
-    wss.on('connection', (ws) => {
-      console.log('New WebSocket client connected');
-      clients.add(ws);
-
-      // When the client disconnects
-      ws.on('close', () => {
-        console.log('WebSocket client disconnected');
-        clients.delete(ws);
-      });
-
-      // Handle incoming messages (if needed)
-      ws.on('message', (message) => {
-        console.log('Received message from client:', message);
-      });
-    });
-
-    // Broadcast a message to all connected WebSocket clients
-    const broadcast = (data) => {
-      clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify(data));
-        }
-      });
+    // Initialize WebSocket server     
+    const setFoundation = async () => {      
+      await strapi.service('api::web-socket.web-socket').initializeWebSocketServer();      
+      await strapi.service('api::variable.variable').fetchIndexVariables();
+      strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket();
     };
-
-    // Expose the broadcast function globally for other parts of the app
-    strapi.webSocket = { broadcast };
-
-    console.log('WebSocket server is running');
+    setFoundation().then(() => {
+      console.log('WebSocket server initialized & Index Variables Fetched succesfully');
+    }).catch((error) => {
+      console.error('Either WebSocket server initialization failed or Fetching Index Variables failed :', error);
+    });
   },
 };

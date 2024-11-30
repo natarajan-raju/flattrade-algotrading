@@ -7,9 +7,10 @@ module.exports = {
         await strapi.service('api::variable.variable').resetInvestmentVariables();
         await strapi.service('api::contract.contract').clearContractVariables();
         await strapi.service('api::variable.variable').stopTrading(1);
+        await strapi.service('api::web-socket.web-socket').resetScripList();
       },
       options: {
-        rule: "07 00 * * *", // Every day at 7:00 AM
+        rule: "07 07 * * *", // Every day at 7:07 AM
         tz: "Asia/Kolkata",  // Set to your desired timezone
       },
     },
@@ -18,6 +19,7 @@ module.exports = {
         await strapi.service('api::variable.variable').resetInvestmentVariables();
         await strapi.service('api::contract.contract').clearContractVariables();
         await strapi.service('api::variable.variable').stopTrading(1);
+        await strapi.service('api::web-socket.web-socket').resetScripList();
       },
       options: {
         rule: "15 15 * * *", // Every day at 3:15 pm

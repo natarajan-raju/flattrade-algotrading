@@ -1,6 +1,7 @@
 'use strict';
 const fs = require( 'fs' );
 const { env } = require('@strapi/utils');
+const index = require('@strapi/plugin-users-permissions/strapi-admin');
 
 /**
  * variable service
@@ -8,13 +9,72 @@ const { env } = require('@strapi/utils');
 
 // @ts-ignore
 const { createCoreService } = require('@strapi/strapi').factories;
+const INDICES = new Map();
+const NIFTY = new Map();
+const BANKNIFTY = new Map();
+const FINNIFTY = new Map();
+const NIFTY50 = new Map();
+const MIDCPNIFTY = new Map();
+INDICES.set('NIFTY', NIFTY);
+INDICES.set('BANKNIFTY', BANKNIFTY);
+INDICES.set('FINNIFTY', FINNIFTY);
+INDICES.set('NIFTY50', NIFTY50);
+INDICES.set('MIDCPNIFTY', MIDCPNIFTY);
+const indexVariables = new Map();
+
+
 
 module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
+
+  //Convert date to string for Scrip search
+  async convertDateFormat(inputDate) {    
+    const dateParts = inputDate.split('-'); // Split YYYY-MM-DD into [YYY,MM,DD]
+    const [year, month, day] = dateParts;    
+    const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+    const monthIndex = parseInt(month, 10) - 1; // Convert month from 1-based to 0-based index    
+    const formattedDate = `${day}${monthNames[monthIndex]}${year.toString().slice(-2)}C`;
+    return formattedDate;    
+  },
+
+  //Generate Scrip list and process Option chain
+  async processScripList(indexToken,index,sampleContractTsym, sessionToken){
+    let contract = await strapi.db.query('api::contract.contract').findOne({where: {index}});
+    if(!contract){
+      contract =await strapi.db.query('api::contract.contract').create({
+        data:{
+          sampleContractTsym,
+          index,
+          indexToken                            
+        },
+      });
+    }
+    let contractTokens;
+    try{
+      contractTokens = await this.processOptionChain(sampleContractTsym, sessionToken);
+    }catch(error){
+      throw new Error(error);
+    }
+
+    //Generate Scrip list and save for the passed token
+    let scripList = `NSE|${indexToken}#`;
+    // Prepare the scripList string for WebSocket subscription
+    scripList += [
+      ...contractTokens.call.map(tokenObj => `NFO|${tokenObj.token}`),
+      ...contractTokens.put.map(tokenObj => `NFO|${tokenObj.token}`)
+    ].join('#');
+    await strapi.db.query('api::web-socket.web-socket').update({
+      where: { indexToken } ,
+      data: { scripList }
+    });
+    return scripList;
+                                
+  },
+
   //Process option chain and retrieve relevant Contracts for the given Expiry date
   async processOptionChain(sampleContractTsym, sessionToken) {
-    try {
+    try {      
       // Prepare the payload for the option chain request
-      const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","tsym":"${sampleContractTsym}","exch":"NFO","strprc":"${sampleContractTsym.slice(-5)}","cnt":"500"}&jKey=${sessionToken}`;
+      const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","tsym":"${sampleContractTsym}","exch":"NFO","strprc":"${sampleContractTsym.slice(-5)}","cnt":"400"}&jKey=${sessionToken}`;
       const optionChainResponse = await fetch(`${env('FLATTRADE_OPTION_CHAIN_URL')}`, {
         method: 'POST',
         headers: {
@@ -22,11 +82,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         },
         body: payload,
       });
-
+    
       // Parse the response JSON
       const optionChain = await optionChainResponse.json();
-      if(!optionChain){
-        return { message: 'Option chain not found', status: false };
+      
+      if(!optionChain.values){
+        throw new Error('Option chain processing failed...');
       }
       // Initialize the contractTokens structure with objects holding token and initial lp as 0
       const contractTokens = {
@@ -52,12 +113,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           contractTokens,
         },
       });
-
-      return { contractTokens, message: 'Option chain processed successfully', status: true };
-
+      return contractTokens;
     } catch (error) {
-      console.error("Error processing option chain:", error);
-      return { message: error.message || 'An error occurred while processing the option chain.', status: false };
+      throw new Error(error);
     }
   },
 
@@ -74,7 +132,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       //NFO Price update received. Update lp for contract token
       try {
         // Retrieve all contracts
-        const contracts = await strapi.db.query('api::contract.contract').findMany();
+        const contracts = await strapi.db.query('api::contract.contract').findOne({
+          where: { indexToken: tk }
+        });
     
         // Find the contract with the token in either call or put arrays
         const contract = contracts.find(contract => {
@@ -113,36 +173,64 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         })
         const headers = {
             Authorization: `Bearer ${env('SPECIAL_TOKEN')}`, // Including the special token in the Authorization header
-          };  
-          const indexItem = await strapi.db.query('api::variable.variable').findOne({
-            where: { token: tk },
-            headers,
-          });
+        };  
+        //Try to fetch indexItem from local Map
+        let indexItem = indexVariables.get(tk);
+
+        //If no items in indexVariables, fetch from DB
+        if(!indexItem){
+            indexItem = await strapi.db.query('api::variable.variable').findOne({
+                where: { token: tk },
+                headers,
+            });
+          console.log('Fetching values from DB.Pls check Map');
+        }      
         
-          if (!indexItem) {
+        //Index variables not found in DB too. No action to be taken
+        if (!indexItem) {
             return { error: 'Index not found for the provided token' };
-          }
-        
-          // Extract variables of the index
+        } else {
+          //Store in local map for future use
+          indexVariables.set(tk, indexItem);
+        }  
+
+
+        // Extract variables of the index
           let {
             basePrice, resistance1, resistance2, support1, support2, targetStep,
-            callOptionBought, putOptionBought,callBoughtAt, putBoughtAt, token, index,initialSpectatorMode,previousTradedPrice, amount, quantity
+            callOptionBought, putOptionBought,callBoughtAt, putBoughtAt, token, index,initialSpectatorMode,previousTradedPrice, amount, quantity, awaitingOrderConfirmation
           } = indexItem;
+          
       
           if (basePrice === 0 || resistance1 === 0 || resistance2 === 0 || support1 === 0 || support2 === 0){        
             return { message: `Investment variables not defined for ${index}`};
-          } else {
-            console.log(feedData);      
+          } 
+          console.log(feedData);
+          if(awaitingOrderConfirmation){
+            indexVariables.set(token, { ...indexItem, previousTradedPrice: lp });
+            strapi.webSocket.broadcast({
+              type: 'variable',
+              message: `Order placement awaiting confirmation for index ${index}. No actions taken at LTP ${lp}`,
+              status: true,
+            });
+            console.log('Awaiting order confirmation');
+            return { message: 'Awaiting order confirmation' };
           }
+
+
           //Fetch the relevant contract for the given token
           const contract = await strapi.db.query('api::contract.contract').findOne({
             where: { indexToken : token }
           });
           if(!contract){
+            console.log('Some error fetching relevant contracts');
             return "Some error fetching relevant contracts";
           }
           
-          const sessionToken = await strapi.service('api::authentication.authentication').fetchRequestToken();
+          const sessionToken = indexVariables.get('sessionToken') || await strapi.service('api::authentication.authentication').fetchRequestToken() || null;
+          if(!sessionToken){
+            throw new Error('Session expired. Please login again.');
+          }
           //Check if initialSpectatorMode is active
           if(initialSpectatorMode){
             if((lp <= basePrice + targetStep && lp >= basePrice - targetStep)
@@ -153,6 +241,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             ){
               //LP in investment hot zone. Turn off Spectator mode
               initialSpectatorMode = false;
+              indexVariables.set(tk, {...indexVariables.get(tk), initialSpectatorMode: initialSpectatorMode});
               await strapi.db.query('api::variable.variable').update({
                 where: {token: tk},
                 data: {initialSpectatorMode},
@@ -161,12 +250,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               console.log('Reaching strategic position.Spectator mode turned off');
             } else {
               //LP in Passive zone. Do not take any action
-              await strapi.db.query('api::variable.variable').update({
-                where: {token: tk},
-                data: {
-                  previousTradedPrice: lp,
-                }
-              });              
+              previousTradedPrice = lp;
+              indexVariables.set(tk, {...indexVariables.get(tk), previousTradedPrice: previousTradedPrice});            
               strapi.webSocket.broadcast({ type: 'variable', message: `No actions taken for index ${index} at LTP ${lp}`, status: true});
               return `No actions taken at LTP ${lp}`;
             }
@@ -191,23 +276,26 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               callOptionBought = true;
               callBoughtAt = lp;
               previousTradedPrice = lp;
+              awaitingOrderConfirmation = true;
+              indexVariables.set(tk, {...indexVariables.get(tk), callOptionBought: callOptionBought, callBoughtAt: callBoughtAt, previousTradedPrice: previousTradedPrice, awaitingOrderConfirmation: awaitingOrderConfirmation});
               let updatedVariable = await strapi.db.query('api::variable.variable').update({
                 where: {token : tk},
                 data: {
-                  callOptionBought: true,
+                  callOptionBought,
                   callBoughtAt,
                   previousTradedPrice,
+                  awaitingOrderConfirmation,
                 }
               });
-              console.log(updatedVariable);
+              
               strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy CALL at LTP ${lp}`, status: true});
               contractType = 'CALL';
-              await strapi.service('api::order.order').placeBuyOrder({contractType,lp,contract,sessionToken,amount,quantity});
-                return {
+              await strapi.service('api::order.order').placeBuyOrder({contractType,lp,contract,sessionToken,amount,quantity,token});
+              return {
                   status: true,
                   message: 'CALL buy Order placed successfully',
                   updatedVariable,
-                }                         
+              }                         
             } else if(((lp <= basePrice - targetStep && lp > support1 + targetStep) 
               || (lp <= support1 - targetStep && lp > support2 + targetStep)
               || (lp <= support2 - targetStep)
@@ -297,7 +385,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     putBoughtAt
                   }           
                 });
-                await strapi.service('api::order.order').placeSellOrder({contractType,lp,contract,sessionToken,index});
+                await strapi.service('api::order.order').placeSellOrder({contractType,lp,contract,sessionToken,index,token});
                 return {
                   status: true,
                   message: 'PUT sell Order placed successfully',
@@ -415,6 +503,30 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           return {status: true, message: `Application stopped now for index ${variable.token}...`};        
       }
     }
+  },
+
+  //MAP CRUD operations
+  setIndexVariable(INDEX,details){   
+    // console.log(INDICES.get('NIFTY').get('NIFTY').index);
+  },
+
+
+  async fetchIndexVariables(){    
+    const variables = await strapi.db.query('api::variable.variable').findMany({
+      where: {
+        basePrice: { $gt: 0 },  // '$gt' means greater than
+      },
+    });
+    if(variables.length > 0){
+      variables.forEach(indexItem => {        
+        INDICES.set(`${indexItem.index}`,new Map(Object.entries(indexItem)));             
+      });
+    }
+    
+    //Try with Multi level Map architecture
+    
+    // return indexVariables; 
+    return INDICES;   
   },
   
 }));

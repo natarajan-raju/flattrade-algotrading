@@ -482,6 +482,8 @@ export interface ApiVariableVariable extends Struct.CollectionTypeSchema {
   };
   attributes: {
     amount: Schema.Attribute.Decimal & Schema.Attribute.DefaultTo<0>;
+    awaitingOrderConfirmation: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
     basePrice: Schema.Attribute.Decimal & Schema.Attribute.DefaultTo<0>;
     callBoughtAt: Schema.Attribute.Decimal & Schema.Attribute.DefaultTo<0>;
     callOptionBought: Schema.Attribute.Boolean &
@@ -533,8 +535,8 @@ export interface ApiWebSocketWebSocket extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    customServerUrl: Schema.Attribute.String;
-    flattradeClientUrl: Schema.Attribute.String;
+    index: Schema.Attribute.String;
+    indexToken: Schema.Attribute.Integer;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',

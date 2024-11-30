@@ -78,6 +78,10 @@
     "quantity": {
       "type": "integer",
       "default": 0
+    },
+    "awaitingOrderConfirmation": {
+      "type": "boolean",
+      "default": false
     }
   }
 }

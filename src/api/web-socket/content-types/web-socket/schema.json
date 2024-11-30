@@ -12,14 +12,14 @@
   },
   "pluginOptions": {},
   "attributes": {
-    "flattradeClientUrl": {
-      "type": "string"
-    },
-    "customServerUrl": {
-      "type": "string"
-    },
     "scripList": {
       "type": "string"
+    },
+    "index": {
+      "type": "string"
+    },
+    "indexToken": {
+      "type": "integer"
     }
   }
 }
