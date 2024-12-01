@@ -6,7 +6,7 @@ module.exports = {
       task: async ({ strapi }) => {
         await strapi.service('api::variable.variable').resetInvestmentVariables();
         await strapi.service('api::contract.contract').clearContractVariables();
-        await strapi.service('api::variable.variable').stopTrading(1);
+        await strapi.service('api::variable.variable').stopTrading('1');
         await strapi.service('api::web-socket.web-socket').resetScripList();
       },
       options: {
@@ -18,7 +18,7 @@ module.exports = {
       task: async ({ strapi }) => {
         await strapi.service('api::variable.variable').resetInvestmentVariables();
         await strapi.service('api::contract.contract').clearContractVariables();
-        await strapi.service('api::variable.variable').stopTrading(1);
+        await strapi.service('api::variable.variable').stopTrading('1');
         await strapi.service('api::web-socket.web-socket').resetScripList();
       },
       options: {

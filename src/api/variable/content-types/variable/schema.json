@@ -40,10 +40,6 @@
       "type": "string",
       "unique": true
     },
-    "token": {
-      "type": "integer",
-      "unique": true
-    },
     "amount": {
       "type": "decimal",
       "default": 0
@@ -82,6 +78,10 @@
     "awaitingOrderConfirmation": {
       "type": "boolean",
       "default": false
+    },
+    "indexToken": {
+      "type": "string",
+      "unique": true
     }
   }
 }

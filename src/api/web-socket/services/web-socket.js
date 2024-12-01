@@ -70,7 +70,7 @@ module.exports = ({ strapi }) => ({
     });
 
     this.flattradeWs.on('close', () => {
-      console.log('Flattrade WebSocket connection closed. Attempting reconnect...');
+      console.log('Flattrade WebSocket connection closed. Attempting reconnect...');      
       strapi.webSocket.broadcast({ type: 'variable', message: 'Flattrade WebSocket connection closed. Attempting reconnect...', status: false });
       setTimeout(() => this.connectFlattradeWebSocket(),3000);
     });
@@ -105,8 +105,7 @@ module.exports = ({ strapi }) => ({
     if (message.t === 'tf' && touchlineTokens.includes(message.tk) && message.lp) {
       if (this.processingTokens.has(message.tk)) {
         // Token is already in processing, ignore the message (duplicate)
-        await strapi.service('api::variable.variable').updateIndexVariable(message.tk, { previousTradedPrice: message.lp });
-        strapi.db.query('api::variable.variable').update({ where: { token: message.tk }, data: { previousTradedPrice: message.lp } });
+        strapi[message.tk].set('previousTradedPrice', message.lp);      
         strapi.webSocket.broadcast({ type: 'variable', message: `No action taken at ${message.lp} for ${message.tk}`, status: true });
         console.log(`Preventing concurrent orders for token: ${message.tk}`);
         return;
@@ -118,15 +117,17 @@ module.exports = ({ strapi }) => ({
       case 'ck':
         if (message.s === 'OK') {
           console.log('Connection acknowledged for user:', message.uid);
-          const scripLists = await strapi.db.query('api::web-socket.web-socket').findMany({
-            where: {
-                      scripList: {
-                        $notNull: true, // Ensure scripList is not null
-                        $ne: '',        // Ensure scripList is not an empty string
-                      },
-                  }
-          });          
-          const scripList = scripLists.map(scrip => scrip.scripList).join('#');          
+          let scripLists = [];
+          let scripString = '';
+          for (const indexToken of strapi.INDICES) { 
+            if(strapi[indexToken]){
+              scripString = strapi[indexToken].get('scripList');              
+            }           
+            if(scripString){
+              scripLists.push(scripString);
+            }            
+          }
+          let scripList = scripLists.join('#');                
           this.subscribeTouchline(scripList);
           
           // this.subscribeOrderbook();
@@ -135,9 +136,7 @@ module.exports = ({ strapi }) => ({
         }
         break;
   
-      case 'tk':
-        strapi.webSocket.broadcast({ type: 'variable', message: 'Successfull subscription with Flattrade...', status: true });
-        console.log(message);
+      case 'tk':       
         break;
   
       case 'tf':
@@ -188,10 +187,17 @@ module.exports = ({ strapi }) => ({
       t: 't',
       k: scripList,
     };
-    this.flattradeWs.send(JSON.stringify(subscribePayload));
+    if(this.flattradeWs.readyState === WebSocket.OPEN){
+      console.log('Flattrade WebSocket connection is open..Subscribing to touchline..');
+      this.flattradeWs.send(JSON.stringify(subscribePayload));
+    } else {
+      this.connectFlattradeWebSocket();
+      this.flattradeWs.send(JSON.stringify(subscribePayload));
+    }
   },
 
   unsubsribeTouchline(scripList) {
+    
     const unsubscribePayload = {
       t: 'u',
       k: scripList,
@@ -218,7 +224,12 @@ module.exports = ({ strapi }) => ({
 
   //Cron Job to reset scripList
   async resetScripList() {    
-    await strapi.db.query('api::web-socket.web-socket').updateMany({ data: { scripList: '' } });  
+    await strapi.db.query('api::web-socket.web-socket').updateMany({ data: { scripList: '' } });
+    for (const indexToken of strapi.INDICES) { 
+      if(strapi[indexToken]){
+        strapi[indexToken].set('scripList', '');        
+      } 
+    }
     console.log('ScripList reset successfully.');
     strapi.webSocket.broadcast({ type: 'action', message: 'ScripList reset successfully.', status: true });  
   } 

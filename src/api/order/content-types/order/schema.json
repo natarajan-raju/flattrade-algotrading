@@ -47,6 +47,9 @@
     },
     "remarks": {
       "type": "string"
+    },
+    "indexToken": {
+      "type": "string"
     }
   }
 }

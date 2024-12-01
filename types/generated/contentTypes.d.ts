@@ -453,6 +453,7 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     index: Schema.Attribute.String;
     indexLtp: Schema.Attribute.String;
+    indexToken: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::order.order'> &
       Schema.Attribute.Private;
@@ -493,6 +494,7 @@ export interface ApiVariableVariable extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     expiry: Schema.Attribute.Date;
     index: Schema.Attribute.String & Schema.Attribute.Unique;
+    indexToken: Schema.Attribute.String & Schema.Attribute.Unique;
     initialSpectatorMode: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<true>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
@@ -513,7 +515,6 @@ export interface ApiVariableVariable extends Struct.CollectionTypeSchema {
     support1: Schema.Attribute.Decimal & Schema.Attribute.DefaultTo<0>;
     support2: Schema.Attribute.Decimal & Schema.Attribute.DefaultTo<0>;
     targetStep: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<20>;
-    token: Schema.Attribute.Integer & Schema.Attribute.Unique;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

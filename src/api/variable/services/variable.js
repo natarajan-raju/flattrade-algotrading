@@ -1,7 +1,7 @@
 'use strict';
 const fs = require( 'fs' );
 const { env } = require('@strapi/utils');
-const index = require('@strapi/plugin-users-permissions/strapi-admin');
+
 
 /**
  * variable service
@@ -9,19 +9,7 @@ const index = require('@strapi/plugin-users-permissions/strapi-admin');
 
 // @ts-ignore
 const { createCoreService } = require('@strapi/strapi').factories;
-const INDICES = new Map();
-const NIFTY = new Map();
-const BANKNIFTY = new Map();
-const FINNIFTY = new Map();
-const NIFTY50 = new Map();
-const MIDCPNIFTY = new Map();
-INDICES.set('NIFTY', NIFTY);
-INDICES.set('BANKNIFTY', BANKNIFTY);
-INDICES.set('FINNIFTY', FINNIFTY);
-INDICES.set('NIFTY50', NIFTY50);
-INDICES.set('MIDCPNIFTY', MIDCPNIFTY);
 const indexVariables = new Map();
-
 
 
 module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
@@ -417,7 +405,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         putOptionBought: false,
         callBoughtAt: 0,
         putBoughtAt: 0,
-        quantity: 0,        
+        quantity: 0, 
+        awaitingOrderConfirmation: false       
       };
 
       const headers = {
@@ -445,11 +434,14 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   },
 
   //Cron function to stop market at 3.15pm daily
-  async stopTrading(token) {
-    if(!token){
+  async stopTrading(indexToken) {
+    if(!indexToken){
         return {status: false, message: 'No token passed to stopTrading'};
     }
     
+    const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken }}); 
+    strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
+    strapi.db.query('api::web-socket.web-socket').update({where: { indexToken }, data: { scripList: '' }});
     const defaultValues = {
       basePrice: 0,
       resistance1: 0,
@@ -458,17 +450,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       support2: 0,
       amount: 0,
       quantity: 0,
-      previousTradedPrice: 0,
-      callOptionBought: false,
-      putOptionBought: false,
-      callBoughtAt: 0,
-      putBoughtAt: 0,
-      initialSpectatorMode: true,                          
+      previousTradedPrice: 0,                                
     };
     const headers = {
       Authorization: `Bearer ${env('SPECIAL_TOKEN')}`,
     };
-    if(token === 1){
+    if(indexToken === '1'){
         
         // Fetch all variable entries
         const variableEntries = await strapi.db.query('api::variable.variable').findMany({
@@ -486,7 +473,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         return {status: true, message: 'Application stopped now..'};      
     }else{
       const variable = await strapi.db.query('api::variable.variable').findOne({
-        where: { token },
+        where: { indexToken },
       });
       if(variable){
         if(variable.callOptionBought){
@@ -494,13 +481,13 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         }else{
           defaultValues.initialSpectatorMode = true;
         }      
-          await strapi.db.query('api::variable.variable').update({
+          strapi.db.query('api::variable.variable').update({
             where: { id: variable.id }, // Specify the condition for the update
             data: defaultValues,        // Specify the new data
           });
           
-          strapi.webSocket.broadcast({type: 'action', message: `Application is stopped now for index ${variable.token}.Please sell all positions before starting to trade again.`, status: true});
-          return {status: true, message: `Application stopped now for index ${variable.token}...`};        
+          strapi.webSocket.broadcast({type: 'action', message: `Application is stopped now for index ${variable.index}.Please sell all positions before starting to trade again.`, status: true});
+          return {status: true, message: `Application stopped now for index ${variable.index}...`};        
       }
     }
   },
@@ -518,15 +505,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       },
     });
     if(variables.length > 0){
-      variables.forEach(indexItem => {        
-        INDICES.set(`${indexItem.index}`,new Map(Object.entries(indexItem)));             
-      });
-    }
-    
-    //Try with Multi level Map architecture
-    
-    // return indexVariables; 
-    return INDICES;   
+      for (const indexItem of variables) {
+        strapi[indexItem.indexToken] = new Map(Object.entries(indexItem));
+        const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken: indexItem.indexToken }});        
+        strapi[indexItem.indexToken].set('scripList', scrip.scripList);
+      }      
+    }       
   },
   
 }));

@@ -13,6 +13,7 @@ const { createCoreController } = require('@strapi/strapi').factories;
 module.exports = createCoreController('api::variable.variable', ({ strapi }) => ({
     //Handle Update request
     async handleInvestmentVariables(ctx) {
+        
 
         //Check input values        
         const {
@@ -21,12 +22,12 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
           resistance2,
           support1,
           support2,
-          token,
+          indexToken,
           amount,
           expiry,
           quantity
         } = ctx.request.body;        
-        if (!quantity || !expiry || !amount || !token || !basePrice || !resistance1 || !resistance2 || !support1 || !support2) {
+        if (!quantity || !expiry || !amount || !indexToken || indexToken.length === 0 || !basePrice || !resistance1 || !resistance2 || !support1 || !support2) {
             return ctx.send({ message: 'Invalid Payload provided. Please fill all the fields...', status: false, });
         } else if(quantity <= 0 || amount <= 0 || basePrice <=0 || resistance1 <=0 || resistance2 <=0 || support1 <=0 || support2 <=0){
             return ctx.send({ message: 'Cannot provide zero or negative values for mandatory fields...', status: false });
@@ -36,10 +37,10 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         
         //Check if a variable row exist in the database for the given token
         const indexItem = await strapi.db.query('api::variable.variable').findOne({
-            where: { token },  
+            where: { indexToken },  
         });
         if(!indexItem){
-            return ctx.send({ message: 'Please check the token number provided...', status: false });
+            return ctx.send({ message: 'Please check the token provided...', status: false });
         }
         let contracts;
 
@@ -68,26 +69,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             }
         } catch (error) {
             return ctx.send({ message: 'Either expiry data provided is wrong or Session token expired', status: false });
-        }
-
-
-
-
-        let scripList;
-        //Find if a scripList is already subscribed for the given token or generate scripList and subscribe to Flattrade websocket
-        let scripLists = await strapi.db.query('api::web-socket.web-socket').findMany();        
-        if(scripLists.find((scrip) => scrip.indexToken === indexItem.token && (scrip.scripList === '' || scrip.scripList === null ))){
-            try{
-                scripList = await strapi.service('api::variable.variable').processScripList(indexItem.token,indexItem.index,contracts.values[0].tsym, sessionToken);
-                //Subscribe touchline with the new scriplist
-                await strapi.service('api::web-socket.web-socket').subscribeTouchline(scripList);    
-            }catch(error){
-                return ctx.send({ message: `Error in processing scrip list with error:  ${error}`, status: false });
-            }
-        } 
-
-
-        
+        }        
        
         //Fetch and create previousTradedPrice which is beneficial for initialSpectatorMode decisions
         let previousTradedPrice;
@@ -113,7 +95,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         
         // Step 2: Update values for the found index
         const updatedIndexItem = await strapi.db.query('api::variable.variable').update({
-            where: { token },  
+            where: { indexToken },  
             data: {
             basePrice,
             resistance1,
@@ -131,7 +113,24 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             putBoughtAt: 0,
             awaitingOrderConfirmation: false,
             },
-        });     
+        });
+        
+        let scripList;
+        //Find if a scripList is already subscribed for the given token or generate scripList and subscribe to Flattrade websocket
+        let scripLists = await strapi.db.query('api::web-socket.web-socket').findMany();        
+        if(scripLists.find((scrip) => scrip.indexToken === indexToken && (scrip.scripList === '' || scrip.scripList === null ))){
+            try{
+                scripList = await strapi.service('api::variable.variable').processScripList(indexToken,indexItem.index,contracts.values[0].tsym, sessionToken);
+                strapi[indexToken] = new Map(Object.entries(updatedIndexItem));
+                strapi[indexToken].set('scripList', scripList); 
+                //Subscribe touchline with the new scriplist
+                await strapi.service('api::web-socket.web-socket').subscribeTouchline(scripList);    
+            }catch(error){
+                return ctx.send({ message: `Error in processing scrip list with error:  ${error}`, status: false });
+            }
+        }
+
+                
         return {
             message: `Investment variables updated successfully. Market watching started for index ${indexItem.index}.`,
             status: true,
@@ -141,9 +140,8 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
 
     //Stop Trading
     async stopTrading(ctx) {
-        const { token } = ctx.request.body;
-        const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken: token }});    
-        return ctx.send(await strapi.service('api::variable.variable').stopTrading(token));
+        const { indexToken } = ctx.request.body;
+        return ctx.send(await strapi.service('api::variable.variable').stopTrading(indexToken));
     }   
 }));
 
