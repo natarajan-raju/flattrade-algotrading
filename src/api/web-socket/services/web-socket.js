@@ -120,8 +120,8 @@ module.exports = ({ strapi }) => ({
           let scripLists = [];
           let scripString = '';
           for (const indexToken of strapi.INDICES) { 
-            if(strapi[indexToken]){
-              scripString = strapi[indexToken].get('scripList');              
+            if(strapi[`${indexToken}`]){
+              scripString = strapi[`${indexToken}`].get('scripList');              
             }           
             if(scripString){
               scripLists.push(scripString);
@@ -226,8 +226,8 @@ module.exports = ({ strapi }) => ({
   async resetScripList() {    
     await strapi.db.query('api::web-socket.web-socket').updateMany({ data: { scripList: '' } });
     for (const indexToken of strapi.INDICES) { 
-      if(strapi[indexToken]){
-        strapi[indexToken].set('scripList', '');        
+      if(strapi[`${indexToken}`]){
+        strapi[`${indexToken}`].set('scripList', '');        
       } 
     }
     console.log('ScripList reset successfully.');

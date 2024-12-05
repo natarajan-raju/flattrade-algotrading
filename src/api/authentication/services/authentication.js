@@ -20,11 +20,11 @@ module.exports = createCoreService('api::authentication.authentication', ({ stra
       });
 
       // Return the first token found or default values if none exist
+      strapi.sessionToken = existingTokens[0]?.requestToken || null;
       return {
         requestToken: existingTokens[0]?.requestToken || false,
         id: existingTokens[0]?.id || "",
       };    
-    
   },
 
   // Other authentication-related service functions can go here

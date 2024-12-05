@@ -29,49 +29,49 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
 
     // Place BUY Order service
     async placeBuyOrder(orderData) {        
-            const {  contractType, lp, contract, sessionToken, amount,quantity,token } = orderData;
-            const indexVariable = await strapi.service('api::variable.variable').readLocalIndexVariables(token);
-            if (!contract ) {
-                indexVariable.awaitingOrderConfirmation = false;
-                indexVariable.initialSpectatorMode = true;                                   
-                await strapi.service('api::variable.variable').saveIndexVariables(token, indexVariable);
-                await strapi.db.query('api::variable.variable').update({ where: { token }, data: { awaitingOrderConfirmation: false, initialSpectatorMode: true } });
-                strapi.webSocket.broadcast({type: 'order', message: 'No relevant contract found.Buy order failed..', status: false});
-                return {
-                    status: false,
-                    message: 'No Contract passed to placeBuyOrder. Check HandleFeed..',
-                };
+            const {  contractType, lp,quantity,index,indexToken } = orderData;
+            let preferredToken;
+            let preferredTokenLp;
+            if(contractType === 'CE'){
+                preferredToken = strapi[`${index}`].get('preferredCallToken');
+                preferredTokenLp = strapi[`${index}`].get('preferredCallTokenLp');
             }
             
-            const preferredToken = await this.getPreferredToken(contract.contractTokens, contractType, amount);
+            if(contractType === 'PE'){
+                preferredToken = strapi[`${index}`].get('preferredPutToken');
+                preferredTokenLp = strapi[`${index}`].get('preferredPutTokenLp');
+            }
             
-            if(preferredToken.token){
-                const lotSize = quantity * preferredToken.ls;
-                const price = lotSize * preferredToken.lp;
-                const contractBought = {
-                    token: preferredToken.token,
-                    contractType,
-                    contractTsym: preferredToken.tsym,
-                    contractId: contract.id,
-                    lotSize,
-                }
+            if(preferredToken){
+                const lotSize = quantity * strapi[`${preferredToken}`].get('ls');
+                const price = lotSize * preferredTokenLp;
+                
                 const createdOrder = await strapi.db.query('api::order.order').create({
                     data: {
-                        index: contract.index,
+                        index,
                         orderType: 'BUY',
                         contractType,                       
-                        contractToken: preferredToken.token,
+                        contractToken: preferredToken,
                         indexLtp: lp,
-                        contractTsym: preferredToken.tsym,
+                        contractTsym: strapi[`${preferredToken}`].get('tsym'),
                         lotSize,
                         price,
-                        contractLp: preferredToken.lp,                        
+                        contractLp: strapi[`${preferredToken}`].get('lp'),                        
                     }               
-                });               
-                await strapi.db.query('api::contract.contract').update({ where: { id: contract.id }, data: { contractBought } });
-                indexVariable.awaitingOrderConfirmation = false;                                   
-                await strapi.service('api::variable.variable').saveIndexVariables(token, indexVariable);
-                strapi.db.query('api::variable.variable').update({ where: { token }, data: { awaitingOrderConfirmation: false } });
+                });
+                console.log(`Created order: ${createdOrder}`);
+                const contractBought = {
+                    contractType,
+                    contractToken: preferredToken,
+                    tsym: strapi[`${preferredToken}`].get('tsym'),
+                    lotSize,                    
+                }               
+                strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractBought } });
+                strapi[`${index}`].set('contractBought', contractBought);
+                let awaitingOrderConfirmation = false;                
+                strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });                                               
+                
 
                 strapi.webSocket.broadcast({
                     type: 'order',
@@ -96,35 +96,44 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     //Place SELL order Service
     async placeSellOrder(orderData) {
         
-            const { contractType, lp,contract, sessionToken, index } = orderData;
-            const contractToBeSold = await strapi.db.query('api::contract.contract').findOne({
-                where: { index },
-            });
-            const contractLp = await strapi.service('api::contract.contract').getLpForOptionToken(contractToBeSold.contractBought.token,contract);
+            const { contractType, lp, index, indexToken, quantity } = orderData;
+            let contractBought = strapi[`${index}`].get('contractBought');
+            
             //Insert Flattrade Sell Execution code here
             const createdOrder = await strapi.db.query('api::order.order').create({
                 data: {
                     index,
                     orderType: 'SELL',
                     contractType,
-                    contractTsym: contractToBeSold.contractBought.contractTsym,
-                    contractToken: contractToBeSold.contractBought.token,
+                    contractTsym: contractBought.tsym,
+                    contractToken: contractBought.contractToken,
                     indexLtp: lp,
-                    lotSize: contractToBeSold.contractBought.lotSize,
-                    contractLp,
-                    price: contractLp * contractToBeSold.contractBought.lotSize,                                       
+                    lotSize: contractBought.lotSize,
+                    contractLp: 0,
+                    price: 0,                                       
                 }
             });
             console.log(`Created order: ${createdOrder}`);
-            await strapi.db.query('api::contract.contract').update({ where: { id: contractToBeSold.id }, data: {
-                contractBought: {},
-            } });
             strapi.webSocket.broadcast({
                 type: 'order',
                 data: createdOrder,
-                message: `Sell order for index ${index} with contract ${contractToBeSold.contractBought.contractTsym} placed`,
+                message: `Sell order for index ${index} with contract ${contractBought.contractTsym} placed`,
                 status: true,
             });
+            let awaitingOrderConfirmation = false;
+            strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
+            strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+            contractBought = {
+                contractType: '',
+                contractToken: '',
+                tsym: '',
+                lotSize: 0,
+            }
+            strapi[`${index}`].set('contractBought', contractBought);
+            strapi.db.query('api::position.position').update({ where: { index }, data: { contractBought } });
+
+           
+            
             return {
                 status: true,
                 message: 'Order placed successfully',

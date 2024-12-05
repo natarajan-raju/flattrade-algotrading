@@ -18,14 +18,23 @@
     "index": {
       "type": "string"
     },
-    "contractTokens": {
-      "type": "json"
-    },
     "indexToken": {
       "type": "string"
     },
-    "contractBought": {
+    "contractTokens": {
       "type": "json"
+    },
+    "preferredCallToken": {
+      "type": "string"
+    },
+    "preferredPutToken": {
+      "type": "string"
+    },
+    "preferredCallTokenLp": {
+      "type": "decimal"
+    },
+    "preferredPutTokenLp": {
+      "type": "decimal"
     }
   }
 }

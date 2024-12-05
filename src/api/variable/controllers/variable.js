@@ -47,15 +47,15 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         
         
         //Check if a session Token exist in            
-        const requestTokenResponse = await strapi.service('api::authentication.authentication').fetchRequestToken();
-        if(!requestTokenResponse.requestToken){
+        await strapi.service('api::authentication.authentication').fetchRequestToken();
+        if(!strapi.sessionToken){
             return ctx.send({ message: 'Request token not found', status: false });
         }
-        const sessionToken = requestTokenResponse.requestToken;
+        
         //Check expiry data by submitting a random contract detail fetch with the given expiry date to Flattrade
         try{            
             const date = await strapi.service('api::variable.variable').convertDateFormat(expiry);
-            const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","stext":"${indexItem.index + date}","exch":"NFO"}&jKey=${sessionToken}`;
+            const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","stext":"${indexItem.index + date}","exch":"NFO"}&jKey=${strapi.sessionToken}`;
             const contractsResponse = await fetch(`${env('FLATTRADE_SEARCH_SCRIP_URL')}`,{
                 method: 'POST',
                 headers: {
@@ -74,7 +74,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         //Fetch and create previousTradedPrice which is beneficial for initialSpectatorMode decisions
         let previousTradedPrice;
         try{
-            const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","exch":"NSE","token":"${sessionToken}"}&jKey=${sessionToken}`;
+            const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","exch":"NSE","token":"${strapi.sessionToken}"}&jKey=${strapi.sessionToken}`;
             const quoteReponse = await fetch(`${env('FLATTRADE_GET_QUOTES_URL')}`,{
                 method: 'POST',
                 headers: {
@@ -89,10 +89,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             return ctx.send({ message: `Error in fetching LTP of the index from Flattrade with error:  ${error}`, status: false });            
         }
 
-       
-        
-           
-        
+              
         // Step 2: Update values for the found index
         const updatedIndexItem = await strapi.db.query('api::variable.variable').update({
             where: { indexToken },  
@@ -114,22 +111,23 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             awaitingOrderConfirmation: false,
             },
         });
-        
+        strapi[`${indexToken}`] = new Map(Object.entries(updatedIndexItem));
         let scripList;
         //Find if a scripList is already subscribed for the given token or generate scripList and subscribe to Flattrade websocket
         let scripLists = await strapi.db.query('api::web-socket.web-socket').findMany();        
-        if(scripLists.find((scrip) => scrip.indexToken === indexToken && (scrip.scripList === '' || scrip.scripList === null ))){
+        if(scripLists.find((scrip) => scrip.indexToken === indexToken && (scrip.scripList === '' || scrip.scripList === null ))){            
             try{
-                scripList = await strapi.service('api::variable.variable').processScripList(indexToken,indexItem.index,contracts.values[0].tsym, sessionToken);
-                strapi[indexToken] = new Map(Object.entries(updatedIndexItem));
-                strapi[indexToken].set('scripList', scripList); 
+                scripList = await strapi.service('api::variable.variable').processScripList(indexToken,indexItem.index,contracts.values[0].tsym, strapi.sessionToken);  
+                strapi[`${indexToken}`].set('scripList', scripList);
+                
                 //Subscribe touchline with the new scriplist
-                await strapi.service('api::web-socket.web-socket').subscribeTouchline(scripList);    
+                strapi.service('api::web-socket.web-socket').subscribeTouchline(scripList);    
             }catch(error){
                 return ctx.send({ message: `Error in processing scrip list with error:  ${error}`, status: false });
             }
         }
-
+       strapi[`${index}`].set('amount', updatedIndexItem.amount);
+        
                 
         return {
             message: `Investment variables updated successfully. Market watching started for index ${indexItem.index}.`,

@@ -411,7 +411,6 @@ export interface ApiContractContract extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
-    contractBought: Schema.Attribute.JSON;
     contractTokens: Schema.Attribute.JSON;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -424,6 +423,10 @@ export interface ApiContractContract extends Struct.CollectionTypeSchema {
       'api::contract.contract'
     > &
       Schema.Attribute.Private;
+    preferredCallToken: Schema.Attribute.String;
+    preferredCallTokenLp: Schema.Attribute.Decimal;
+    preferredPutToken: Schema.Attribute.String;
+    preferredPutTokenLp: Schema.Attribute.Decimal;
     publishedAt: Schema.Attribute.DateTime;
     sampleContractTsym: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
@@ -464,6 +467,39 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     price: Schema.Attribute.Decimal;
     publishedAt: Schema.Attribute.DateTime;
     remarks: Schema.Attribute.String;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiPositionPosition extends Struct.CollectionTypeSchema {
+  collectionName: 'positions';
+  info: {
+    displayName: 'position';
+    pluralName: 'positions';
+    singularName: 'position';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    contractToken: Schema.Attribute.String;
+    contractType: Schema.Attribute.String;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    index: Schema.Attribute.String;
+    indexToken: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::position.position'
+    > &
+      Schema.Attribute.Private;
+    lotSize: Schema.Attribute.String;
+    publishedAt: Schema.Attribute.DateTime;
+    tsym: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -537,7 +573,7 @@ export interface ApiWebSocketWebSocket extends Struct.CollectionTypeSchema {
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     index: Schema.Attribute.String;
-    indexToken: Schema.Attribute.Integer;
+    indexToken: Schema.Attribute.String & Schema.Attribute.Unique;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -1064,6 +1100,7 @@ declare module '@strapi/strapi' {
       'api::authentication.authentication': ApiAuthenticationAuthentication;
       'api::contract.contract': ApiContractContract;
       'api::order.order': ApiOrderOrder;
+      'api::position.position': ApiPositionPosition;
       'api::variable.variable': ApiVariableVariable;
       'api::web-socket.web-socket': ApiWebSocketWebSocket;
       'plugin::content-releases.release': PluginContentReleasesRelease;

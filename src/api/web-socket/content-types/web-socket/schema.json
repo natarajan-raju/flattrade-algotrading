@@ -19,7 +19,8 @@
       "type": "string"
     },
     "indexToken": {
-      "type": "integer"
+      "type": "string",
+      "unique": true
     }
   }
 }

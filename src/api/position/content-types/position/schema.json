@@ -1,0 +1,33 @@
+{
+  "kind": "collectionType",
+  "collectionName": "positions",
+  "info": {
+    "singularName": "position",
+    "pluralName": "positions",
+    "displayName": "position"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "index": {
+      "type": "string"
+    },
+    "indexToken": {
+      "type": "string"
+    },
+    "contractType": {
+      "type": "string"
+    },
+    "contractToken": {
+      "type": "string"
+    },
+    "tsym": {
+      "type": "string"
+    },
+    "lotSize": {
+      "type": "string"
+    }
+  }
+}
