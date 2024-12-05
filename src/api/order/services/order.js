@@ -1,31 +1,11 @@
 'use strict';
 const { env } = require('@strapi/utils');
-const contract = require('../../contract/controllers/contract');
+
 // @ts-ignore
 const { createCoreService } = require('@strapi/strapi').factories;
 
 module.exports = createCoreService('api::order.order', ({ strapi }) => ({
 
-    // Helper function to get the preferred token
-    async getPreferredToken(contractTokens, contractType, targetAmount) {
-        // Select the appropriate array based on contract type
-        const tokensArray = contractType === 'CALL' ? contractTokens.call : contractTokens.put;
-      
-        // Find the token with the `lp` closest to `targetAmount`
-        let closestTokenData = {token: null, lp: Infinity, tsym: null};
-        let smallestDifference = Infinity;
-      
-        tokensArray.forEach(tokenData => {
-          if(tokenData.lp > targetAmount){
-            const difference = Math.abs(tokenData.lp - targetAmount);
-            if (difference < smallestDifference) {
-                smallestDifference = difference;
-                closestTokenData = tokenData;
-            }
-          }         
-        });      
-        return closestTokenData; // Return token ID or null if not found
-    }, 
 
     // Place BUY Order service
     async placeBuyOrder(orderData) {        
@@ -76,7 +56,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 strapi.webSocket.broadcast({
                     type: 'order',
                     data: createdOrder,
-                    message: `Buy order for index ${contract.index} with contract ${preferredToken.tsym} placed`,
+                    message: `Buy order for index ${index} with contract ${preferredToken.tsym} placed`,
                     status: 'success',
                 });
                 return {

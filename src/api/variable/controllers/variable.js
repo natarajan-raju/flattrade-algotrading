@@ -1,5 +1,5 @@
 'use strict';
-const index = require('@strapi/plugin-users-permissions/strapi-admin');
+
 const { env } = require('@strapi/utils');
 
 
@@ -126,7 +126,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                 return ctx.send({ message: `Error in processing scrip list with error:  ${error}`, status: false });
             }
         }
-       strapi[`${index}`].set('amount', updatedIndexItem.amount);
+       strapi[`${indexItem.index}`].set('amount', updatedIndexItem.amount);
         
                 
         return {

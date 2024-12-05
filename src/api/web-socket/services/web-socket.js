@@ -105,7 +105,7 @@ module.exports = ({ strapi }) => ({
     if (message.t === 'tf' && touchlineTokens.includes(message.tk) && message.lp) {
       if (this.processingTokens.has(message.tk)) {
         // Token is already in processing, ignore the message (duplicate)
-        strapi[message.tk].set('previousTradedPrice', message.lp);      
+        strapi[`${message.tk}`].set('previousTradedPrice', message.lp);      
         strapi.webSocket.broadcast({ type: 'variable', message: `No action taken at ${message.lp} for ${message.tk}`, status: true });
         console.log(`Preventing concurrent orders for token: ${message.tk}`);
         return;
@@ -155,9 +155,8 @@ module.exports = ({ strapi }) => ({
                 }
               } else {
                 console.log(`Preventing concurrent action for token: ${message.tk} due to incoming data burst`);
-                await strapi.service('api::variable.variable').updateIndexVariable(message.tk, { previousTradedPrice: message.lp });
-                strapi.db.query('api::variable.variable').update({ where: { token: message.tk }, data: { previousTradedPrice: message.lp } })
-                .catch((error) => {console.log(error)});
+                strapi[`${message.tk}`].set('previousTradedPrice', message.lp);
+                
               }
           }else {
             try {

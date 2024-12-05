@@ -1,8 +1,6 @@
 'use strict';
-const fs = require( 'fs' );
+
 const { env } = require('@strapi/utils');
-const index = require('@strapi/plugin-users-permissions/strapi-admin');
-const position = require('../../position/controllers/position');
 
 
 /**
@@ -11,7 +9,7 @@ const position = require('../../position/controllers/position');
 
 // @ts-ignore
 const { createCoreService } = require('@strapi/strapi').factories;
-const indexVariables = new Map();
+
 
 
 module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
@@ -182,6 +180,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               status: true,
             });
             console.log(`Order placement awaiting confirmation for index ${index}. No actions taken at LTP ${lp}`);
+            strapi[`${tk}`].set('previousTradedPrice', lp);
             return { message: 'Awaiting order confirmation' };
           }
         
@@ -420,8 +419,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     if(!indexToken){
         return {status: false, message: 'No token passed to stopTrading'};
     }
-    const {basePrice} = Object.fromEntries(strapi[`${indexToken}`]);
-    console.log('stopTrading',basePrice);
+   
     const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken }}); 
     strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
     strapi.db.query('api::web-socket.web-socket').update({where: { indexToken }, data: { scripList: '' }});
@@ -451,6 +449,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             where: { id: entry.id },
             data: defaultValues,
           });
+          strapi[`${entry.index}`].clear();
+          strapi[`${entry.indexToken}`].clear();
         }        
         strapi.webSocket.broadcast({type: 'action', message: 'Application is stopped now.Please sell all positions before starting to trade again.', status: true});
         return {status: true, message: 'Application stopped now..'};      
@@ -468,7 +468,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             where: { id: variable.id }, // Specify the condition for the update
             data: defaultValues,        // Specify the new data
           });
-          
+          strapi[`${indexToken}`].clear();
+          strapi[`${variable.index}`].clear();
           strapi.webSocket.broadcast({type: 'action', message: `Application is stopped now for index ${variable.index}.Please sell all positions before starting to trade again.`, status: true});
           return {status: true, message: `Application stopped now for index ${variable.index}...`};        
       }
