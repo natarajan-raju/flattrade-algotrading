@@ -86,21 +86,14 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         },
       });
 
-      strapi[`${contract.index}`] = new Map();
-      strapi[`${contract.index}`].set('preferredCallToken', contract.preferredCallToken);
-      strapi[`${contract.index}`].set('preferredPutToken', contract.preferredPutToken);
-      strapi[`${contract.index}`].set('preferredCallTokenLp', contract.preferredCallTokenLp || Infinity);
-      strapi[`${contract.index}`].set('preferredPutTokenLp', contract.preferredPutTokenLp || Infinity);
-
+     
 
       //Update the scrip list in database
       await strapi.db.query('api::web-socket.web-socket').update({
         where: { indexToken } ,
-        data: { scripList }
+        data: { scripList },
       });
       return scripList;
-
-      
     } catch (error) {
       throw new Error(error);
     }  
@@ -131,15 +124,15 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         strapi[`${index}`].set('preferredPutTokenLp', lp);
         strapi[`${index}`].set('preferredPutToken', tk);
       }
-      strapi.db.query('api::contract.contract').update({where: { 
-        index,
-        data: {
-          preferredCallToken,
-          preferredPutToken,
-          preferredCallTokenLp,
-          preferredPutTokenLp          
-        }
-       }});
+      strapi.db.query('api::contract.contract').update(
+        { where: { index },
+          data: {
+            preferredCallToken,
+            preferredPutToken,
+            preferredCallTokenLp,
+            preferredPutTokenLp          
+          }
+       });
 
       return { message: 'NFO Price updation received' };      
     } else {
@@ -148,6 +141,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           data: feedData,          
           status: true
         })
+        console.log(feedData);
         const headers = {
             Authorization: `Bearer ${env('SPECIAL_TOKEN')}`, // Including the special token in the Authorization header
         };  
@@ -198,7 +192,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               initialSpectatorMode = false;
               strapi[`${tk}`].set('initialSpectatorMode', initialSpectatorMode);
               strapi.db.query('api::variable.variable').update({
-                where: {token: tk},
+                where: {indexToken: `${tk}`},
                 data: {initialSpectatorMode},
               });
               strapi.webSocket.broadcast({ type: 'variable', message: `Reaching strategic position.Spectator mode turned off for index ${index}`, status: true});
@@ -237,7 +231,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
               strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);              
               strapi.db.query('api::variable.variable').update({
-                where: {token : tk},
+                where: {indexToken : `${tk}`},
                 data: {
                   callOptionBought,
                   callBoughtAt,
@@ -273,7 +267,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
               strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
               strapi.db.query('api::variable.variable').update({
-                where: {token : tk},
+                where: {indexToken : `${tk}`},
                 data: {              
                   putOptionBought,
                   putBoughtAt,
@@ -313,7 +307,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
                 strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                 strapi.db.query('api::variable.variable').update({
-                  where: {token : tk},
+                  where: {indexToken : `${tk}`},
                   data: {
                     callOptionBought,                  
                     previousTradedPrice,
@@ -352,7 +346,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
                 strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                 let updatedVariable = await strapi.db.query('api::variable.variable').update({
-                  where: {token: tk},
+                  where: {indexToken: `${tk}`},
                   data: {
                     putOptionBought,                  
                     previousTradedPrice,
@@ -402,7 +396,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
       // Iterate over each entry and update it with default values
       for (const entry of variableEntries) {
-        await strapi.entityService.update('api::variable.variable', entry.id, {
+        await strapi.db.query('api::variable.variable').update({
+          where: { id: entry.id },
           data: defaultValues,
         });
       }
@@ -542,9 +537,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         
         strapi[`${indexItem.indexToken}`] = new Map(Object.entries(indexItem));        
         const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken: indexItem.indexToken }});
-        const contract = await strapi.db.query('api::contract.contract').findOne({where: {indexToken: indexItem.indexToken}});      
+              
         strapi[`${indexItem.indexToken}`].set('scripList', scrip.scripList);
-        strapi[`${indexItem.index}`].set('amount', indexItem.amount);       
+        if(strapi[`${indexItem.index}`]){
+          strapi[`${indexItem.index}`].set('amount', indexItem.amount);
+        }
+               
         
       }      
     }   

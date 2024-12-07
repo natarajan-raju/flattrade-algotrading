@@ -1,5 +1,6 @@
 'use strict';
 
+const index = require('@strapi/plugin-users-permissions/strapi-admin');
 const { env } = require('@strapi/utils');
 
 
@@ -126,6 +127,12 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                 return ctx.send({ message: `Error in processing scrip list with error:  ${error}`, status: false });
             }
         }
+        const contract = await strapi.db.query('api::contract.contract').findOne({where: {index: indexItem.index}});
+        strapi[`${indexItem.index}`] = new Map();
+       
+        strapi[`${indexItem.index}`].set('preferredCallTokenLp', Infinity);
+        strapi[`${indexItem.index}`].set('preferredPutTokenLp', Infinity);
+        console.log(indexItem.index);
        strapi[`${indexItem.index}`].set('amount', updatedIndexItem.amount);
         
                 

@@ -70,14 +70,55 @@ module.exports = ({ strapi }) => ({
     });
 
     this.flattradeWs.on('close', () => {
-      console.log('Flattrade WebSocket connection closed. Attempting reconnect...');      
-      strapi.webSocket.broadcast({ type: 'variable', message: 'Flattrade WebSocket connection closed. Attempting reconnect...', status: false });
-      setTimeout(() => this.connectFlattradeWebSocket(),3000);
-    });
+      console.log('Flattrade WebSocket connection closed. Checking for existing scripList before reconnecting...');
+      
+      // Collect scripLists
+      let scripLists = [];
+      let scripString = '';
+      for (const indexToken of strapi.INDICES) {
+          if (strapi[`${indexToken}`]) {
+              scripString = strapi[`${indexToken}`].get('scripList');
+          }
+          if (scripString) {
+              scripLists.push(scripString);
+          }
+      }
+  
+      // Join scripLists if any exist
+      const scripList = scripLists.length > 0 ? scripLists.join('#') : null;
+  
+      // Attempt reconnect only if a scripList exists
+      if (scripList) {
+          console.log('ScripList exists. Attempting WebSocket reconnect...');
+          strapi.webSocket.broadcast({
+              type: 'variable',
+              message: 'Flattrade WebSocket connection closed. Attempting reconnect...',
+              status: false,
+          });
+          setTimeout(() => this.connectFlattradeWebSocket(), 3000);
+      } else {
+          console.log('No scripList found. WebSocket will not attempt to reconnect.');
+          strapi.webSocket.broadcast({
+              type: 'variable',
+              message: 'WebSocket connection closed. No scripList found, not reconnecting.',
+              status: false,
+          });
+      }
+  });
+  
 
     this.flattradeWs.on('error', (error) => {
       strapi.webSocket.broadcast({ type: 'action', message: `Flattrade WebSocket error: ${error}`, status: false });
       console.error('Flattrade WebSocket error:', error);
+    });
+
+    // Graceful shutdown on SIGINT (Ctrl+C)
+    process.on('SIGINT', () => {
+      if (this.flattradeWs && this.flattradeWs.readyState === WebSocket.OPEN) {
+        this.flattradeWs.close();
+        console.log('Flattrade WebSocket connection closed gracefully.');
+      }
+      process.exit(0);
     });
   },
 
@@ -119,6 +160,7 @@ module.exports = ({ strapi }) => ({
           console.log('Connection acknowledged for user:', message.uid);
           let scripLists = [];
           let scripString = '';
+          let scripList = '';
           for (const indexToken of strapi.INDICES) { 
             if(strapi[`${indexToken}`]){
               scripString = strapi[`${indexToken}`].get('scripList');              
@@ -127,8 +169,13 @@ module.exports = ({ strapi }) => ({
               scripLists.push(scripString);
             }            
           }
-          let scripList = scripLists.join('#');                
-          this.subscribeTouchline(scripList);
+          if(scripLists.length > 0){
+            scripList = scripLists.join('#');
+          }
+          if(scripList.length > 0){
+            this.subscribeTouchline(scripList);
+          }
+
           
           // this.subscribeOrderbook();
         } else {
