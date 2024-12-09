@@ -47,7 +47,7 @@ module.exports = ({ strapi }) => ({
   },
   
 
-  async connectFlattradeWebSocket() {
+  async connectFlattradeWebSocket(scripList) {
     // Fetch all WebSocket configuration entries and get the first one
     
     const flattradeWsUrl = env('FLATTRADE_WS_URL');
@@ -66,44 +66,20 @@ module.exports = ({ strapi }) => ({
     this.flattradeWs.on('message', (data) => {
       const messageString = Buffer.isBuffer(data) ? data.toString() : data;
       const message = JSON.parse(messageString);
-      this.handleIncomingMessage(message);
+      this.handleIncomingMessage(message,scripList);
     });
 
     this.flattradeWs.on('close', () => {
-      console.log('Flattrade WebSocket connection closed. Checking for existing scripList before reconnecting...');
+      console.log('Flattrade WebSocket connection closed.Attempting to reconnect...');
+      strapi.webSocket.broadcast({
+        type: 'variable',
+        message: 'Flattrade WebSocket connection closed. Attempting reconnect...',
+        status: false,
+      });
+      setTimeout(() => this.connectFlattradeWebSocket(scripList), 3000);
       
       // Collect scripLists
-      let scripLists = [];
-      let scripString = '';
-      for (const indexToken of strapi.INDICES) {
-          if (strapi[`${indexToken}`]) {
-              scripString = strapi[`${indexToken}`].get('scripList');
-          }
-          if (scripString) {
-              scripLists.push(scripString);
-          }
-      }
-  
-      // Join scripLists if any exist
-      const scripList = scripLists.length > 0 ? scripLists.join('#') : null;
-  
-      // Attempt reconnect only if a scripList exists
-      if (scripList) {
-          console.log('ScripList exists. Attempting WebSocket reconnect...');
-          strapi.webSocket.broadcast({
-              type: 'variable',
-              message: 'Flattrade WebSocket connection closed. Attempting reconnect...',
-              status: false,
-          });
-          setTimeout(() => this.connectFlattradeWebSocket(), 3000);
-      } else {
-          console.log('No scripList found. WebSocket will not attempt to reconnect.');
-          strapi.webSocket.broadcast({
-              type: 'variable',
-              message: 'WebSocket connection closed. No scripList found, not reconnecting.',
-              status: false,
-          });
-      }
+      
   });
   
 
@@ -138,7 +114,7 @@ module.exports = ({ strapi }) => ({
     this.flattradeWs.send(JSON.stringify(connectPayload));
   },
 
-  async handleIncomingMessage(message) {
+  async handleIncomingMessage(message,scripList) {
     // Define the specific touchline tokens to deduplicate
     const touchlineTokens = ['26000', '26014', '26037', '26013', '26009'];
   
@@ -157,26 +133,8 @@ module.exports = ({ strapi }) => ({
     switch (message.t) {
       case 'ck':
         if (message.s === 'OK') {
-          console.log('Connection acknowledged for user:', message.uid);
-          let scripLists = [];
-          let scripString = '';
-          let scripList = '';
-          for (const indexToken of strapi.INDICES) { 
-            if(strapi[`${indexToken}`]){
-              scripString = strapi[`${indexToken}`].get('scripList');              
-            }           
-            if(scripString){
-              scripLists.push(scripString);
-            }            
-          }
-          if(scripLists.length > 0){
-            scripList = scripLists.join('#');
-          }
-          if(scripList.length > 0){
-            this.subscribeTouchline(scripList);
-          }
-
-          
+          console.log('Connection acknowledged for user:', message.uid);          
+          this.subscribeTouchline(scripList);         
           // this.subscribeOrderbook();
         } else {
           console.error('Connection failed: Invalid user ID or session token.');
@@ -228,17 +186,26 @@ module.exports = ({ strapi }) => ({
     }
   },
 
-  subscribeTouchline(scripList) {
+  async subscribeTouchline(scripList) {
+    
     const subscribePayload = {
       t: 't',
       k: scripList,
     };
+
+    if (!this.flattradeWs) {
+      console.error('WebSocket is not initialized. Connecting...');
+      await this.connectFlattradeWebSocket();
+    }
     if(this.flattradeWs.readyState === WebSocket.OPEN){
       console.log('Flattrade WebSocket connection is open..Subscribing to touchline..');
       this.flattradeWs.send(JSON.stringify(subscribePayload));
     } else {
-      this.connectFlattradeWebSocket();
-      this.flattradeWs.send(JSON.stringify(subscribePayload));
+      await this.connectFlattradeWebSocket();
+      if(this.flattradeWs.readyState === WebSocket.OPEN){
+        console.log('Flattrade WebSocket connection is open..Subscribing to touchline..');
+        this.flattradeWs.send(JSON.stringify(subscribePayload));
+      }
     }
   },
 
@@ -269,12 +236,13 @@ module.exports = ({ strapi }) => ({
   },
 
   //Cron Job to reset scripList
-  async resetScripList() {    
-    await strapi.db.query('api::web-socket.web-socket').updateMany({ data: { scripList: '' } });
-    for (const indexToken of strapi.INDICES) { 
-      if(strapi[`${indexToken}`]){
-        strapi[`${indexToken}`].set('scripList', '');        
-      } 
+  async resetScripList() {
+    
+    for (const indexToken of strapi.INDICES) {
+      strapi.db.query('api::web-socket.web-socket').update({where: { indexToken }, data: { scripList: '' }});
+      // if(strapi[`${indexToken}`]){
+      //   strapi[`${indexToken}`].set('scripList', '');        
+      // } 
     }
     console.log('ScripList reset successfully.');
     strapi.webSocket.broadcast({ type: 'action', message: 'ScripList reset successfully.', status: true });  

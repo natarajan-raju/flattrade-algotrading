@@ -415,9 +415,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         return {status: false, message: 'No token passed to stopTrading'};
     }
    
-    const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken }}); 
-    strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
-    strapi.db.query('api::web-socket.web-socket').update({where: { indexToken }, data: { scripList: '' }});
+    const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken }});
+    if(scrip.scripList){
+      strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
+      strapi.db.query('api::web-socket.web-socket').update({where: { indexToken }, data: { scripList: '' }});
+    } 
+    
     const defaultValues = {
       basePrice: 0,
       resistance1: 0,
@@ -432,7 +435,14 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       Authorization: `Bearer ${env('SPECIAL_TOKEN')}`,
     };
     if(indexToken === '1'){
-        
+        const contractEntries = await strapi.db.query('api::contract.contract').findMany();
+        if(contractEntries.length > 0){
+          for (const contract of contractEntries) {
+            Object.keys(contract.contractTokens).forEach((token) => {
+              delete strapi[`${token}`];
+            });
+          }
+        }
         // Fetch all variable entries
         const variableEntries = await strapi.db.query('api::variable.variable').findMany({
           select: ['id'], // Select only the 'id' field
@@ -444,8 +454,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             where: { id: entry.id },
             data: defaultValues,
           });
-          strapi[`${entry.index}`].clear();
-          strapi[`${entry.indexToken}`].clear();
+          delete strapi[`${entry.index}`];
+          delete strapi[`${entry.indexToken}`];
         }        
         strapi.webSocket.broadcast({type: 'action', message: 'Application is stopped now.Please sell all positions before starting to trade again.', status: true});
         return {status: true, message: 'Application stopped now..'};      
@@ -463,8 +473,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             where: { id: variable.id }, // Specify the condition for the update
             data: defaultValues,        // Specify the new data
           });
-          strapi[`${indexToken}`].clear();
-          strapi[`${variable.index}`].clear();
+          delete strapi[`${indexToken}`];
+          delete strapi[`${variable.index}`];
           strapi.webSocket.broadcast({type: 'action', message: `Application is stopped now for index ${variable.index}.Please sell all positions before starting to trade again.`, status: true});
           return {status: true, message: `Application stopped now for index ${variable.index}...`};        
       }
@@ -538,7 +548,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         strapi[`${indexItem.indexToken}`] = new Map(Object.entries(indexItem));        
         const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken: indexItem.indexToken }});
               
-        strapi[`${indexItem.indexToken}`].set('scripList', scrip.scripList);
+        // strapi[`${indexItem.indexToken}`].set('scripList', scrip.scripList);
         if(strapi[`${indexItem.index}`]){
           strapi[`${indexItem.index}`].set('amount', indexItem.amount);
         }

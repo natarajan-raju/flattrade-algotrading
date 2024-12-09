@@ -14,7 +14,14 @@ const { createCoreController } = require('@strapi/strapi').factories;
 module.exports = createCoreController('api::variable.variable', ({ strapi }) => ({
     //Handle Update request
     async handleInvestmentVariables(ctx) {
-        
+        const contractEntries = await strapi.db.query('api::contract.contract').findMany();
+        if(contractEntries.length > 0){
+            for (const contract of contractEntries) {
+              Object.keys(contract.contractTokens).forEach((token) => {
+                console.log(token);
+              })
+            }
+          }
 
         //Check input values        
         const {
@@ -113,26 +120,28 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             },
         });
         strapi[`${indexToken}`] = new Map(Object.entries(updatedIndexItem));
+
         let scripList;
         //Find if a scripList is already subscribed for the given token or generate scripList and subscribe to Flattrade websocket
-        let scripLists = await strapi.db.query('api::web-socket.web-socket').findMany();        
-        if(scripLists.find((scrip) => scrip.indexToken === indexToken && (scrip.scripList === '' || scrip.scripList === null ))){            
+        let scripItem = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken }});    
+        if(!scripItem.scripList){
             try{
                 scripList = await strapi.service('api::variable.variable').processScripList(indexToken,indexItem.index,contracts.values[0].tsym, strapi.sessionToken);  
-                strapi[`${indexToken}`].set('scripList', scripList);
-                
-                //Subscribe touchline with the new scriplist
-                strapi.service('api::web-socket.web-socket').subscribeTouchline(scripList);    
+                strapi[`${indexToken}`].set('scripList', scripList);                    
             }catch(error){
                 return ctx.send({ message: `Error in processing scrip list with error:  ${error}`, status: false });
             }
+        } else {
+            scripList = scripItem.scripList;
         }
-        const contract = await strapi.db.query('api::contract.contract').findOne({where: {index: indexItem.index}});
+       
+        await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
+        
         strapi[`${indexItem.index}`] = new Map();
        
         strapi[`${indexItem.index}`].set('preferredCallTokenLp', Infinity);
         strapi[`${indexItem.index}`].set('preferredPutTokenLp', Infinity);
-        console.log(indexItem.index);
+        
        strapi[`${indexItem.index}`].set('amount', updatedIndexItem.amount);
         
                 
