@@ -13,7 +13,7 @@
   "pluginOptions": {},
   "attributes": {
     "scripList": {
-      "type": "string"
+      "type": "text"
     },
     "index": {
       "type": "string"
