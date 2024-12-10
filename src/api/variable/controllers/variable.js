@@ -131,7 +131,8 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
         
         strapi[`${indexItem.index}`] = new Map();
-       
+        strapi[`${indexItem.index}`].set('preferredCallToken', '');
+        strapi[`${indexItem.index}`].set('preferredPutToken', '');
         strapi[`${indexItem.index}`].set('preferredCallTokenLp', Infinity);
         strapi[`${indexItem.index}`].set('preferredPutTokenLp', Infinity);
         

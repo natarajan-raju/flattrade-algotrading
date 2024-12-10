@@ -77,7 +77,15 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     async placeSellOrder(orderData) {
         
             const { contractType, lp, index, indexToken, quantity } = orderData;
-            let contractBought = strapi[`${index}`].get('contractBought');
+            let contractBought;
+            try{
+                contractBought = strapi[`${index}`].get('contractBought');
+            } catch(error){
+                return {
+                    status: false,
+                    message: error
+                }
+            }
             
             //Insert Flattrade Sell Execution code here
             const createdOrder = await strapi.db.query('api::order.order').create({
