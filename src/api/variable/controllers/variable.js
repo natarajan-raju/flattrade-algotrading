@@ -14,14 +14,7 @@ const { createCoreController } = require('@strapi/strapi').factories;
 module.exports = createCoreController('api::variable.variable', ({ strapi }) => ({
     //Handle Update request
     async handleInvestmentVariables(ctx) {
-        const contractEntries = await strapi.db.query('api::contract.contract').findMany();
-        if(contractEntries.length > 0){
-            for (const contract of contractEntries) {
-              Object.keys(contract.contractTokens).forEach((token) => {
-                console.log(token);
-              })
-            }
-          }
+        
 
         //Check input values        
         const {
