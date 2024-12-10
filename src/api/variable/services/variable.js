@@ -118,21 +118,26 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         preferredCallTokenLp = lp;
         strapi[`${index}`].set('preferredCallTokenLp', lp);
         strapi[`${index}`].set('preferredCallToken', tk);
+        strapi.db.query('api::contract.contract').update({
+          where: { index },
+          data: {
+            preferredCallToken,
+            preferredCallTokenLp
+          }
+        });
       }else if(optt === 'PE' && lp >= amount && lp < preferredPutTokenLp){
         preferredPutToken = tk;
         preferredPutTokenLp = lp;
         strapi[`${index}`].set('preferredPutTokenLp', lp);
         strapi[`${index}`].set('preferredPutToken', tk);
-      }
-      strapi.db.query('api::contract.contract').update(
-        { where: { index },
+        strapi.db.query('api::contract.contract').update({
+          where: { index },
           data: {
-            preferredCallToken,
             preferredPutToken,
-            preferredCallTokenLp,
-            preferredPutTokenLp          
+            preferredPutTokenLp
           }
-       });
+        });
+      }      
 
       return { message: 'NFO Price updation received' };      
     } else {
@@ -456,7 +461,22 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           });
           delete strapi[`${entry.index}`];
           delete strapi[`${entry.indexToken}`];
-        }        
+        } 
+        //Reset scrip list in database and cache
+        const scrips = await strapi.db.query('api::web-socket.web-socket').findMany(
+          { where: 
+            { scripList: {
+                $ne: '',
+                $notNull: true,
+              } 
+            }
+          }
+        );
+        for (const scrip of scrips){
+          strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
+          strapi.db.query('api::web-socket.web-socket').update({where: { indexToken }, data: { scripList: '' }});
+        }
+        
         strapi.webSocket.broadcast({type: 'action', message: 'Application is stopped now.Please sell all positions before starting to trade again.', status: true});
         return {status: true, message: 'Application stopped now..'};      
     }else{

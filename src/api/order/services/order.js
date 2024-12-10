@@ -46,7 +46,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     tsym: strapi[`${preferredToken}`].get('tsym'),
                     lotSize,                    
                 }               
-                strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractBought } });
+                strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType, contractToken: preferredToken,tsym: strapi[`${preferredToken}`].get('tsym'),lotSize } });
                 strapi[`${index}`].set('contractBought', contractBought);
                 let awaitingOrderConfirmation = false;                
                 strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
@@ -110,7 +110,12 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 lotSize: 0,
             }
             strapi[`${index}`].set('contractBought', contractBought);
-            strapi.db.query('api::position.position').update({ where: { index }, data: { contractBought } });
+            strapi.db.query('api::position.position').update({ where: { index }, data: { 
+                contractType: '',
+                contractToken: '',
+                tsym: '',
+                lotSize: 0 
+            }});
 
            
             
