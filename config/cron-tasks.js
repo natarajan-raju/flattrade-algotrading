@@ -22,7 +22,7 @@ module.exports = {
         await strapi.service('api::web-socket.web-socket').resetScripList();
       },
       options: {
-        rule: "15 15 * * *", // Every day at 3:15 pm
+        rule: "34 18 * * *", // Every day at 3:15 pm
         tz: "Asia/Kolkata",  // Set to your desired timezone
       },
     },

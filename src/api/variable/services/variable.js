@@ -113,32 +113,43 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       //NFO Price update received. Update lp for contract token
       const { optt, index } = Object.fromEntries(strapi[`${tk}`]);
       let { preferredCallToken, preferredPutToken, preferredCallTokenLp, preferredPutTokenLp, amount } = Object.fromEntries(strapi[`${index}`]);
-      if(optt === 'CE' && lp >= amount && lp < preferredCallTokenLp){
-        preferredCallToken = tk;
-        preferredCallTokenLp = lp;
-        strapi[`${index}`].set('preferredCallTokenLp', lp);
-        strapi[`${index}`].set('preferredCallToken', tk);
-        strapi.db.query('api::contract.contract').update({
-          where: { index },
-          data: {
-            preferredCallToken,
-            preferredCallTokenLp
-          }
-        });
-      }else if(optt === 'PE' && lp >= amount && lp < preferredPutTokenLp){
-        preferredPutToken = tk;
-        preferredPutTokenLp = lp;
-        strapi[`${index}`].set('preferredPutTokenLp', lp);
-        strapi[`${index}`].set('preferredPutToken', tk);
-        strapi.db.query('api::contract.contract').update({
-          where: { index },
-          data: {
-            preferredPutToken,
-            preferredPutTokenLp
-          }
-        });
-      }      
-
+      if(optt === 'CE'){
+        if(tk === preferredCallToken){
+          strapi[`${tk}`].set('preferredCallTokenLp', lp);
+          strapi[`${tk}`].set('preferredCallToken', tk);
+        }else if(lp >= amount && lp < preferredCallTokenLp){
+          console.log(`New Preferred CALL token ${tk} with LTP ${lp} identified..`);
+          preferredCallToken = tk;
+          preferredCallTokenLp = lp;
+          strapi[`${index}`].set('preferredCallTokenLp', lp);
+          strapi[`${index}`].set('preferredCallToken', tk);
+          strapi.db.query('api::contract.contract').update({
+            where: { index },
+            data: {
+              preferredCallToken,
+              preferredCallTokenLp
+            }
+          });
+        }
+      }else if(optt === 'PE'){
+        if(tk === preferredPutToken){
+          strapi[`${tk}`].set('preferredPutTokenLp', lp);
+          strapi[`${tk}`].set('preferredPutToken', tk);
+        }else if(lp >= amount && lp < preferredPutTokenLp){
+          console.log(`New Preferred PUT token ${tk} with LTP ${lp} identified..`);
+          preferredPutToken = tk;
+          preferredPutTokenLp = lp;
+          strapi[`${index}`].set('preferredPutTokenLp', lp);
+          strapi[`${index}`].set('preferredPutToken', tk);
+          strapi.db.query('api::contract.contract').update({
+            where: { index },
+            data: {
+              preferredPutToken,
+              preferredPutTokenLp
+            }
+          });
+        }        
+      }
       return { message: 'NFO Price updation received' };      
     } else {
         strapi.webSocket.broadcast({
@@ -407,6 +418,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         });
       }
       strapi.webSocket.broadcast({ type: 'action',message: "Investment variables reset", status: true, });
+      console.log('Investment variables reset');
          
     } catch (error) {
       strapi.webSocket.broadcast({ type: 'action',message: "Error resetting investment variables. Please reset all variables", status: false, });
@@ -420,11 +432,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         return {status: false, message: 'No token passed to stopTrading'};
     }
    
-    const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken }});
-    if(scrip.scripList){
-      strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
-      strapi.db.query('api::web-socket.web-socket').update({where: { indexToken }, data: { scripList: '' }});
-    } 
+    
     
     const defaultValues = {
       basePrice: 0,
@@ -473,13 +481,28 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           }
         );
         for (const scrip of scrips){
-          strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
-          strapi.db.query('api::web-socket.web-socket').update({where: { indexToken }, data: { scripList: '' }});
+          try{
+            strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
+          }catch(error){
+            console.log(error);
+          }
+          
         }
         
         strapi.webSocket.broadcast({type: 'action', message: 'Application is stopped now.Please sell all positions before starting to trade again.', status: true});
         return {status: true, message: 'Application stopped now..'};      
     }else{
+
+      try{
+        const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken }});
+        if(scrip.scripList){
+          strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
+          strapi.db.query('api::web-socket.web-socket').update({where: { indexToken }, data: { scripList: '' }});
+          strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
+        } 
+      }catch(e){
+        console.log(e);
+      }
       const variable = await strapi.db.query('api::variable.variable').findOne({
         where: { indexToken },
       });
@@ -518,8 +541,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     if(contracts.length > 0){
       for (const contract of contracts) {
         strapi[`${contract.index}`] = new Map();
-        strapi[`${contract.index}`].set('preferredCallToken', contract.preferredCallToken);
-        strapi[`${contract.index}`].set('preferredPutToken', contract.preferredPutToken);
+        strapi[`${contract.index}`].set('preferredCallToken', contract.preferredCallToken || '');
+        strapi[`${contract.index}`].set('preferredPutToken', contract.preferredPutToken || '');
         strapi[`${contract.index}`].set('preferredCallTokenLp', contract.preferredCallTokenLp || Infinity);
         strapi[`${contract.index}`].set('preferredPutTokenLp', contract.preferredPutTokenLp || Infinity);
         
