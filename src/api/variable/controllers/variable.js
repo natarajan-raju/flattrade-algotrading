@@ -113,6 +113,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             },
         });
         strapi[`${indexToken}`] = new Map(Object.entries(updatedIndexItem));
+        strapi[`${indexItem.index}`] = new Map();
 
         let scripList;
         //Find if a scripList is already subscribed for the given token or generate scripList and subscribe to Flattrade websocket
@@ -126,17 +127,20 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             }
         } else {
             scripList = scripItem.scripList;
+            let contract = await strapi.db.query('api::contract.contract').findOne({where: {index}});
+            strapi[`${indexItem.index}`].set('contractTokens', contract.contractTokens);
+
         }
        
         await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
         
-        strapi[`${indexItem.index}`] = new Map();
-        strapi[`${indexItem.index}`].set('preferredCallToken', '');
-        strapi[`${indexItem.index}`].set('preferredPutToken', '');
-        strapi[`${indexItem.index}`].set('preferredCallTokenLp', Infinity);
-        strapi[`${indexItem.index}`].set('preferredPutTokenLp', Infinity);
         
-       strapi[`${indexItem.index}`].set('amount', updatedIndexItem.amount);
+    //     strapi[`${indexItem.index}`].set('preferredCallToken', '');
+    //     strapi[`${indexItem.index}`].set('preferredPutToken', '');
+    //     strapi[`${indexItem.index}`].set('preferredCallTokenLp', Infinity);
+    //     strapi[`${indexItem.index}`].set('preferredPutTokenLp', Infinity);
+        
+    //    strapi[`${indexItem.index}`].set('amount', updatedIndexItem.amount);
         
                 
         return {

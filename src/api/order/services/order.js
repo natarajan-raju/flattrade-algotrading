@@ -1,52 +1,62 @@
 'use strict';
 const { env } = require('@strapi/utils');
+const contract = require('../../contract/controllers/contract');
 
 // @ts-ignore
 const { createCoreService } = require('@strapi/strapi').factories;
 
 module.exports = createCoreService('api::order.order', ({ strapi }) => ({
 
+    async getPreferredContract(index,contractType,amount) {
+        const contractTokens = strapi[`${index}`].get('contractTokens');
+        const contracts = contractType === 'CE' ? contractTokens.ce : contractTokens.pe;
+        let preferredContract = {token: null, lp: Infinity, tsym: null, lotSize: null};
+        let smallestDifference = Infinity;
+        contracts.forEach(contract => {
+            if(contract.lp >= amount){
+                const difference = Math.abs(contract.lp - amount);
+                if(difference < smallestDifference){
+                    smallestDifference = difference;
+                    preferredContract = contract;
+                }
+            }
+        });
+        return preferredContract;
+    },
+
 
     // Place BUY Order service
     async placeBuyOrder(orderData) {        
-            const {  contractType, lp,quantity,index,indexToken } = orderData;
-            let preferredToken;
-            let preferredTokenLp;
-            if(contractType === 'CE'){
-                preferredToken = strapi[`${index}`].get('preferredCallToken');
-                preferredTokenLp = strapi[`${index}`].get('preferredCallTokenLp');
-            }
+            const {  contractType, lp,quantity,index,indexToken, amount } = orderData;
+            const preferredContract = await this.getPreferredContract(index,contractType,amount);
             
-            if(contractType === 'PE'){
-                preferredToken = strapi[`${index}`].get('preferredPutToken');
-                preferredTokenLp = strapi[`${index}`].get('preferredPutTokenLp');
-            }
+           
             
-            if(preferredToken){
-                const lotSize = quantity * strapi[`${preferredToken}`].get('ls');
-                const price = lotSize * preferredTokenLp;
+            if(preferredContract.token){
+                const lotSize = quantity * preferredContract.ls;
+                const price = lotSize * preferredContract.lp;
                 
                 const createdOrder = await strapi.db.query('api::order.order').create({
                     data: {
                         index,
                         orderType: 'BUY',
                         contractType,                       
-                        contractToken: preferredToken,
+                        contractToken: preferredContract.token,
                         indexLtp: lp,
-                        contractTsym: strapi[`${preferredToken}`].get('tsym'),
+                        contractTsym: preferredContract.tsym,
                         lotSize,
                         price,
-                        contractLp: strapi[`${preferredToken}`].get('lp'),                        
+                        contractLp: preferredContract.lp,                        
                     }               
                 });
                 console.log(`Created order: ${createdOrder}`);
                 const contractBought = {
                     contractType,
-                    contractToken: preferredToken,
-                    tsym: strapi[`${preferredToken}`].get('tsym'),
+                    contractToken: preferredContract.token,
+                    tsym: preferredContract.tsym,
                     lotSize,                    
                 }               
-                strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType, contractToken: preferredToken,tsym: strapi[`${preferredToken}`].get('tsym'),lotSize } });
+                strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType, contractToken: preferredContract.token,tsym: preferredContract.tsym,lotSize } });
                 strapi[`${index}`].set('contractBought', contractBought);
                 let awaitingOrderConfirmation = false;                
                 strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
@@ -56,7 +66,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 strapi.webSocket.broadcast({
                     type: 'order',
                     data: createdOrder,
-                    message: `Buy order for index ${index} with contract ${preferredToken.tsym} placed`,
+                    message: `Buy order for index ${index} with contract ${preferredContract.tsym} placed`,
                     status: 'success',
                 });
                 return {
