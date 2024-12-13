@@ -23,18 +23,6 @@
     },
     "contractTokens": {
       "type": "json"
-    },
-    "preferredCallToken": {
-      "type": "string"
-    },
-    "preferredPutToken": {
-      "type": "string"
-    },
-    "preferredCallTokenLp": {
-      "type": "decimal"
-    },
-    "preferredPutTokenLp": {
-      "type": "decimal"
     }
   }
 }

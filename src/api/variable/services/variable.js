@@ -76,11 +76,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         }else if(option.optt === 'PE'){
           contractTokens.pe.push(tokenData);
         }
-        // strapi[`${option.token}`] = new Map();
-        // strapi[`${option.token}`].set('optt', option.optt);
-        // strapi[`${option.token}`].set('tsym', option.tsym);
-        // strapi[`${option.token}`].set('ls', option.ls);
-        // strapi[`${option.token}`].set('index', index);
+        strapi[`${option.token}`] = new Map();
+        strapi[`${option.token}`].set('optt', option.optt);
+        strapi[`${option.token}`].set('tsym', option.tsym);
+        strapi[`${option.token}`].set('ls', option.ls);
+        strapi[`${option.token}`].set('index', index);
         // contractTokens[`${option.token}`] = tokenData;
         
       });
@@ -122,7 +122,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       //NFO Price update received. Update lp for contract token
 
       const { optt, index } = Object.fromEntries(strapi[`${tk}`]);
-      const contractTokens = Object.fromEntries(strapi[`${index}`].get('contractTokens'));
+      const contractTokens = strapi[`${index}`].get('contractTokens');
       //update the lp for current tk in contractTokens
       if(optt === 'CE'){
         contractTokens.ce.find(item => item.token === tk).lp = lp;
@@ -566,7 +566,23 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         strapi[`${contract.index}`].set('contractTokens', contract.contractTokens || {});
         
         
-        // const contractTokens = contract.contractTokens;
+        const contractTokens = contract.contractTokens;
+        contractTokens.ce.forEach(contract => {
+          const {token, optt, tsym, ls, index} = contract;
+          strapi[`${token}`] = new Map();
+          strapi[`${token}`].set('optt', optt);
+          strapi[`${token}`].set('tsym', tsym);
+          strapi[`${token}`].set('ls', ls);
+          strapi[`${token}`].set('index', index);
+        });
+        contractTokens.pe.forEach(contract => {
+          const {token, optt, tsym, ls, index} = contract;
+          strapi[`${token}`] = new Map();
+          strapi[`${token}`].set('optt', optt);
+          strapi[`${token}`].set('tsym', tsym);
+          strapi[`${token}`].set('ls', ls);
+          strapi[`${token}`].set('index', index);
+        });
         // for (const [token, tokenData] of Object.entries(contractTokens)) {
         //   strapi[`${token}`] = new Map();
         //   strapi[`${token}`].set('optt', tokenData.optt);

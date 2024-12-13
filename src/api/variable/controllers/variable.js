@@ -126,8 +126,8 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                 return ctx.send({ message: `Error in processing scrip list with error:  ${error}`, status: false });
             }
         } else {
-            scripList = scripItem.scripList;
-            let contract = await strapi.db.query('api::contract.contract').findOne({where: {index}});
+            scripList = scripItem.scripList;           
+            let contract = await strapi.db.query('api::contract.contract').findOne({where: {indexToken}});            
             strapi[`${indexItem.index}`].set('contractTokens', contract.contractTokens);
 
         }

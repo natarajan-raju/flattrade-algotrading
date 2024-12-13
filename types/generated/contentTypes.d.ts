@@ -423,10 +423,6 @@ export interface ApiContractContract extends Struct.CollectionTypeSchema {
       'api::contract.contract'
     > &
       Schema.Attribute.Private;
-    preferredCallToken: Schema.Attribute.String;
-    preferredCallTokenLp: Schema.Attribute.Decimal;
-    preferredPutToken: Schema.Attribute.String;
-    preferredPutTokenLp: Schema.Attribute.Decimal;
     publishedAt: Schema.Attribute.DateTime;
     sampleContractTsym: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
