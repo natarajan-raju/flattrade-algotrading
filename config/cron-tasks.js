@@ -14,15 +14,25 @@ module.exports = {
         tz: "Asia/Kolkata",  // Set to your desired timezone
       },
     },
+    dailyMorningTradeJob: {
+      task: async ({ strapi }) => {
+        strapi.isTradingEnabled = true;
+      },
+      options: {
+        rule: "30 09 * * *", // Every day at 7:07 AM
+        tz: "Asia/Kolkata",  // Set to your desired timezone
+      },
+    },
     dailyEveningJob: {
       task: async ({ strapi }) => {
         await strapi.service('api::variable.variable').resetInvestmentVariables();
         await strapi.service('api::contract.contract').clearContractVariables();
         await strapi.service('api::variable.variable').stopTrading('1');
         await strapi.service('api::web-socket.web-socket').resetScripList();
+        strapi.isTradingEnabled = false;
       },
       options: {
-        rule: "34 18 * * *", // Every day at 3:15 pm
+        rule: "30 15 * * *", // Every day at 3:15 pm
         tz: "Asia/Kolkata",  // Set to your desired timezone
       },
     },

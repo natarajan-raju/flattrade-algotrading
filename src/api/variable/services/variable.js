@@ -176,232 +176,235 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           status: true
         })
         console.log(feedData);
-        const headers = {
-            Authorization: `Bearer ${env('SPECIAL_TOKEN')}`, // Including the special token in the Authorization header
-        };  
-        //Try to fetch indexItem from local Map
-        let indexItem;
-        if(strapi[`${tk}`]){
-          indexItem = Object.fromEntries(strapi[`${tk}`]);
-        } else {
-          console.log('Fetching from database.. Please check map allocation');
-          indexItem = await strapi.db.query('api::index.index').findOne({
-            where: { indexToken: tk },
-          });
-        }
-
-        // Extract variables of the index
-          let {
-            basePrice, resistance1, resistance2, support1, support2, targetStep,
-            callOptionBought, putOptionBought,callBoughtAt, putBoughtAt, indexToken, index,initialSpectatorMode,previousTradedPrice, amount, quantity, awaitingOrderConfirmation
-          } = indexItem;
-          
-      
-          if (basePrice === 0 || resistance1 === 0 || resistance2 === 0 || support1 === 0 || support2 === 0){        
-            return { message: `Investment variables not defined for ${index}`};
-          } 
-          
-          if(awaitingOrderConfirmation){            
-            strapi.webSocket.broadcast({
-              type: 'variable',
-              message: `Order placement awaiting confirmation for index ${index}. No actions taken at LTP ${lp}`,
-              status: true,
+        if(strapi.isTradingEnabled){
+          const headers = {
+              Authorization: `Bearer ${env('SPECIAL_TOKEN')}`, // Including the special token in the Authorization header
+          };  
+          //Try to fetch indexItem from local Map
+          let indexItem;
+          if(strapi[`${tk}`]){
+            indexItem = Object.fromEntries(strapi[`${tk}`]);
+          } else {
+            console.log('Fetching from database.. Please check map allocation');
+            indexItem = await strapi.db.query('api::index.index').findOne({
+              where: { indexToken: tk },
             });
-            console.log(`Order placement awaiting confirmation for index ${index}. No actions taken at LTP ${lp}`);
-            strapi[`${tk}`].set('previousTradedPrice', lp);
-            return { message: 'Awaiting order confirmation' };
           }
-        
-          
-         
-          //Check if initialSpectatorMode is active
-          if(initialSpectatorMode){
-            if((lp <= basePrice + targetStep && lp >= basePrice - targetStep)
-              || (lp <= resistance1 + targetStep && lp >= resistance1 - targetStep)
-              || (lp <= resistance2 + targetStep && lp >= resistance2 - targetStep)
-              || (lp <= support1 + targetStep && lp >= support1 - targetStep)
-              || (lp <= support2 + targetStep && lp >= support2 - targetStep)
-            ){
-              //LP in investment hot zone. Turn off Spectator mode
-              initialSpectatorMode = false;
-              strapi[`${tk}`].set('initialSpectatorMode', initialSpectatorMode);
-              strapi.db.query('api::variable.variable').update({
-                where: {indexToken: `${tk}`},
-                data: {initialSpectatorMode},
-              });
-              strapi.webSocket.broadcast({ type: 'variable', message: `Reaching strategic position.Spectator mode turned off for index ${index}`, status: true});
-              console.log('Reaching strategic position.Spectator mode turned off');
-            } else {
-              //LP in Passive zone. Do not take any action
-              previousTradedPrice = lp;
-              strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);          
-              strapi.webSocket.broadcast({ type: 'variable', message: `No actions taken for index ${index} at LTP ${lp}`, status: true});
-              return `No actions taken at LTP ${lp}`;
-            }
-          }
-          
-          
-          let contractType;   
-          
-          //Buy CALL
-          if(!callOptionBought && !putOptionBought && !initialSpectatorMode ){
+
+          // Extract variables of the index
+            let {
+              basePrice, resistance1, resistance2, support1, support2, targetStep,
+              callOptionBought, putOptionBought,callBoughtAt, putBoughtAt, indexToken, index,initialSpectatorMode,previousTradedPrice, amount, quantity, awaitingOrderConfirmation
+            } = indexItem;
             
-            if(((lp >= basePrice + targetStep && lp < resistance1 - targetStep) 
-              || (lp >= resistance1 + targetStep && lp < resistance2 - targetStep)
-              || (lp>= resistance2 + targetStep)
-              || (lp >= support1 + targetStep && lp < basePrice - targetStep)
-              || (lp >= support2 + targetStep && lp < support1 - targetStep))
-              && (previousTradedPrice === 0 || previousTradedPrice < lp)
-            ){
-              
-              
-              //Buy CALL
-              callOptionBought = true;
-              callBoughtAt = lp;
-              previousTradedPrice = lp;
-              awaitingOrderConfirmation = true;
-              strapi[`${tk}`].set('callOptionBought', callOptionBought);
-              strapi[`${tk}`].set('callBoughtAt', callBoughtAt);
-              strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
-              strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);              
-              strapi.db.query('api::variable.variable').update({
-                where: {indexToken : `${tk}`},
-                data: {
-                  callOptionBought,
-                  callBoughtAt,
-                  previousTradedPrice,
-                  awaitingOrderConfirmation,
-                }
-              });
-              
-              strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy CALL at LTP ${lp}`, status: true});
-              contractType = 'CE';              
-              await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken,amount});
-              return {
-                  status: true,
-                  message: 'CALL buy Order placed successfully',
-                  
-              }                         
-            } else if(((lp <= basePrice - targetStep && lp > support1 + targetStep) 
-              || (lp <= support1 - targetStep && lp > support2 + targetStep)
-              || (lp <= support2 - targetStep)
-              || (lp <= resistance1 - targetStep && lp > basePrice + targetStep)
-              || (lp <= resistance2 - targetStep && lp > resistance1 + targetStep))
-              && (previousTradedPrice === 0 || previousTradedPrice > lp)
-            ){             
-              //Buy PUT 
-              
-              contractType = 'PE';
-              putOptionBought = true;
-              putBoughtAt = lp;
-              previousTradedPrice = lp;
-              awaitingOrderConfirmation = true;
-              strapi[`${tk}`].set('putOptionBought', putOptionBought);
-              strapi[`${tk}`].set('putBoughtAt', putBoughtAt);
-              strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
-              strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-              strapi.db.query('api::variable.variable').update({
-                where: {indexToken : `${tk}`},
-                data: {              
-                  putOptionBought,
-                  putBoughtAt,
-                  previousTradedPrice,
-                  awaitingOrderConfirmation
-                }
-              });
-              
-              strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`, status: true});
-              await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken, amount});
-              return {
+        
+            if (basePrice === 0 || resistance1 === 0 || resistance2 === 0 || support1 === 0 || support2 === 0){        
+              return { message: `Investment variables not defined for ${index}`};
+            } 
+            
+            if(awaitingOrderConfirmation){            
+              strapi.webSocket.broadcast({
+                type: 'variable',
+                message: `Order placement awaiting confirmation for index ${index}. No actions taken at LTP ${lp}`,
                 status: true,
-                message: 'PUT buy Order placed successfully',                            
-              }                           
+              });
+              console.log(`Order placement awaiting confirmation for index ${index}. No actions taken at LTP ${lp}`);
+              strapi[`${tk}`].set('previousTradedPrice', lp);
+              return { message: 'Awaiting order confirmation' };
             }
-          }
-      
-          //Sell CALL
-          if(callOptionBought){
-            if(
-              ((lp >= basePrice && (callBoughtAt >= support1 + targetStep && callBoughtAt < basePrice)) || (lp <= basePrice && (callBoughtAt >= basePrice + targetStep &&callBoughtAt < resistance1)))
-              || ((lp >= resistance1 && (callBoughtAt >= basePrice + targetStep && callBoughtAt < resistance1)) || (lp <= resistance1 && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2)))
-              || ((lp >= support1 && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1)) || (lp <= support1 && (callBoughtAt >= support1 + targetStep && callBoughtAt < basePrice)))
-              || ((lp >=resistance2 && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2)) || (lp <= resistance2 && callBoughtAt  >= resistance2 + targetStep)) 
-              || ((lp >= support2 && callBoughtAt < support2) || (lp <= support2 && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1))) //Stop loss at Support 2
-            ){              
-              strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell CALL at LTP ${lp}`, status: true});     
-              //call sell API
+          
+            
+          
+            //Check if initialSpectatorMode is active
+            if(initialSpectatorMode){
+              if((lp <= basePrice + targetStep && lp >= basePrice - targetStep)
+                || (lp <= resistance1 + targetStep && lp >= resistance1 - targetStep)
+                || (lp <= resistance2 + targetStep && lp >= resistance2 - targetStep)
+                || (lp <= support1 + targetStep && lp >= support1 - targetStep)
+                || (lp <= support2 + targetStep && lp >= support2 - targetStep)
+              ){
+                //LP in investment hot zone. Turn off Spectator mode
+                initialSpectatorMode = false;
+                strapi[`${tk}`].set('initialSpectatorMode', initialSpectatorMode);
+                strapi.db.query('api::variable.variable').update({
+                  where: {indexToken: `${tk}`},
+                  data: {initialSpectatorMode},
+                });
+                strapi.webSocket.broadcast({ type: 'variable', message: `Reaching strategic position.Spectator mode turned off for index ${index}`, status: true});
+                console.log('Reaching strategic position.Spectator mode turned off');
+              } else {
+                //LP in Passive zone. Do not take any action
+                previousTradedPrice = lp;
+                strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);          
+                strapi.webSocket.broadcast({ type: 'variable', message: `No actions taken for index ${index} at LTP ${lp}`, status: true});
+                return `No actions taken at LTP ${lp}`;
+              }
+            }
+            
+            
+            let contractType;   
+            
+            //Buy CALL
+            if(!callOptionBought && !putOptionBought && !initialSpectatorMode ){
               
-                contractType = 'CE';              
-                callOptionBought = false; 
-                callBoughtAt = 0;             
+              if(((lp >= basePrice + targetStep && lp < resistance1 - targetStep) 
+                || (lp >= resistance1 + targetStep && lp < resistance2 - targetStep)
+                || (lp>= resistance2 + targetStep)
+                || (lp >= support1 + targetStep && lp < basePrice - targetStep)
+                || (lp >= support2 + targetStep && lp < support1 - targetStep))
+                && (previousTradedPrice === 0 || previousTradedPrice < lp)
+              ){
+                
+                
+                //Buy CALL
+                callOptionBought = true;
+                callBoughtAt = lp;
                 previousTradedPrice = lp;
                 awaitingOrderConfirmation = true;
                 strapi[`${tk}`].set('callOptionBought', callOptionBought);
                 strapi[`${tk}`].set('callBoughtAt', callBoughtAt);
                 strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
-                strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);              
                 strapi.db.query('api::variable.variable').update({
                   where: {indexToken : `${tk}`},
                   data: {
-                    callOptionBought,                  
-                    previousTradedPrice,
+                    callOptionBought,
                     callBoughtAt,
-                    awaitingOrderConfirmation
+                    previousTradedPrice,
+                    awaitingOrderConfirmation,
                   }
                 });
-                await strapi.service('api::order.order').placeSellOrder({contractType,lp,index,indexToken,quantity});
+                
+                strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy CALL at LTP ${lp}`, status: true});
+                contractType = 'CE';              
+                await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken,amount});
                 return {
-                  status: true,
-                  message: 'CALL sell Order placed successfully',
-                           
-                }                                                 
-            }
-          }
-      
-          //Sell PUT
-          if(putOptionBought){
-            if(
-              ((lp <= basePrice && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)) || (lp >= basePrice && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)))
-              || ((lp <= support1 && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)) || (lp >= support1 && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)))
-              || ((lp <= resistance1 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1)) || (lp >= resistance1 && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)))
-              || ((lp <= support2 && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)) || (lp >= support2 && putBoughtAt <= support2 - targetStep))
-              || ((lp <= resistance2 && putBoughtAt > resistance2) || (lp >= resistance2 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1))) //Stop loss at Resistance 2
-            ){                            
-              strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell PUT at LTP ${lp}`, status: true}); 
-              //PUT sell API 
-             
-                contractType = 'PE';             
-                putOptionBought = false;  
-                putBoughtAt = 0;            
+                    status: true,
+                    message: 'CALL buy Order placed successfully',
+                    
+                }                         
+              } else if(((lp <= basePrice - targetStep && lp > support1 + targetStep) 
+                || (lp <= support1 - targetStep && lp > support2 + targetStep)
+                || (lp <= support2 - targetStep)
+                || (lp <= resistance1 - targetStep && lp > basePrice + targetStep)
+                || (lp <= resistance2 - targetStep && lp > resistance1 + targetStep))
+                && (previousTradedPrice === 0 || previousTradedPrice > lp)
+              ){             
+                //Buy PUT 
+                
+                contractType = 'PE';
+                putOptionBought = true;
+                putBoughtAt = lp;
                 previousTradedPrice = lp;
                 awaitingOrderConfirmation = true;
                 strapi[`${tk}`].set('putOptionBought', putOptionBought);
                 strapi[`${tk}`].set('putBoughtAt', putBoughtAt);
                 strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
                 strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-                let updatedVariable = await strapi.db.query('api::variable.variable').update({
-                  where: {indexToken: `${tk}`},
-                  data: {
-                    putOptionBought,                  
-                    previousTradedPrice,
+                strapi.db.query('api::variable.variable').update({
+                  where: {indexToken : `${tk}`},
+                  data: {              
+                    putOptionBought,
                     putBoughtAt,
+                    previousTradedPrice,
                     awaitingOrderConfirmation
-                  }           
+                  }
                 });
-                await strapi.service('api::order.order').placeSellOrder({contractType,lp,index,indexToken,quantity});
+                
+                strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`, status: true});
+                await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken, amount});
                 return {
                   status: true,
-                  message: 'PUT sell Order placed successfully',
-                  updatedVariable,
-                }                          
+                  message: 'PUT buy Order placed successfully',                            
+                }                           
+              }
             }
-          }  
-          strapi[`${tk}`].set('previousTradedPrice', lp);     
-      }   
+        
+            //Sell CALL
+            if(callOptionBought){
+              if(
+                ((lp >= basePrice && (callBoughtAt >= support1 + targetStep && callBoughtAt < basePrice)) || (lp <= basePrice && (callBoughtAt >= basePrice + targetStep &&callBoughtAt < resistance1)))
+                || ((lp >= resistance1 && (callBoughtAt >= basePrice + targetStep && callBoughtAt < resistance1)) || (lp <= resistance1 && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2)))
+                || ((lp >= support1 && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1)) || (lp <= support1 && (callBoughtAt >= support1 + targetStep && callBoughtAt < basePrice)))
+                || ((lp >=resistance2 && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2)) || (lp <= resistance2 && callBoughtAt  >= resistance2 + targetStep)) 
+                || ((lp >= support2 && callBoughtAt < support2) || (lp <= support2 && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1))) //Stop loss at Support 2
+              ){              
+                strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell CALL at LTP ${lp}`, status: true});     
+                //call sell API
+                
+                  contractType = 'CE';              
+                  callOptionBought = false; 
+                  callBoughtAt = 0;             
+                  previousTradedPrice = lp;
+                  awaitingOrderConfirmation = true;
+                  strapi[`${tk}`].set('callOptionBought', callOptionBought);
+                  strapi[`${tk}`].set('callBoughtAt', callBoughtAt);
+                  strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
+                  strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                  strapi.db.query('api::variable.variable').update({
+                    where: {indexToken : `${tk}`},
+                    data: {
+                      callOptionBought,                  
+                      previousTradedPrice,
+                      callBoughtAt,
+                      awaitingOrderConfirmation
+                    }
+                  });
+                  await strapi.service('api::order.order').placeSellOrder({contractType,lp,index,indexToken,quantity});
+                  return {
+                    status: true,
+                    message: 'CALL sell Order placed successfully',
+                            
+                  }                                                 
+              }
+            }
+        
+            //Sell PUT
+            if(putOptionBought){
+              if(
+                ((lp <= basePrice && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)) || (lp >= basePrice && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)))
+                || ((lp <= support1 && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)) || (lp >= support1 && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)))
+                || ((lp <= resistance1 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1)) || (lp >= resistance1 && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)))
+                || ((lp <= support2 && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)) || (lp >= support2 && putBoughtAt <= support2 - targetStep))
+                || ((lp <= resistance2 && putBoughtAt > resistance2) || (lp >= resistance2 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1))) //Stop loss at Resistance 2
+              ){                            
+                strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell PUT at LTP ${lp}`, status: true}); 
+                //PUT sell API 
+              
+                  contractType = 'PE';             
+                  putOptionBought = false;  
+                  putBoughtAt = 0;            
+                  previousTradedPrice = lp;
+                  awaitingOrderConfirmation = true;
+                  strapi[`${tk}`].set('putOptionBought', putOptionBought);
+                  strapi[`${tk}`].set('putBoughtAt', putBoughtAt);
+                  strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
+                  strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                  let updatedVariable = await strapi.db.query('api::variable.variable').update({
+                    where: {indexToken: `${tk}`},
+                    data: {
+                      putOptionBought,                  
+                      previousTradedPrice,
+                      putBoughtAt,
+                      awaitingOrderConfirmation
+                    }           
+                  });
+                  await strapi.service('api::order.order').placeSellOrder({contractType,lp,index,indexToken,quantity});
+                  return {
+                    status: true,
+                    message: 'PUT sell Order placed successfully',
+                    updatedVariable,
+                  }                          
+              }
+            }  
+            strapi[`${tk}`].set('previousTradedPrice', lp);     
+        }
+    }   
   },
   // Custom function to reset investment variables
   async resetInvestmentVariables() {
     try {
+      
       const defaultValues = {
         basePrice: 0,
         resistance1: 0,
@@ -442,6 +445,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       strapi.webSocket.broadcast({ type: 'action',message: "Error resetting investment variables. Please reset all variables", status: false, });
         
     }
+    
   },
 
   //Cron function to stop market at 3.15pm daily
@@ -590,10 +594,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         //   strapi[`${token}`].set('ls', tokenData.ls);
         //   strapi[`${token}`].set('index', tokenData.index);
           
-        // }      
+        // } 
+             
       }
     }
-
+    console.log('Contracts fetched...');
     const positions = await strapi.db.query('api::position.position').findMany({
       where: {
         contractToken: {
@@ -614,7 +619,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         strapi[`${position.index}`].set('contractBought', contractBought);
       }
     }
-    
+    console.log('Positions fetched...');
     const variables = await strapi.db.query('api::variable.variable').findMany({
       where: {
         basePrice: { $gt: 0 },  // '$gt' means greater than
@@ -633,7 +638,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                
         
       }      
-    }   
+    } 
+    console.log('Variables fetched...');  
   },
   
 }));

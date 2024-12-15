@@ -1,6 +1,6 @@
 'use strict';
 const { env } = require('@strapi/utils');
-const contract = require('../../contract/controllers/contract');
+
 
 // @ts-ignore
 const { createCoreService } = require('@strapi/strapi').factories;

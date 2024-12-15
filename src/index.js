@@ -17,7 +17,7 @@ module.exports = {
    *
    * This gives you an opportunity to set up your data model,
    * run jobs, or perform some special logic.
-   */
+   */ 
   bootstrap({ strapi }) {
     
     // Initialize WebSocket server     
@@ -25,8 +25,16 @@ module.exports = {
       await strapi.service('api::web-socket.web-socket').initializeWebSocketServer();      
       await strapi.service('api::variable.variable').fetchIndexVariables();
       strapi.INDICES = ['26000','26009','26013','26014','26037'];  
-      // strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket();
-      
+      // strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket()
+      const currentTime = new Date();
+      const currentHour = currentTime.getHours();
+      const currentMinute = currentTime.getMinutes();
+      if(currentHour < 9 || (currentHour === 9 && currentMinute < 30) || (currentHour >= 15 && currentMinute >= 30)){
+        strapi.isTradingEnabled = false;
+      }else {
+        strapi.isTradingEnabled = true;
+      }
+      console.log(`is Trading enabled? ${strapi.isTradingEnabled} | Current Time: ${currentTime} | Current Hour: ${currentHour} | Current Minute: ${currentMinute}`);
     };
     setFoundation().then((result) => {
       console.log('WebSocket server initialized & Index Variables Fetched succesfully');     
