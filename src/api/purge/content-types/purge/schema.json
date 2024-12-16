@@ -1,0 +1,57 @@
+{
+  "kind": "collectionType",
+  "collectionName": "purges",
+  "info": {
+    "singularName": "purge",
+    "pluralName": "purges",
+    "displayName": "purge"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "index": {
+      "type": "string"
+    },
+    "orderType": {
+      "type": "string"
+    },
+    "contractType": {
+      "type": "string"
+    },
+    "contractTsym": {
+      "type": "string"
+    },
+    "contractToken": {
+      "type": "string"
+    },
+    "indexLtp": {
+      "type": "string"
+    },
+    "lotSize": {
+      "type": "integer"
+    },
+    "price": {
+      "type": "decimal"
+    },
+    "orderDate": {
+      "type": "date"
+    },
+    "norenordno": {
+      "type": "string"
+    },
+    "orderStatus": {
+      "type": "string"
+    },
+    "remarks": {
+      "type": "string"
+    },
+    "indexToken": {
+      "type": "string"
+    },
+    "contractLp": {
+      "type": "decimal"
+    }
+  }
+}

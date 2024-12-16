@@ -96,7 +96,11 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     message: error
                 }
             }
-            
+            if(!contractBought.tsym || contractBought.tsym === undefined || contractBought.tsym === '' || contractBought.tsym === null){
+                return {
+                    status: false,
+                }
+            }
             //Insert Flattrade Sell Execution code here
             const createdOrder = await strapi.db.query('api::order.order').create({
                 data: {

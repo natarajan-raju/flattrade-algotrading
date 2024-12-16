@@ -397,7 +397,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 }
               }
             }else{
-              console.log('Trading will initiate only after 0930 hrs');
+              console.log('Trading will be execercised only between 0915 and 1530 hrs. Please wait...');
               strapi.webSocket.broadcast({ type: 'variable', message: `Trading will initiate only after 0930 hrs`, status: true});
             }  
             strapi[`${tk}`].set('previousTradedPrice', lp);     

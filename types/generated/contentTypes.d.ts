@@ -502,6 +502,44 @@ export interface ApiPositionPosition extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiPurgePurge extends Struct.CollectionTypeSchema {
+  collectionName: 'purges';
+  info: {
+    displayName: 'purge';
+    pluralName: 'purges';
+    singularName: 'purge';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    contractLp: Schema.Attribute.Decimal;
+    contractToken: Schema.Attribute.String;
+    contractTsym: Schema.Attribute.String;
+    contractType: Schema.Attribute.String;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    index: Schema.Attribute.String;
+    indexLtp: Schema.Attribute.String;
+    indexToken: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<'oneToMany', 'api::purge.purge'> &
+      Schema.Attribute.Private;
+    lotSize: Schema.Attribute.Integer;
+    norenordno: Schema.Attribute.String;
+    orderDate: Schema.Attribute.Date;
+    orderStatus: Schema.Attribute.String;
+    orderType: Schema.Attribute.String;
+    price: Schema.Attribute.Decimal;
+    publishedAt: Schema.Attribute.DateTime;
+    remarks: Schema.Attribute.String;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiVariableVariable extends Struct.CollectionTypeSchema {
   collectionName: 'variables';
   info: {
@@ -1097,6 +1135,7 @@ declare module '@strapi/strapi' {
       'api::contract.contract': ApiContractContract;
       'api::order.order': ApiOrderOrder;
       'api::position.position': ApiPositionPosition;
+      'api::purge.purge': ApiPurgePurge;
       'api::variable.variable': ApiVariableVariable;
       'api::web-socket.web-socket': ApiWebSocketWebSocket;
       'plugin::content-releases.release': PluginContentReleasesRelease;

@@ -29,7 +29,7 @@ module.exports = {
       const currentTime = new Date();
       const currentHour = currentTime.getHours();
       const currentMinute = currentTime.getMinutes();
-      if(currentHour < 9 || (currentHour === 9 && currentMinute < 30) || (currentHour >= 15 && currentMinute >= 30)){
+      if(currentHour < 9 || (currentHour === 9 && currentMinute < 15) || (currentHour >= 15 && currentMinute >= 30)){
         strapi.isTradingEnabled = false;
       }else {
         strapi.isTradingEnabled = true;
