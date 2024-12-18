@@ -21,5 +21,19 @@ module.exports = createCoreController('api::order.order', ({strapi}) => ({
         } else {
             return ctx.badRequest('No positions found to sell..');
         }
-    }
+    },
+
+    //Place Order with flattrade
+    async placeOrder(ctx){
+        const { exchange, tsym, quantity, price, orderType, remarks } = ctx.request.body;
+        if( !exchange || !tsym || !quantity || !price || !orderType || !remarks){
+            return ctx.send('Invalid payload provided');
+        }
+        const orderResponse = await strapi.service('api::order.order').placeOrderWithFlattrade(exchange,tsym,quantity,price,orderType,remarks);
+        if(orderResponse !== null){
+            return ctx.send(`Order placed successfully with flattrade via order id: ${orderResponse}`);
+        } else {
+            return ctx.badRequest('Order could not be placed..');
+        }
+    },
 }));

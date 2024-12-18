@@ -135,6 +135,7 @@ module.exports = ({ strapi }) => ({
         if (message.s === 'OK') {
           console.log('Connection acknowledged for user:', message.uid);          
           this.subscribeTouchline(scripList);         
+          this.subscribeOrderbook();
           // this.subscribeOrderbook();
         } else {
           console.error('Connection failed: Invalid user ID or session token.');
@@ -222,7 +223,8 @@ module.exports = ({ strapi }) => ({
     const subscribePayload = {
       t: 'o',
       actid: `${env('FLATTRADE_ACCOUNT_ID')}`,
-    };
+    };        
+    console.log('Flattrade WebSocket connection is open..Subscribing to orderbook..');
     this.flattradeWs.send(JSON.stringify(subscribePayload));
   },
 

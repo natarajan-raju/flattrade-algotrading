@@ -59,5 +59,15 @@ module.exports = {
         middlewares: [],
       },
     },
+    // Custom route
+    {
+      method: 'POST',
+      path: '/orders/placeOrder',
+      handler: 'order.placeOrder',
+      config: {
+        policies: [],
+        middlewares: [],
+      },
+    },
   ],
 };

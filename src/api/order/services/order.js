@@ -75,6 +75,15 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     data: createdOrder
                 }
             } else {
+                let awaitingOrderConfirmation = false;                
+                strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } }); 
+                strapi.webSocket.broadcast({
+                    type: 'order',
+                    data: null,
+                    message: `Buy order for index ${index} with contract ${preferredContract.tsym} failed as no suitable tokens found`,
+                    status: 'failure',
+                });
                 return {
                     status: false,
                     message: 'No suitable tokens found for the order.'
@@ -145,6 +154,43 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 status: true,
                 message: 'Order placed successfully',
             }        
+    },
+
+    async placeOrderWithFlattrade(exchange,tsym,quantity,price,orderType,remarks){
+        try{
+            const payload = `jData={
+            "uid":"${env('FLATTRADE_USER_ID')}",
+            "actid":"${env('FLATTRADE_ACCOUNT_ID')}",
+            "exch":"${exchange}",
+            "tsym":"${tsym}",
+            "qty":${quantity},
+            "prc":${price},
+            "prd":"M",
+            "trantype":"${orderType}",
+            "prctyp":"MKT",
+            "ret":"DAY",
+            "ordersource":"API",
+            "remarks":"${remarks}"
+            }&jKey=${strapi.sessionToken}`;
+            const orderResponse = await fetch(`${env('FLATTRADE_PLACE_ORDER_URL')}`,{
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: payload, 
+            });
+            const order = await orderResponse.json();
+            if(order.norenordno){                
+                return order.norenordno;
+            } else {
+                console.log(order);
+                return null;
+            }           
+            
+        }catch(error){
+            console.log(error);
+            return null;         
+        }
     },
 
     async handleOrderbookFeed(feedData){
