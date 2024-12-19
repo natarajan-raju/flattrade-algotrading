@@ -186,9 +186,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             indexItem = Object.fromEntries(strapi[`${tk}`]);
           } else {
             console.log('Fetching from database.. Please check map allocation');
-            indexItem = await strapi.db.query('api::index.index').findOne({
+            indexItem = await strapi.db.query('api::variable.variable').findOne({
               where: { indexToken: tk },
             });
+          }
+          if(!indexItem){
+            return { message: `No index found for token ${tk}`};
           }
 
           // Extract variables of the index
