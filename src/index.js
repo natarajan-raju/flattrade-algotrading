@@ -29,15 +29,18 @@ module.exports = {
       const currentTime = new Date();
       const currentHour = currentTime.getHours();
       const currentMinute = currentTime.getMinutes();
-      if(currentHour < 9 || (currentHour === 9 && currentMinute < 15) || (currentHour >= 15 && currentMinute >= 30)){
+      if(currentHour < 9 
+        || (currentHour === 9 && currentMinute < 15)
+        || currentHour > 15 
+        || (currentHour === 15 && currentMinute >= 30)){
         strapi.isTradingEnabled = false;
       }else {
         strapi.isTradingEnabled = true;
       }
-      console.log(`is Trading enabled? ${strapi.isTradingEnabled} | Current Time: ${currentTime} | Current Hour: ${currentHour} | Current Minute: ${currentMinute}`);
+      strapi.log.info(`is Trading enabled? ${strapi.isTradingEnabled} | Current Time: ${currentTime} | Current Hour: ${currentHour} | Current Minute: ${currentMinute}`);
     };
     setFoundation().then((result) => {
-      console.log('WebSocket server initialized & Index Variables Fetched succesfully');     
+      strapi.log.info('WebSocket server initialized & Index Variables Fetched succesfully');     
       
     }).catch((error) => {
       console.error('Either WebSocket server initialization failed or Fetching Index Variables failed :', error);

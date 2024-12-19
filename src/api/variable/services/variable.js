@@ -1,6 +1,7 @@
 'use strict';
 
 const { env } = require('@strapi/utils');
+const contract = require('../../contract/controllers/contract');
 
 
 /**
@@ -130,52 +131,27 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         contractTokens.pe.find(item => item.token === tk).lp = lp;
       }
       strapi[`${index}`].set('contractTokens', contractTokens);
-      // let { preferredCallToken, preferredPutToken, preferredCallTokenLp, preferredPutTokenLp, amount } = Object.fromEntries(strapi[`${index}`]);
-      // if(optt === 'CE'){
-      //   if(tk === preferredCallToken){
-      //     strapi[`${tk}`].set('preferredCallTokenLp', lp);
-      //     strapi[`${tk}`].set('preferredCallToken', tk);
-      //   }else if(lp >= amount && lp < preferredCallTokenLp){
-      //     console.log(`New Preferred CALL token ${tk} with LTP ${lp} identified..`);
-      //     preferredCallToken = tk;
-      //     preferredCallTokenLp = lp;
-      //     strapi[`${index}`].set('preferredCallTokenLp', lp);
-      //     strapi[`${index}`].set('preferredCallToken', tk);
-      //     strapi.db.query('api::contract.contract').update({
-      //       where: { index },
-      //       data: {
-      //         preferredCallToken,
-      //         preferredCallTokenLp
-      //       }
-      //     });
-      //   }
-      // }else if(optt === 'PE'){
-      //   if(tk === preferredPutToken){
-      //     strapi[`${tk}`].set('preferredPutTokenLp', lp);
-      //     strapi[`${tk}`].set('preferredPutToken', tk);
-      //   }else if(lp >= amount && lp < preferredPutTokenLp){
-      //     console.log(`New Preferred PUT token ${tk} with LTP ${lp} identified..`);
-      //     preferredPutToken = tk;
-      //     preferredPutTokenLp = lp;
-      //     strapi[`${index}`].set('preferredPutTokenLp', lp);
-      //     strapi[`${index}`].set('preferredPutToken', tk);
-      //     strapi.db.query('api::contract.contract').update({
-      //       where: { index },
-      //       data: {
-      //         preferredPutToken,
-      //         preferredPutTokenLp
-      //       }
-      //     });
-      //   }        
-      // }
+
       return { message: 'NFO Price updation received' };      
     } else {
+        const indexData = {
+          date: new Date(),
+          volume: v,
+          open: o,
+          high: h,
+          low: l,
+          close: c,
+          averagePrice: ap,
+          lastTradedPrice: lp,
+          percentageChange: pc,
+          exchange: e,
+        }  
         strapi.webSocket.broadcast({
           type: 'index',
-          data: feedData,          
+          data: indexData,          
           status: true
         })
-        console.log(feedData);
+        strapi.log.info(feedData);
         
           const headers = {
               Authorization: `Bearer ${env('SPECIAL_TOKEN')}`, // Including the special token in the Authorization header
@@ -185,7 +161,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           if(strapi[`${tk}`]){
             indexItem = Object.fromEntries(strapi[`${tk}`]);
           } else {
-            console.log('Fetching from database.. Please check map allocation');
+            strapi.log.info('Fetching from database.. Please check map allocation');
             indexItem = await strapi.db.query('api::variable.variable').findOne({
               where: { indexToken: tk },
             });
@@ -211,7 +187,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 message: `Order placement awaiting confirmation for index ${index}. No actions taken at LTP ${lp}`,
                 status: true,
               });
-              console.log(`Order placement awaiting confirmation for index ${index}. No actions taken at LTP ${lp}`);
+              strapi.log.info(`Order placement awaiting confirmation for index ${index}. No actions taken at LTP ${lp}`);
               strapi[`${tk}`].set('previousTradedPrice', lp);
               return { message: 'Awaiting order confirmation' };
             }
@@ -234,7 +210,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   data: {initialSpectatorMode},
                 });
                 strapi.webSocket.broadcast({ type: 'variable', message: `Reaching strategic position.Spectator mode turned off for index ${index}`, status: true});
-                console.log('Reaching strategic position.Spectator mode turned off');
+                strapi.log.info('Reaching strategic position.Spectator mode turned off');
               } else {
                 //LP in Passive zone. Do not take any action
                 previousTradedPrice = lp;
@@ -400,7 +376,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 }
               }
             }else{
-              console.log('Trading will be execercised only between 0915 and 1530 hrs. Please wait...');
+              strapi.log.info('Trading will be execercised only between 0915 and 1530 hrs. Please wait...');
               strapi.webSocket.broadcast({ type: 'variable', message: `Trading will initiate only after 0930 hrs`, status: true});
             }  
             strapi[`${tk}`].set('previousTradedPrice', lp);     
@@ -444,8 +420,20 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           data: defaultValues,
         });
       }
-      strapi.webSocket.broadcast({ type: 'action',message: "Investment variables reset", status: true, });
-      console.log('Investment variables reset');
+
+      //Update all positions
+      await strapi.db.query('api::position.position').updateMany({
+        data: {
+          contractType: '',
+          contractToken: '',
+          tsym: '',
+          lotSize: '',
+        }
+      })  
+      
+
+      strapi.webSocket.broadcast({ type: 'action',message: "Investment variables & Positions reset", status: true, });
+      strapi.log.info('Investment variables & Positions reset');
          
     } catch (error) {
       strapi.webSocket.broadcast({ type: 'action',message: "Error resetting investment variables. Please reset all variables", status: false, });
@@ -512,7 +500,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           try{
             strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
           }catch(error){
-            console.log(error);
+            strapi.log.info(error);
           }
           
         }
@@ -526,10 +514,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         if(scrip.scripList){
           strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
           strapi.db.query('api::web-socket.web-socket').update({where: { indexToken }, data: { scripList: '' }});
-          strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
+          strapi[`${indexToken}`].set('scripList', '');
         } 
       }catch(e){
-        console.log(e);
+        strapi.log.info(e);
       }
       const variable = await strapi.db.query('api::variable.variable').findOne({
         where: { indexToken },
@@ -604,7 +592,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
              
       }
     }
-    console.log('Contracts fetched...');
+    strapi.log.info('Contracts fetched...');
     const positions = await strapi.db.query('api::position.position').findMany({
       where: {
         contractToken: {
@@ -625,7 +613,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         strapi[`${position.index}`].set('contractBought', contractBought);
       }
     }
-    console.log('Positions fetched...');
+    strapi.log.info('Positions fetched...');
     const variables = await strapi.db.query('api::variable.variable').findMany({
       where: {
         basePrice: { $gt: 0 },  // '$gt' means greater than
@@ -645,7 +633,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         
       }      
     } 
-    console.log('Variables fetched...');  
+    strapi.log.info('Variables fetched...');  
   },
   
 }));

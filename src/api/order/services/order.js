@@ -49,7 +49,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                         contractLp: preferredContract.lp,                        
                     }               
                 });
-                console.log(`Created order: ${createdOrder}`);
+                strapi.log.info(`Created order: ${createdOrder}`);
                 const contractBought = {
                     contractType,
                     contractToken: preferredContract.token,
@@ -96,6 +96,12 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     async placeSellOrder(orderData) {
         
             const { contractType, lp, index, indexToken, quantity } = orderData;
+            if(!contractType || !lp || !index || !indexToken || !quantity){
+                return {
+                    status: false,
+                    message: 'Invalid payload provided'
+                }
+            }
             let contractBought;
             try{
                 contractBought = strapi[`${index}`].get('contractBought');
@@ -106,8 +112,15 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 }
             }
             if(!contractBought.tsym || contractBought.tsym === undefined || contractBought.tsym === '' || contractBought.tsym === null){
+                strapi.webSocket.broadcast({
+                   type: 'order',
+                   data: null,
+                   message: `Sell order for index ${index} with contract ${contractBought.contractTsym} failed as no contract bought for this index`,
+                   status: false,  
+                });
                 return {
                     status: false,
+                    message: 'No contract bought for this index'
                 }
             }
             //Insert Flattrade Sell Execution code here
@@ -124,7 +137,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     price: 0,                                       
                 }
             });
-            console.log(`Created order: ${createdOrder}`);
+            strapi.log.info(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractTsym} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.lotSize} ${createdOrder.price} `);
             strapi.webSocket.broadcast({
                 type: 'order',
                 data: createdOrder,
@@ -183,12 +196,12 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             if(order.norenordno){                
                 return order.norenordno;
             } else {
-                console.log(order);
+                strapi.log.info(order);
                 return null;
             }           
             
         }catch(error){
-            console.log(error);
+            strapi.log.info(error);
             return null;         
         }
     },

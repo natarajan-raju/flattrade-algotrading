@@ -135,13 +135,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
         
         
-    //     strapi[`${indexItem.index}`].set('preferredCallToken', '');
-    //     strapi[`${indexItem.index}`].set('preferredPutToken', '');
-    //     strapi[`${indexItem.index}`].set('preferredCallTokenLp', Infinity);
-    //     strapi[`${indexItem.index}`].set('preferredPutTokenLp', Infinity);
-        
-    //    strapi[`${indexItem.index}`].set('amount', updatedIndexItem.amount);
-        
+   
                 
         return {
             message: `Investment variables updated successfully. Market watching started for index ${indexItem.index}.`,

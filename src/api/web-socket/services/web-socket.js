@@ -16,18 +16,18 @@ module.exports = ({ strapi }) => ({
 
     // When a new WebSocket connection is made
     wss.on('connection', (ws) => {
-      console.log('New WebSocket client connected');
+      strapi.log.info('New WebSocket client connected');
       clients.add(ws);
 
       // When the client disconnects
       ws.on('close', () => {
-        console.log('WebSocket client disconnected');
+        strapi.log.info('WebSocket client disconnected');
         clients.delete(ws);
       });
 
       // Handle incoming messages (if needed)
       ws.on('message', (message) => {
-        console.log('Received message from client:', message);
+        strapi.log.info('Received message from client:', message);
       });
     });
 
@@ -43,7 +43,7 @@ module.exports = ({ strapi }) => ({
     // Expose the broadcast function globally for other parts of the app
     strapi.webSocket = { broadcast };
 
-    console.log('WebSocket server is running');
+    strapi.log.info('WebSocket server is running');
   },
   
 
@@ -53,13 +53,13 @@ module.exports = ({ strapi }) => ({
     const flattradeWsUrl = env('FLATTRADE_WS_URL');
 
     if (!flattradeWsUrl) {
-      console.log('WebSocket URL not found in database or environment.');
+      strapi.log.info('WebSocket URL not found in database or environment.');
     }
 
     this.flattradeWs = new WebSocket(flattradeWsUrl);
 
     this.flattradeWs.on('open', async () => {
-      console.log('Flattrade WebSocket connection established.');
+      strapi.log.info('Flattrade WebSocket connection established.');
       this.sendConnectionRequest();
     });
 
@@ -70,13 +70,15 @@ module.exports = ({ strapi }) => ({
     });
 
     this.flattradeWs.on('close', () => {
-      console.log('Flattrade WebSocket connection closed.Attempting to reconnect...');
+      strapi.log.info('Flattrade WebSocket connection closed.Attempting to reconnect...');
       strapi.webSocket.broadcast({
         type: 'variable',
         message: 'Flattrade WebSocket connection closed. Attempting reconnect...',
         status: false,
       });
-      setTimeout(() => this.connectFlattradeWebSocket(scripList), 3000);
+      if(strapi.isTradingEnabled){
+        setTimeout(() => this.connectFlattradeWebSocket(scripList), 3000);
+      }
       
       // Collect scripLists
       
@@ -92,7 +94,7 @@ module.exports = ({ strapi }) => ({
     process.on('SIGINT', () => {
       if (this.flattradeWs && this.flattradeWs.readyState === WebSocket.OPEN) {
         this.flattradeWs.close();
-        console.log('Flattrade WebSocket connection closed gracefully.');
+        strapi.log.info('Flattrade WebSocket connection closed gracefully.');
       }
       process.exit(0);
     });
@@ -110,7 +112,7 @@ module.exports = ({ strapi }) => ({
       source: 'API',
       susertoken: sessionToken,
     };
-    console.log('Sending connection request:', connectPayload);
+    strapi.log.info('Sending connection request:', connectPayload);
     this.flattradeWs.send(JSON.stringify(connectPayload));
   },
 
@@ -124,7 +126,7 @@ module.exports = ({ strapi }) => ({
         // Token is already in processing, ignore the message (duplicate)
         strapi[`${message.tk}`].set('previousTradedPrice', message.lp);      
         strapi.webSocket.broadcast({ type: 'variable', message: `No action taken at ${message.lp} for ${message.tk}`, status: true });
-        console.log(`Preventing concurrent orders for token: ${message.tk}`);
+        strapi.log.info(`Preventing concurrent orders for token: ${message.tk}`);
         return;
       }     
     }
@@ -133,7 +135,7 @@ module.exports = ({ strapi }) => ({
     switch (message.t) {
       case 'ck':
         if (message.s === 'OK') {
-          console.log('Connection acknowledged for user:', message.uid);          
+          strapi.log.info('Connection acknowledged for user:', message.uid);          
           this.subscribeTouchline(scripList);         
           this.subscribeOrderbook();
           // this.subscribeOrderbook();
@@ -160,7 +162,7 @@ module.exports = ({ strapi }) => ({
                   this.processingTokens.delete(message.tk);
                 }
               } else {
-                console.log(`Preventing concurrent action for token: ${message.tk} due to incoming data burst`);
+                strapi.log.info(`Preventing concurrent action for token: ${message.tk} due to incoming data burst`);
                 strapi[`${message.tk}`].set('previousTradedPrice', message.lp);
                 
               }
@@ -179,11 +181,11 @@ module.exports = ({ strapi }) => ({
         break;
   
       case 'uk':
-        console.log('Unsubscription acknowledged:', message);
+        strapi.log.info('Unsubscription acknowledged:', message);
         break;
   
       default:
-        console.log('Unknown message type:', message);
+        strapi.log.info('Unknown message type:', message);
     }
   },
 
@@ -199,12 +201,12 @@ module.exports = ({ strapi }) => ({
       await this.connectFlattradeWebSocket();
     }
     if(this.flattradeWs.readyState === WebSocket.OPEN){
-      console.log('Flattrade WebSocket connection is open..Subscribing to touchline..');
+      strapi.log.info('Flattrade WebSocket connection is open..Subscribing to touchline..');
       this.flattradeWs.send(JSON.stringify(subscribePayload));
     } else {
       await this.connectFlattradeWebSocket();
       if(this.flattradeWs.readyState === WebSocket.OPEN){
-        console.log('Flattrade WebSocket connection is open..Subscribing to touchline..');
+        strapi.log.info('Flattrade WebSocket connection is open..Subscribing to touchline..');
         this.flattradeWs.send(JSON.stringify(subscribePayload));
       }
     }
@@ -224,7 +226,7 @@ module.exports = ({ strapi }) => ({
       t: 'o',
       actid: `${env('FLATTRADE_ACCOUNT_ID')}`,
     };        
-    console.log('Flattrade WebSocket connection is open..Subscribing to orderbook..');
+    strapi.log.info('Flattrade WebSocket connection is open..Subscribing to orderbook..');
     this.flattradeWs.send(JSON.stringify(subscribePayload));
   },
 
@@ -246,7 +248,7 @@ module.exports = ({ strapi }) => ({
       //   strapi[`${indexToken}`].set('scripList', '');        
       // } 
     }
-    console.log('ScripList reset successfully.');
+    strapi.log.info('ScripList reset successfully.');
     strapi.webSocket.broadcast({ type: 'action', message: 'ScripList reset successfully.', status: true });  
   } 
 });

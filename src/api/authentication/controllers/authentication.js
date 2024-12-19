@@ -42,7 +42,7 @@ module.exports = createCoreController('api::authentication.authentication',({str
             body: JSON.stringify( payload ),
           });
           const data = await tokenResponse.json();
-          console.log(data);
+          strapi.log.info(data);
           // Check if token retrieval was successful
           if (data.token.length === 0 || !data.token) {
             return ctx.redirect(`${frontendErrorUrl}/?message=${encodeURIComponent('Either a token code for the day already exists, or something went wrong during the authentication process.')}`);
