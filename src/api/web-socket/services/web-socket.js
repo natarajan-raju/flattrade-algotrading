@@ -27,7 +27,7 @@ module.exports = ({ strapi }) => ({
 
       // Handle incoming messages (if needed)
       ws.on('message', (message) => {
-        strapi.log.info('Received message from client:', message);
+        console.log('Received message from client:', message);
       });
     });
 
@@ -78,6 +78,8 @@ module.exports = ({ strapi }) => ({
       });
       if(strapi.isTradingEnabled){
         setTimeout(() => this.connectFlattradeWebSocket(scripList), 3000);
+      } else {
+        strapi.log.info('No scrips found for reconnect.Exiting reconnect loop.');
       }
       
       // Collect scripLists
@@ -112,7 +114,7 @@ module.exports = ({ strapi }) => ({
       source: 'API',
       susertoken: sessionToken,
     };
-    strapi.log.info('Sending connection request:', connectPayload);
+    console.log('Sending connection request:', connectPayload);
     this.flattradeWs.send(JSON.stringify(connectPayload));
   },
 
@@ -126,7 +128,7 @@ module.exports = ({ strapi }) => ({
         // Token is already in processing, ignore the message (duplicate)
         strapi[`${message.tk}`].set('previousTradedPrice', message.lp);      
         strapi.webSocket.broadcast({ type: 'variable', message: `No action taken at ${message.lp} for ${message.tk}`, status: true });
-        strapi.log.info(`Preventing concurrent orders for token: ${message.tk}`);
+        console.log(`Preventing concurrent orders for token: ${message.tk}`);
         return;
       }     
     }
@@ -135,7 +137,7 @@ module.exports = ({ strapi }) => ({
     switch (message.t) {
       case 'ck':
         if (message.s === 'OK') {
-          strapi.log.info('Connection acknowledged for user:', message.uid);          
+          console.log('Connection acknowledged for user:', message.uid);          
           this.subscribeTouchline(scripList);         
           this.subscribeOrderbook();
           // this.subscribeOrderbook();
@@ -162,7 +164,7 @@ module.exports = ({ strapi }) => ({
                   this.processingTokens.delete(message.tk);
                 }
               } else {
-                strapi.log.info(`Preventing concurrent action for token: ${message.tk} due to incoming data burst`);
+                console.log(`Preventing concurrent action for token: ${message.tk} due to incoming data burst`);
                 strapi[`${message.tk}`].set('previousTradedPrice', message.lp);
                 
               }
@@ -181,11 +183,11 @@ module.exports = ({ strapi }) => ({
         break;
   
       case 'uk':
-        strapi.log.info('Unsubscription acknowledged:', message);
+        console.log('Unsubscription acknowledged:', message);
         break;
   
       default:
-        strapi.log.info('Unknown message type:', message);
+        console.log('Unknown message type:', message);
     }
   },
 
@@ -212,13 +214,13 @@ module.exports = ({ strapi }) => ({
     }
   },
 
-  unsubsribeTouchline(scripList) {
-    
+  async unsubscribeTouchline(scripList) {
+    console.log(`Unsubscribing from ${scripList}`);
     const unsubscribePayload = {
       t: 'u',
       k: scripList,
     };
-    this.flattradeWs.send(JSON.stringify(unsubscribePayload));
+    await this.flattradeWs.send(JSON.stringify(unsubscribePayload));
   },
 
   subscribeOrderbook() {

@@ -42,8 +42,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         });
       }
       
+      const match = sampleContractTsym.match(/([CP])(\d+)$/);
+
       // Prepare the payload for the option chain request
-      const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","tsym":"${sampleContractTsym}","exch":"NFO","strprc":"${sampleContractTsym.slice(-5)}","cnt":"400"}&jKey=${sessionToken}`;
+      const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","tsym":"${sampleContractTsym}","exch":"NFO","strprc":"${parseInt(match[2],10)}","cnt":"400"}&jKey=${sessionToken}`;
       const optionChainResponse = await fetch(`${env('FLATTRADE_OPTION_CHAIN_URL')}`, {
         method: 'POST',
         headers: {
@@ -54,7 +56,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     
       // Parse the response JSON
       const optionChain = await optionChainResponse.json();
-      
+      console.log(optionChain);
       if(!optionChain.values){
         throw new Error('Option chain processing failed...');
       }
@@ -66,12 +68,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
       
 
-      let scripList = `NSE|${indexToken}#`;
+      let scripList = `NSE|${indexToken}`;
 
       // Iterate over the option chain values to populate call and put objects
       optionChain.values.forEach(option => {
         const tokenData = { token: option.token, optt: option.optt, tsym: option.tsym, ls: option.ls, index, lp: 0 }; // Initialize lp as 0
-        scripList += `NFO|${option.token}#`;
+        scripList += `#NFO|${option.token}`;
         if(option.optt === 'CE'){
           contractTokens.ce.push(tokenData);
         }else if(option.optt === 'PE'){
@@ -121,18 +123,20 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const buySellTokens = new Set(['26000', '26009', '26013', '26014', '26037']);
     if (!buySellTokens.has(tk)) {     
       //NFO Price update received. Update lp for contract token
-
-      const { optt, index } = Object.fromEntries(strapi[`${tk}`]);
-      const contractTokens = strapi[`${index}`].get('contractTokens');
-      //update the lp for current tk in contractTokens
-      if(optt === 'CE'){
-        contractTokens.ce.find(item => item.token === tk).lp = lp;
-      } else if(optt === 'PE'){
-        contractTokens.pe.find(item => item.token === tk).lp = lp;
-      }
-      strapi[`${index}`].set('contractTokens', contractTokens);
-
-      return { message: 'NFO Price updation received' };      
+      if(strapi[`${tk}`]){
+          const { optt, index } = Object.fromEntries(strapi[`${tk}`]);
+          if(strapi[`${index}`]){
+            const contractTokens = strapi[`${index}`].get('contractTokens');
+            //update the lp for current tk in contractTokens
+            if(optt === 'CE'){
+              contractTokens.ce.find(item => item.token === tk).lp = lp;
+            } else if(optt === 'PE'){
+              contractTokens.pe.find(item => item.token === tk).lp = lp;
+            }
+            strapi[`${index}`].set('contractTokens', contractTokens);
+        }
+        return { message: 'NFO Price updation received' }; 
+      }           
     } else {
         const indexData = {
           date: new Date(),
@@ -151,7 +155,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           data: indexData,          
           status: true
         })
-        strapi.log.info(feedData);
+        console.log(feedData);
         
           const headers = {
               Authorization: `Bearer ${env('SPECIAL_TOKEN')}`, // Including the special token in the Authorization header
@@ -187,7 +191,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 message: `Order placement awaiting confirmation for index ${index}. No actions taken at LTP ${lp}`,
                 status: true,
               });
-              strapi.log.info(`Order placement awaiting confirmation for index ${index}. No actions taken at LTP ${lp}`);
+              console.log(`Order placement awaiting confirmation for index ${index}. No actions taken at LTP ${lp}`);
               strapi[`${tk}`].set('previousTradedPrice', lp);
               return { message: 'Awaiting order confirmation' };
             }
@@ -496,14 +500,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             }
           }
         );
-        for (const scrip of scrips){
-          try{
-            strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
-          }catch(error){
-            strapi.log.info(error);
-          }
-          
-        }
+
         
         strapi.webSocket.broadcast({type: 'action', message: 'Application is stopped now.Please sell all positions before starting to trade again.', status: true});
         return {status: true, message: 'Application stopped now..'};      
@@ -511,13 +508,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
       try{
         const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken }});
-        if(scrip.scripList){
-          strapi.service('api::web-socket.web-socket').unsubsribeTouchline(scrip.scripList);
-          strapi.db.query('api::web-socket.web-socket').update({where: { indexToken }, data: { scripList: '' }});
-          strapi[`${indexToken}`].set('scripList', '');
+        if(scrip.scripList){          
+          strapi.db.query('api::web-socket.web-socket').update({where: { indexToken }, data: { scripList: '' }});          
         } 
       }catch(e){
-        strapi.log.info(e);
+        console.log(e);
       }
       const variable = await strapi.db.query('api::variable.variable').findOne({
         where: { indexToken },
@@ -532,8 +527,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             where: { id: variable.id }, // Specify the condition for the update
             data: defaultValues,        // Specify the new data
           });
-          delete strapi[`${indexToken}`];
-          delete strapi[`${variable.index}`];
+          // delete strapi[`${indexToken}`];
+          // delete strapi[`${variable.index}`];
           strapi.webSocket.broadcast({type: 'action', message: `Application is stopped now for index ${variable.index}.Please sell all positions before starting to trade again.`, status: true});
           return {status: true, message: `Application stopped now for index ${variable.index}...`};        
       }

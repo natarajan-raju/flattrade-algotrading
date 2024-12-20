@@ -49,7 +49,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                         contractLp: preferredContract.lp,                        
                     }               
                 });
-                strapi.log.info(`Created order: ${createdOrder}`);
+                console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.lotSize} ${createdOrder.price} ${createdOrder.contractLp}`);
                 const contractBought = {
                     contractType,
                     contractToken: preferredContract.token,
@@ -137,7 +137,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     price: 0,                                       
                 }
             });
-            strapi.log.info(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractTsym} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.lotSize} ${createdOrder.price} `);
+            console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractTsym} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.lotSize} ${createdOrder.price} `);
             strapi.webSocket.broadcast({
                 type: 'order',
                 data: createdOrder,
@@ -193,15 +193,29 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 body: payload, 
             });
             const order = await orderResponse.json();
-            if(order.norenordno){                
+            if(order.norenordno){
+                console.log(order);
+                const createdOrder = await strapi.db.query('api::order.order').create({
+                    data: {
+                        index: '',
+                        orderType,
+                        contractType: '',
+                        contractTsym: tsym,
+                        contractToken: '',
+                        indexLtp: '',
+                        lotSize: '',
+                        contractLp: 0,
+                        price: 0,                                       
+                    }
+                });                
                 return order.norenordno;
             } else {
-                strapi.log.info(order);
+                console.log(order);
                 return null;
             }           
             
         }catch(error){
-            strapi.log.info(error);
+            console.log(error);
             return null;         
         }
     },

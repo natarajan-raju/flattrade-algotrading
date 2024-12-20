@@ -11,15 +11,9 @@ module.exports = createCoreService('api::purge.purge',({ strapi }) => ({
     //Purge orders prior to 3 days from the current date
     async purgeOrders() {
         let uptoDate = new Date();
-        uptoDate.setDate(uptoDate.getDate() - 1);
+        // uptoDate.setDate(uptoDate.getDate() - 1);
         let formattedDate = uptoDate.toISOString().split('T')[0];
-        const orders = await strapi.db.query('api::order.order').findMany({
-            where: {
-                createdAt: {
-                    $lte: formattedDate,
-                }
-            }
-        });
+        const orders = await strapi.db.query('api::order.order').findMany();
         if(orders.length === 0){
             strapi.log.info('No orders to purge...');
             strapi.webSocket.broadcast({ type: 'action', message: `No orders to purge upto ${formattedDate}.`, status: false });
