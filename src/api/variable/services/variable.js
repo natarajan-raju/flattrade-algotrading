@@ -139,16 +139,17 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       }           
     } else {
         const indexData = {
+          tk,
           date: new Date(),
           volume: v,
           open: o,
           high: h,
           low: l,
           close: c,
-          averagePrice: ap,
-          lastTradedPrice: lp,
-          percentageChange: pc,
-          exchange: e,
+          ap,
+          lp,
+          pc,
+          e,
         }  
         strapi.webSocket.broadcast({
           type: 'index',

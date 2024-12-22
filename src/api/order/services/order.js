@@ -222,7 +222,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
 
     async handleOrderbookFeed(feedData){
         
-            const { norenordno,prc,status } = feedData;
+            const { norenordno,prc,status, qty } = feedData;
             const order = await strapi.db.query('api::order.order').findOne({
                 where: { norenordno },
             });
@@ -230,6 +230,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 const updatedOrder = await strapi.db.query('api::order.order').update({ where: { id: order.id }, data: {
                     orderStatus: status,
                     prc,
+                    qty
                 } 
                 });
                 strapi.webSocket.broadcast({                
