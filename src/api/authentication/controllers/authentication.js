@@ -60,7 +60,7 @@ module.exports = createCoreController('api::authentication.authentication',({str
               data: { requestToken: data.token },
             });
           } else {
-            
+            strapi.sessionToken = data.token;
             // Token(s) found, update the first one (or you could update all if necessary)
             await strapi.db.query('api::authentication.authentication').update({
               where: { id: requestTokenResponse.id }, // Update the first found token

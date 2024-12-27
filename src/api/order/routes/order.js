@@ -69,5 +69,24 @@ module.exports = {
         middlewares: [],
       },
     },
+    {
+      method: 'POST',
+      path: '/orders/getPreferredContract',
+      handler: 'order.getPreferredContract',
+      config: {
+        policies: [],
+        middlewares: [],
+      },
+    },
+    {
+      method: 'POST',
+      path: '/orders/orderPostBackHandler',
+      handler: 'order.orderPostBackHandler',
+      config: {
+        policies: [],
+        middlewares: [],
+      },
+    },
+    
   ],
 };

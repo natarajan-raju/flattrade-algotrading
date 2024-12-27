@@ -8,7 +8,14 @@ const { createCoreService } = require('@strapi/strapi').factories;
 module.exports = createCoreService('api::order.order', ({ strapi }) => ({
 
     async getPreferredContract(index,contractType,amount) {
-        const contractTokens = strapi[`${index}`].get('contractTokens');
+        let contractTokens;
+        
+        if(strapi[`${index}`]?.get('contractTokens')){
+            contractTokens = strapi[`${index}`].get('contractTokens');
+        } else {
+            return {message: 'Investment variables not entered for the day',token: null, lp: Infinity, tsym: null, lotSize: null}; 
+        }
+        
         const contracts = contractType === 'CE' ? contractTokens.ce : contractTokens.pe;
         let preferredContract = {token: null, lp: Infinity, tsym: null, lotSize: null};
         let smallestDifference = Infinity;
@@ -28,13 +35,33 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     // Place BUY Order service
     async placeBuyOrder(orderData) {        
             const {  contractType, lp,quantity,index,indexToken, amount } = orderData;
-            const preferredContract = await this.getPreferredContract(index,contractType,amount);
-            
-           
-            
+            const preferredContract = await this.getPreferredContract(index,contractType,amount);            
             if(preferredContract.token){
                 const lotSize = quantity * preferredContract.ls;
                 const price = lotSize * preferredContract.lp;
+                let orderStatus;
+                const norenordno = await this.placeOrderWithFlattrade('NFO',preferredContract.tsym,lotSize,'0','B','dashboard.rajaapp.in');
+                if(norenordno){
+                    try{
+                        const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","norenordno":"${norenordno}"}&jKey=${strapi.sessionToken}`;
+                        const updateResponse = await fetch(`${env('FLATTRADE_ORDER_HISTORY_URL')}`,{
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: payload,
+                        });
+                        orderStatus = await updateResponse.json();
+                                            
+                    }catch(error){
+                        console.log(error);                        
+                    }
+                    const order = orderStatus.find(order => order.status.toLowerCase() === 'complete');
+
+                } else {
+
+                }
+                
                 
                 const createdOrder = await strapi.db.query('api::order.order').create({
                     data: {
@@ -170,21 +197,10 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     },
 
     async placeOrderWithFlattrade(exchange,tsym,quantity,price,orderType,remarks){
+        
         try{
-            const payload = `jData={
-            "uid":"${env('FLATTRADE_USER_ID')}",
-            "actid":"${env('FLATTRADE_ACCOUNT_ID')}",
-            "exch":"${exchange}",
-            "tsym":"${tsym}",
-            "qty":${quantity},
-            "prc":${price},
-            "prd":"M",
-            "trantype":"${orderType}",
-            "prctyp":"MKT",
-            "ret":"DAY",
-            "ordersource":"API",
-            "remarks":"${remarks}"
-            }&jKey=${strapi.sessionToken}`;
+            
+            const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${price}","prd":"M","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}"}&jKey=${strapi.sessionToken}`;
             const orderResponse = await fetch(`${env('FLATTRADE_PLACE_ORDER_URL')}`,{
                 method: 'POST',
                 headers: {
@@ -194,20 +210,8 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             });
             const order = await orderResponse.json();
             if(order.norenordno){
-                console.log(order);
-                const createdOrder = await strapi.db.query('api::order.order').create({
-                    data: {
-                        index: '',
-                        orderType,
-                        contractType: '',
-                        contractTsym: tsym,
-                        contractToken: '',
-                        indexLtp: '',
-                        lotSize: '',
-                        contractLp: 0,
-                        price: 0,                                       
-                    }
-                });                
+                
+                    
                 return order.norenordno;
             } else {
                 console.log(order);

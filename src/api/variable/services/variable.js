@@ -539,7 +539,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
 
   async fetchIndexVariables(){
-    
+    await strapi.service('api::authentication.authentication').fetchRequestToken();
     const contracts = await strapi.db.query('api::contract.contract').findMany({
       where: {
         //sampleContractTsym length is not equal to zero

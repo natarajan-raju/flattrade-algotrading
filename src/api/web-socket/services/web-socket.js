@@ -7,10 +7,9 @@ module.exports = ({ strapi }) => ({
 
   async initializeWebSocketServer(){
     const server = strapi.server.httpServer;
-
+    // console.log(server);
     // Create a new WebSocket server attached to the Strapi HTTP server
     const wss = new WebSocket.Server({ server });
-
     // Store connected clients
     const clients = new Set();
 
@@ -138,15 +137,20 @@ module.exports = ({ strapi }) => ({
       case 'ck':
         if (message.s === 'OK') {
           console.log('Connection acknowledged for user:', message.uid);          
-          this.subscribeTouchline(scripList);         
-          this.subscribeOrderbook();
+          await this.subscribeTouchline(scripList);         
+          await this.subscribeOrderbook();
           // this.subscribeOrderbook();
         } else {
           console.error('Connection failed: Invalid user ID or session token.');
         }
         break;
-  
-      case 'tk':       
+
+      case 'ok':
+        console.log('Order book subscribed');
+        break;
+
+      case 'tk': 
+        // console.log('Subscribed to touchline feed for token:', message.tk);      
         break;
   
       case 'tf':
@@ -223,13 +227,32 @@ module.exports = ({ strapi }) => ({
     await this.flattradeWs.send(JSON.stringify(unsubscribePayload));
   },
 
-  subscribeOrderbook() {
-    const subscribePayload = {
-      t: 'o',
-      actid: `${env('FLATTRADE_ACCOUNT_ID')}`,
-    };        
-    strapi.log.info('Flattrade WebSocket connection is open..Subscribing to orderbook..');
-    this.flattradeWs.send(JSON.stringify(subscribePayload));
+  async subscribeOrderbook() {
+    // const subscribePayload = {
+    //   t: 'o',
+    //   actid: `${env('FLATTRADE_ACCOUNT_ID')}`,
+    // };        
+    
+    if (!this.flattradeWs) {
+      console.error('WebSocket is not initialized. Connecting...');
+      await this.connectFlattradeWebSocket();
+    }
+    if(this.flattradeWs.readyState === WebSocket.OPEN){
+      strapi.log.info('Flattrade WebSocket connection is open..Subscribing to orderbook..');
+      this.flattradeWs.send(JSON.stringify({
+        t: 'o',
+        actid: `${env('FLATTRADE_ACCOUNT_ID')}`,
+      }));
+    } else {
+      await this.connectFlattradeWebSocket();
+      if(this.flattradeWs.readyState === WebSocket.OPEN){
+        strapi.log.info('Flattrade WebSocket connection is open..Subscribing to orderbook..');
+        this.flattradeWs.send(JSON.stringify({
+          t: 'o',
+          actid: `${env('FLATTRADE_ACCOUNT_ID')}`,
+        }));
+      }
+    }
   },
 
   async handleOrderbookFeed(feedData) {

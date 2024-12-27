@@ -36,4 +36,14 @@ module.exports = createCoreController('api::order.order', ({strapi}) => ({
             return ctx.badRequest('Order could not be placed..');
         }
     },
+
+    //Get Prefeffered contract
+    async getPreferredContract(ctx){
+        const { index, contractType, amount } = ctx.request.body;
+        return strapi.service('api::order.order').getPreferredContract(index,contractType,amount);
+    },
+
+    async orderPostBackHandler(ctx){
+        console.log(ctx);
+    }
 }));

@@ -65,8 +65,9 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                 body: payload, 
             });
             contracts = await contractsResponse.json();                                    
+            // console.log(strapi.sessionToken);
             if(!contracts.values || contracts.values.length == 0 ){
-                return ctx.send({ message: contracts.emsg ||'Either expiry data provided is wrong or Session token expired', status: false });
+                return ctx.send({ message: 'Either expiry data provided is wrong or Session token expired', status: false });
             }
         } catch (error) {
             return ctx.send({ message: 'Either expiry data provided is wrong or Session token expired', status: false });
