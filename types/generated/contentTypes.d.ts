@@ -462,6 +462,8 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     orderType: Schema.Attribute.String;
     price: Schema.Attribute.Decimal;
     publishedAt: Schema.Attribute.DateTime;
+    quantity: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    realizedPL: Schema.Attribute.Decimal & Schema.Attribute.DefaultTo<0>;
     remarks: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -472,6 +474,7 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
 export interface ApiPositionPosition extends Struct.CollectionTypeSchema {
   collectionName: 'positions';
   info: {
+    description: '';
     displayName: 'position';
     pluralName: 'positions';
     singularName: 'position';
@@ -494,7 +497,9 @@ export interface ApiPositionPosition extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     lotSize: Schema.Attribute.String;
+    price: Schema.Attribute.Decimal & Schema.Attribute.DefaultTo<0>;
     publishedAt: Schema.Attribute.DateTime;
+    quantity: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
     tsym: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &

@@ -2,6 +2,7 @@
 
 const { env } = require('@strapi/utils');
 const contract = require('../../contract/controllers/contract');
+const order = require('../../order/controllers/order');
 
 
 /**
@@ -228,44 +229,70 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             if(strapi.isTradingEnabled){
               let contractType;           
               //Buy CALL
-              if(!callOptionBought && !putOptionBought && !initialSpectatorMode ){
-                
+              if(!callOptionBought && !putOptionBought && !initialSpectatorMode ){                
                 if(((lp >= basePrice + targetStep && lp < resistance1 - targetStep) 
                   || (lp >= resistance1 + targetStep && lp < resistance2 - targetStep)
                   || (lp>= resistance2 + targetStep)
                   || (lp >= support1 + targetStep && lp < basePrice - targetStep)
                   || (lp >= support2 + targetStep && lp < support1 - targetStep))
                   && (previousTradedPrice === 0 || previousTradedPrice < lp)
-                ){
-                  
-                  
+                ){                 
                   //Buy CALL
                   callOptionBought = true;
                   callBoughtAt = lp;
                   previousTradedPrice = lp;
-                  awaitingOrderConfirmation = true;
-                  strapi[`${tk}`].set('callOptionBought', callOptionBought);
-                  strapi[`${tk}`].set('callBoughtAt', callBoughtAt);
-                  strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
-                  strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);              
-                  strapi.db.query('api::variable.variable').update({
-                    where: {indexToken : `${tk}`},
-                    data: {
-                      callOptionBought,
-                      callBoughtAt,
-                      previousTradedPrice,
-                      awaitingOrderConfirmation,
-                    }
-                  });
-                  
+                  awaitingOrderConfirmation = true;                  
+                  strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                  // strapi.db.query('api::variable.variable').update({
+                  //   where: {indexToken : `${tk}`},
+                  //   data: {
+                  //     awaitingOrderConfirmation,
+                  //   }
+                  // });
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy CALL at LTP ${lp}`, status: true});
                   contractType = 'CE';              
-                  await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken,amount});
-                  return {
+                  const orderStatus = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken,amount});              
+                  if(orderStatus.status === true || orderStatus.status === 'true'){
+                    strapi[`${tk}`].set('callOptionBought', callOptionBought);
+                    strapi[`${tk}`].set('callBoughtAt', callBoughtAt);
+                    strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
+                    strapi[`${tk}`].set('awaitingOrderConfirmation', false);
+                    strapi.db.query('api::variable.variable').update({
+                      where: {indexToken : `${tk}`},
+                      data: {
+                        callOptionBought,
+                        callBoughtAt,
+                        previousTradedPrice,
+                        awaitingOrderConfirmation: false,
+                      }
+                    });
+                    return {
                       status: true,
                       message: 'CALL buy Order placed successfully',
                       
-                  }                         
+                    } 
+                  }else{
+                    strapi[`${tk}`].set('callOptionBought', false);
+                    strapi[`${tk}`].set('callBoughtAt', 0);
+                    strapi[`${tk}`].set('previousTradedPrice', lp);
+                    strapi[`${tk}`].set('awaitingOrderConfirmation', false);
+                    strapi.db.query('api::variable.variable').update({
+                      where: {indexToken : `${tk}`},
+                      data: {
+                        callOptionBought: false,
+                        callBoughtAt: 0,
+                        previousTradedPrice,
+                        awaitingOrderConfirmation: false,
+                      }
+                    });
+                    return {
+                      status: false,
+                      message: 'CALL buy Order failed',
+                      
+                    } 
+                  }                  
+                  
+                                     
                 } else if(((lp <= basePrice - targetStep && lp > support1 + targetStep) 
                   || (lp <= support1 - targetStep && lp > support2 + targetStep)
                   || (lp <= support2 - targetStep)
@@ -275,31 +302,51 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 ){             
                   //Buy PUT 
                   
+                  strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`, status: true});
                   contractType = 'PE';
                   putOptionBought = true;
                   putBoughtAt = lp;
                   previousTradedPrice = lp;
                   awaitingOrderConfirmation = true;
-                  strapi[`${tk}`].set('putOptionBought', putOptionBought);
-                  strapi[`${tk}`].set('putBoughtAt', putBoughtAt);
-                  strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
                   strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-                  strapi.db.query('api::variable.variable').update({
-                    where: {indexToken : `${tk}`},
-                    data: {              
-                      putOptionBought,
-                      putBoughtAt,
-                      previousTradedPrice,
-                      awaitingOrderConfirmation
+                  const orderStatus = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken, amount});
+                  if(orderStatus.status === true || orderStatus.status === 'true'){
+                    strapi[`${tk}`].set('putOptionBought', putOptionBought);
+                    strapi[`${tk}`].set('putBoughtAt', putBoughtAt);
+                    strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
+                    strapi[`${tk}`].set('awaitingOrderConfirmation', false);
+                    strapi.db.query('api::variable.variable').update({
+                      where: {indexToken : `${tk}`},
+                      data: {              
+                        putOptionBought,
+                        putBoughtAt,
+                        previousTradedPrice,
+                        awaitingOrderConfirmation
+                      }
+                    });
+                    return {
+                      status: true,
+                      message: 'PUT buy Order placed successfully',                            
+                    }                    
+                  } else {
+                    strapi[`${tk}`].set('putOptionBought', false);
+                    strapi[`${tk}`].set('putBoughtAt', 0);
+                    strapi[`${tk}`].set('previousTradedPrice', lp);
+                    strapi[`${tk}`].set('awaitingOrderConfirmation', false);
+                    strapi.db.query('api::variable.variable').update({
+                      where: {indexToken : `${tk}`},
+                      data: {
+                        putOptionBought: false,
+                        putBoughtAt: 0,
+                        previousTradedPrice,
+                        awaitingOrderConfirmation: false,
+                      }
+                    });
+                    return {
+                      status: false,
+                      message: 'PUT buy Order failed',
                     }
-                  });
-                  
-                  strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`, status: true});
-                  await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken, amount});
-                  return {
-                    status: true,
-                    message: 'PUT buy Order placed successfully',                            
-                  }                           
+                  }                    
                 }
               }
           
@@ -320,25 +367,41 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     callBoughtAt = 0;             
                     previousTradedPrice = lp;
                     awaitingOrderConfirmation = true;
-                    strapi[`${tk}`].set('callOptionBought', callOptionBought);
-                    strapi[`${tk}`].set('callBoughtAt', callBoughtAt);
-                    strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
                     strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-                    strapi.db.query('api::variable.variable').update({
-                      where: {indexToken : `${tk}`},
-                      data: {
-                        callOptionBought,                  
-                        previousTradedPrice,
-                        callBoughtAt,
-                        awaitingOrderConfirmation
+                    const orderStatus = await strapi.service('api::order.order').placeSellOrder({contractType,lp,index,indexToken,quantity});
+                    if(orderStatus.status === true || orderStatus.status === 'true'){
+                      strapi[`${tk}`].set('callOptionBought', callOptionBought);
+                      strapi[`${tk}`].set('callBoughtAt', callBoughtAt);
+                      strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
+                      strapi[`${tk}`].set('awaitingOrderConfirmation', false);
+                      strapi.db.query('api::variable.variable').update({
+                        where: {indexToken : `${tk}`},
+                        data: {
+                          callOptionBought,                  
+                          previousTradedPrice,
+                          callBoughtAt,
+                          awaitingOrderConfirmation: false,
+                        }
+                      });
+                      return {
+                        status: true,
+                        message: 'CALL sell Order placed successfully',
                       }
-                    });
-                    await strapi.service('api::order.order').placeSellOrder({contractType,lp,index,indexToken,quantity});
-                    return {
-                      status: true,
-                      message: 'CALL sell Order placed successfully',
-                              
-                    }                                                 
+                    } else {
+                      strapi[`${tk}`].set('awaitingOrderConfirmation', false);                      
+                      strapi.db.query('api::variable.variable').update({
+                        where: {indexToken : `${tk}`},
+                        data: {
+                          awaitingOrderConfirmation: false,
+                        }
+                      });
+                      return {
+                        status: false,
+                        message: 'CALL sell Order placement failed',
+                      }
+                    }   
+                    
+                                                                  
                 }
               }
           
@@ -359,25 +422,43 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     putBoughtAt = 0;            
                     previousTradedPrice = lp;
                     awaitingOrderConfirmation = true;
-                    strapi[`${tk}`].set('putOptionBought', putOptionBought);
-                    strapi[`${tk}`].set('putBoughtAt', putBoughtAt);
-                    strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
                     strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-                    let updatedVariable = await strapi.db.query('api::variable.variable').update({
-                      where: {indexToken: `${tk}`},
-                      data: {
-                        putOptionBought,                  
-                        previousTradedPrice,
-                        putBoughtAt,
-                        awaitingOrderConfirmation
-                      }           
-                    });
-                    await strapi.service('api::order.order').placeSellOrder({contractType,lp,index,indexToken,quantity});
-                    return {
-                      status: true,
-                      message: 'PUT sell Order placed successfully',
-                      updatedVariable,
-                    }                          
+                    let orderStatus = await strapi.service('api::order.order').placeSellOrder({contractType,lp,index,indexToken,quantity});
+                    if(orderStatus.status === true || orderStatus.status === 'true'){
+                      strapi[`${tk}`].set('putOptionBought', putOptionBought);
+                      strapi[`${tk}`].set('putBoughtAt', putBoughtAt);
+                      strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
+                      strapi[`${tk}`].set('awaitingOrderConfirmation', false);
+                      let updatedVariable = await strapi.db.query('api::variable.variable').update({
+                        where: {indexToken: `${tk}`},
+                        data: {
+                          putOptionBought,                  
+                          previousTradedPrice,
+                          putBoughtAt,
+                          awaitingOrderConfirmation
+                        }           
+                      });
+                      
+                      return {
+                        status: true,
+                        message: 'PUT sell Order placed successfully',
+                        updatedVariable,
+                      } 
+                    } else {
+                      strapi[`${tk}`].set('awaitingOrderConfirmation', false);
+                      let updatedVariable = await strapi.db.query('api::variable.variable').update({
+                        where: {indexToken: `${tk}`},
+                        data: {
+                          awaitingOrderConfirmation: false,
+                        }
+                      });
+                      return {
+                        status: false,
+                        message: 'PUT sell Order placement failed',
+                        updatedVariable,
+                      }
+                    }
+                                             
                 }
               }
             }else{
@@ -433,6 +514,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           contractToken: '',
           tsym: '',
           lotSize: '',
+          quantity: 0,
+          price: 0,
         }
       })  
       
@@ -604,7 +687,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           contractType: position.contractType,
           contractToken: position.contractToken,
           tsym: position.tsym,
-          lotSize: position.lotSize,
+          quantity: position.quantity || 0,
+          costPrice: position.price || 0,
+          
         }
         strapi[`${position.index}`].set('contractBought', contractBought);
       }

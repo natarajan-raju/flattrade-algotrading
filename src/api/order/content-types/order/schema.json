@@ -50,6 +50,14 @@
     },
     "indexToken": {
       "type": "string"
+    },
+    "quantity": {
+      "type": "integer",
+      "default": 0
+    },
+    "realizedPL": {
+      "type": "decimal",
+      "default": 0
     }
   }
 }

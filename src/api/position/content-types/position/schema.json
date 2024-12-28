@@ -4,7 +4,8 @@
   "info": {
     "singularName": "position",
     "pluralName": "positions",
-    "displayName": "position"
+    "displayName": "position",
+    "description": ""
   },
   "options": {
     "draftAndPublish": false
@@ -28,6 +29,14 @@
     },
     "lotSize": {
       "type": "string"
+    },
+    "price": {
+      "type": "decimal",
+      "default": 0
+    },
+    "quantity": {
+      "type": "integer",
+      "default": 0
     }
   }
 }
