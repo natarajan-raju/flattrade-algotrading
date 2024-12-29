@@ -1,8 +1,7 @@
 'use strict';
 
 const { env } = require('@strapi/utils');
-const contract = require('../../contract/controllers/contract');
-const order = require('../../order/controllers/order');
+
 
 
 /**
@@ -57,7 +56,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     
       // Parse the response JSON
       const optionChain = await optionChainResponse.json();
-      console.log(optionChain);
+      
       if(!optionChain.values){
         throw new Error('Option chain processing failed...');
       }

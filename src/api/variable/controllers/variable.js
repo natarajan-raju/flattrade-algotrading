@@ -132,7 +132,22 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             strapi[`${indexItem.index}`].set('contractTokens', contract.contractTokens);
 
         }
-       
+        // Find all other scripLists and concatenate them with the current scripList using '#'
+        let otherScripItems = await strapi.db.query('api::web-socket.web-socket').findMany({
+            where: { 
+                indexToken: { $ne: indexToken } // Exclude the current indexToken
+            },
+            select: ['scripList'], // Select only the scripList field
+        });
+
+        if (otherScripItems && otherScripItems.length > 0) {
+            for (const otherScripItem of otherScripItems) {
+                if (otherScripItem.scripList) {
+                    scripList += `#${otherScripItem.scripList}`; // Concatenate with '#'
+                }
+            }
+        }
+        console.log(scripList);
         await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
         
         

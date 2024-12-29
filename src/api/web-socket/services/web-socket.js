@@ -75,10 +75,10 @@ module.exports = ({ strapi }) => ({
         message: 'Flattrade WebSocket connection closed. Attempting reconnect...',
         status: false,
       });
-      if(strapi.isTradingEnabled){
+      if(strapi.isTradingEnabled){        
         setTimeout(() => this.connectFlattradeWebSocket(scripList), 3000);
       } else {
-        strapi.log.info('No scrips found for reconnect.Exiting reconnect loop.');
+        strapi.log.info('Outisde Market hours. Websocket will not attempt to reconnect.');
       }
       
       // Collect scripLists
