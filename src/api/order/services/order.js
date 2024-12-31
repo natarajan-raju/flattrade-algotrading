@@ -55,7 +55,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                 indexLtp: lp,
                                 lotSize: parseInt(orderStatus.ls),
                                 price,
-                                contractLp: preferredContract.lp,
+                                contractLp: parseFloat(orderStatus.avgprc) || preferredContract.lp,
                                 norenordno,
                                 orderStatus: orderStatus.status,
                                 remarks: orderStatus.rejreason || orderStatus.remarks,
@@ -65,7 +65,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             }               
                         });
                         console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
-                        if(orderStatus.status.toLowerCase === 'complete'){
+                        if(orderStatus.status.toLowerCase() === 'complete'){
                             const contractBought = {
                                 contractType,
                                 contractToken: preferredContract.token,
@@ -93,7 +93,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                 data: createdOrder
                             }    
 
-                        } else if(orderStatus.status.toLowerCase === 'rejected'){
+                        } else if(orderStatus.status.toLowerCase() === 'rejected'){
                             strapi.webSocket.broadcast({
                                 type: 'order',
                                 data: createdOrder,
@@ -210,7 +210,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             indexLtp: lp,
                             lotSize: parseInt(orderStatus.ls),
                             price,
-                            contractLp: orderStatus.avgprc,
+                            contractLp: parseFloat(orderStatus.avgprc),
                             norenordno,
                             orderStatus: orderStatus.status,
                             remarks: orderStatus.rejreason || orderStatus.remarks,
@@ -220,7 +220,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                         }               
                     });
                     console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
-                    if(orderStatus.status.toLowerCase === 'complete'){
+                    if(orderStatus.status.toLowerCase() === 'complete'){
                         const contractBought = {                                    
                         }
                         strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType: '', contractToken: '',tsym: '',lotSize: '', quantity: 0, price: 0 } });
@@ -241,7 +241,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             data: createdOrder
                         }    
 
-                    } else if(orderStatus.status.toLowerCase === 'rejected'){
+                    } else if(orderStatus.status.toLowerCase() === 'rejected'){
                         strapi.webSocket.broadcast({
                             type: 'order',
                             data: createdOrder,
