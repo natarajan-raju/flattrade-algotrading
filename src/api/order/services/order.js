@@ -40,7 +40,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             if(preferredContract.token){
                 const orderQuantity = quantity * preferredContract.ls;                
                 let orderStatus;
-                const norenordno = await this.placeOrderWithFlattrade('NFO',preferredContract.tsym,orderQuantity,'0','B','dashboard.rajaapp.in');
+                const norenordno = await this.placeOrderWithFlattrade('NFO',preferredContract.tsym,orderQuantity,'0','B','Order created from dashboard.rajaapp.in');
                 if(norenordno){
                     orderStatus = await this.fetchOrderStatus(norenordno);
                     if(orderStatus){
@@ -58,10 +58,10 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                 contractLp: parseFloat(orderStatus.avgprc) || preferredContract.lp,
                                 norenordno,
                                 orderStatus: orderStatus.status,
-                                remarks: orderStatus.rejreason || orderStatus.remarks,
+                                remarks: orderStatus.rejreason.length > 0? orderStatus.rejreason : orderStatus.remarks,
                                 indexToken,
                                 quantity: parseInt(orderStatus.qty),
-                                realizedPL: 0,                        
+                                realizedPL: 0,                                                        
                             }               
                         });
                         console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
@@ -70,8 +70,8 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                 contractType,
                                 contractToken: preferredContract.token,
                                 tsym: preferredContract.tsym,
-                                quantity: orderStatus.qty,
-                                costPrice: createdOrder.price || price,                   
+                                quantity: parseInt(orderStatus.qty),
+                                costPrice: parseFloat(createdOrder.price) || price,                   
                             }
                             strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType, contractToken: preferredContract.token,tsym: preferredContract.tsym,lotSize: preferredContract.ls, quantity: orderStatus.qty, price } });
                             strapi[`${index}`].set('contractBought', contractBought);
@@ -193,7 +193,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             }
             //Insert Flattrade Sell Execution code here
             let orderStatus;
-            const norenordno = await this.placeOrderWithFlattrade('NFO',contractBought.tsym,contractBought.quantity,'0','S','dashboard.rajaapp.in');
+            const norenordno = await this.placeOrderWithFlattrade('NFO',contractBought.tsym,contractBought.quantity,'0','S','Order created from dashboard.rajaapp.in');
             if(norenordno){
                 orderStatus = await this.fetchOrderStatus(norenordno);
                 if(orderStatus){
@@ -213,7 +213,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             contractLp: parseFloat(orderStatus.avgprc),
                             norenordno,
                             orderStatus: orderStatus.status,
-                            remarks: orderStatus.rejreason || orderStatus.remarks,
+                            remarks: orderStatus.rejreason.length > 0? orderStatus.rejreason : orderStatus.remarks,
                             indexToken,
                             quantity: parseInt(orderStatus.qty),
                             realizedPL,                        

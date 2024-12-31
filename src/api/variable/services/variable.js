@@ -134,6 +134,26 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               contractTokens.pe.find(item => item.token === tk).lp = lp;
             }
             strapi[`${index}`].set('contractTokens', contractTokens);
+            const contractBought = strapi[`${index}`].get('contractBought') || null;
+            try{
+              if(contractBought && contractBought.contractToken === tk){
+                const realizedPL = (parseFloat(lp) - contractBought.costPrice) * parseFloat(contractBought.quantity);              
+                //send a Strapi web broadcast to client regarding the contract bought's token lp
+                strapi.log.info('Sending contract bought update to frontend');
+                strapi.webSocket.broadcast({
+                  type: 'position',
+                  data: {
+                    token: contractBought.token,
+                    lp,
+                    realizedPL
+                  },
+                  status: true
+                });
+              }
+            }catch(error){
+              console.log(error);
+            }
+            
         }
         return { message: 'NFO Price updation received' }; 
       }           

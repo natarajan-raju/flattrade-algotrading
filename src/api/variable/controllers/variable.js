@@ -147,7 +147,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                 }
             }
         }
-        console.log(scripList);
+        
         await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
         
         
