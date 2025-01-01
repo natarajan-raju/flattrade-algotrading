@@ -78,7 +78,7 @@ module.exports = ({ strapi }) => ({
       const currentTime = new Date();
       const currentHour = currentTime.getHours();
       const currentMinute = currentTime.getMinutes();
-      if(currentHour > 9  || (currentHour <= 15 && currentMinute <= 30)){        
+      if(currentHour >= 8  || (currentHour <= 15 && currentMinute <= 30)){        
         setTimeout(() => this.connectFlattradeWebSocket(scripList), 3000);
       } else {
         strapi.log.info('Outisde Market hours. Websocket will not attempt to reconnect.');
@@ -144,7 +144,7 @@ module.exports = ({ strapi }) => ({
         if (message.s === 'OK') {
           console.log('Connection acknowledged for user:', message.uid);          
           await this.subscribeTouchline(scripList);         
-          await this.subscribeOrderbook();
+          // await this.subscribeOrderbook();
           // this.subscribeOrderbook();
         } else {
           console.error('Connection failed: Invalid user ID or session token.');
@@ -152,7 +152,7 @@ module.exports = ({ strapi }) => ({
         break;
 
       case 'ok':
-        console.log('Order book subscribed');
+        // console.log('Order book subscribed');
         break;
 
       case 'tk': 
@@ -189,7 +189,7 @@ module.exports = ({ strapi }) => ({
         break;
   
       case 'om':
-        this.handleOrderbookFeed(message);
+        // this.handleOrderbookFeed(message);
         break;
   
       case 'uk':
@@ -197,6 +197,7 @@ module.exports = ({ strapi }) => ({
         break;
   
       default:
+        strapi.webSocket.broadcast({ type: 'action', message, status: true });
         console.log('Unknown message type:', message);
     }
   },
@@ -233,43 +234,43 @@ module.exports = ({ strapi }) => ({
     await this.flattradeWs.send(JSON.stringify(unsubscribePayload));
   },
 
-  async subscribeOrderbook() {
-    // const subscribePayload = {
-    //   t: 'o',
-    //   actid: `${env('FLATTRADE_ACCOUNT_ID')}`,
-    // };        
+  // async subscribeOrderbook() {
+  //   // const subscribePayload = {
+  //   //   t: 'o',
+  //   //   actid: `${env('FLATTRADE_ACCOUNT_ID')}`,
+  //   // };        
     
-    if (!this.flattradeWs) {
-      console.error('WebSocket is not initialized. Connecting...');
-      await this.connectFlattradeWebSocket();
-    }
-    if(this.flattradeWs.readyState === WebSocket.OPEN){
-      strapi.log.info('Flattrade WebSocket connection is open..Subscribing to orderbook..');
-      this.flattradeWs.send(JSON.stringify({
-        t: 'o',
-        actid: `${env('FLATTRADE_ACCOUNT_ID')}`,
-      }));
-    } else {
-      await this.connectFlattradeWebSocket();
-      if(this.flattradeWs.readyState === WebSocket.OPEN){
-        strapi.log.info('Flattrade WebSocket connection is open..Subscribing to orderbook..');
-        this.flattradeWs.send(JSON.stringify({
-          t: 'o',
-          actid: `${env('FLATTRADE_ACCOUNT_ID')}`,
-        }));
-      }
-    }
-  },
+  //   if (!this.flattradeWs) {
+  //     console.error('WebSocket is not initialized. Connecting...');
+  //     await this.connectFlattradeWebSocket();
+  //   }
+  //   if(this.flattradeWs.readyState === WebSocket.OPEN){
+  //     strapi.log.info('Flattrade WebSocket connection is open..Subscribing to orderbook..');
+  //     this.flattradeWs.send(JSON.stringify({
+  //       t: 'o',
+  //       actid: `${env('FLATTRADE_ACCOUNT_ID')}`,
+  //     }));
+  //   } else {
+  //     await this.connectFlattradeWebSocket();
+  //     if(this.flattradeWs.readyState === WebSocket.OPEN){
+  //       strapi.log.info('Flattrade WebSocket connection is open..Subscribing to orderbook..');
+  //       this.flattradeWs.send(JSON.stringify({
+  //         t: 'o',
+  //         actid: `${env('FLATTRADE_ACCOUNT_ID')}`,
+  //       }));
+  //     }
+  //   }
+  // },
 
-  async handleOrderbookFeed(feedData) {
-    strapi.log.info('Order update received..');
-    try {
-      await strapi.service('api::order.order').handleOrderbookFeed(feedData);
-    } catch (error) {
-      strapi.webSocket.broadcast({ type: 'variable', message: `Error handling orderbook feed: ${error}..Consider restarting the application..`, status: false });
-      throw new Error(error);    
-    }
-  },
+  // async handleOrderbookFeed(feedData) {
+  //   strapi.log.info('Order update received..');
+  //   try {
+  //     await strapi.service('api::order.order').handleOrderbookFeed(feedData);
+  //   } catch (error) {
+  //     strapi.webSocket.broadcast({ type: 'variable', message: `Error handling orderbook feed: ${error}..Consider restarting the application..`, status: false });
+  //     throw new Error(error);    
+  //   }
+  // },
 
   //Cron Job to reset scripList
   async resetScripList() {

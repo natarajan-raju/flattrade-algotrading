@@ -29,5 +29,45 @@ module.exports = createCoreService('api::purge.purge',({ strapi }) => ({
         strapi.webSocket.broadcast({ type: 'action', message: `${orders.length} orders purged upto ${formattedDate}.`, status: true });
         strapi.log.info(`${orders.length} orders purged upto ${formattedDate}.`);
     },
+
+    //Delete purged orders once in a month
+    async deletePurgeTableMonthly() {
+        let uptoDate = new Date();
+        let formattedDate = uptoDate.toISOString().split('T')[0];
+        
+        // Calculate the date 1 month ago from the current date
+        let oneMonthAgo = new Date(uptoDate);
+        oneMonthAgo.setMonth(uptoDate.getMonth() - 1);
+        
+        // Find all records in the 'purge' table older than or equal to 1 month
+        const oldPurgedRecords = await strapi.db.query('api::purge.purge').findMany({
+            where: {
+                createdAt: {
+                    $lte: oneMonthAgo // records created on or before one month ago
+                }
+            }
+        });
+    
+        if(oldPurgedRecords.length === 0){
+            strapi.log.info('No data older than 1 month to purge...');
+            strapi.webSocket.broadcast({ type: 'action', message: `No data older than 1 month to purge from the purge table for ${formattedDate}.`, status: false });
+            return;
+        }
+    
+        // Deleting purged records older than or equal to 1 month
+        await strapi.db.query('api::purge.purge').deleteMany({
+            where: {
+                createdAt: {
+                    $lte: oneMonthAgo // records created on or before one month ago
+                }
+            }
+        });
+    
+        // Log and broadcast the purge operation
+        strapi.webSocket.broadcast({ type: 'action', message: `${oldPurgedRecords.length} records purged from the purge table for ${formattedDate}.`, status: true });
+        strapi.log.info(`${oldPurgedRecords.length} records purged from the purge table for ${formattedDate}.`);
+    },
+    
+    
 }
 ));

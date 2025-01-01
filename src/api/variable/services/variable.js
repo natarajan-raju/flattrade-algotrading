@@ -272,6 +272,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   contractType = 'CE';              
                   const orderStatus = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken,amount});              
                   if(orderStatus.status === true || orderStatus.status === 'true'){
+                    console.log('CALL buy Order status true from variable service. Resetting awaitingOrderConfirmation to false');
                     strapi[`${tk}`].set('callOptionBought', callOptionBought);
                     strapi[`${tk}`].set('callBoughtAt', callBoughtAt);
                     strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
@@ -291,6 +292,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                       
                     } 
                   }else{
+                    console.log('CALL buy Order status false from variable service. Resetting awaitingOrderConfirmation to false');
                     strapi[`${tk}`].set('callOptionBought', false);
                     strapi[`${tk}`].set('callBoughtAt', 0);
                     strapi[`${tk}`].set('previousTradedPrice', lp);
@@ -330,6 +332,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                   const orderStatus = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken, amount});
                   if(orderStatus.status === true || orderStatus.status === 'true'){
+                    console.log('PUT buy Order status true from variable service. Resetting awaitingOrderConfirmation to false');
                     strapi[`${tk}`].set('putOptionBought', putOptionBought);
                     strapi[`${tk}`].set('putBoughtAt', putBoughtAt);
                     strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
@@ -348,6 +351,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                       message: 'PUT buy Order placed successfully',                            
                     }                    
                   } else {
+                    console.log('PUT buy Order status false from variable service. Resetting awaitingOrderConfirmation to false');
                     strapi[`${tk}`].set('putOptionBought', false);
                     strapi[`${tk}`].set('putBoughtAt', 0);
                     strapi[`${tk}`].set('previousTradedPrice', lp);
@@ -389,6 +393,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                     const orderStatus = await strapi.service('api::order.order').placeSellOrder({contractType,lp,index,indexToken,quantity});
                     if(orderStatus.status === true || orderStatus.status === 'true'){
+                      console.log('CALL sell Order status true from variable service. Resetting awaitingOrderConfirmation to false');
                       strapi[`${tk}`].set('callOptionBought', callOptionBought);
                       strapi[`${tk}`].set('callBoughtAt', callBoughtAt);
                       strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
@@ -407,6 +412,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                         message: 'CALL sell Order placed successfully',
                       }
                     } else {
+                      console.log('CALL sell Order status false from variable service. Resetting awaitingOrderConfirmation to false');
                       strapi[`${tk}`].set('awaitingOrderConfirmation', false);                      
                       strapi.db.query('api::variable.variable').update({
                         where: {indexToken : `${tk}`},
@@ -444,6 +450,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                     let orderStatus = await strapi.service('api::order.order').placeSellOrder({contractType,lp,index,indexToken,quantity});
                     if(orderStatus.status === true || orderStatus.status === 'true'){
+                      console.log('PUT sell Order status true from variable service. Resetting awaitingOrderConfirmation to false');
                       strapi[`${tk}`].set('putOptionBought', putOptionBought);
                       strapi[`${tk}`].set('putBoughtAt', putBoughtAt);
                       strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
@@ -464,6 +471,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                         updatedVariable,
                       } 
                     } else {
+                      console.log('PUT sell Order status false from variable service. Resetting awaitingOrderConfirmation to false');
                       strapi[`${tk}`].set('awaitingOrderConfirmation', false);
                       let updatedVariable = await strapi.db.query('api::variable.variable').update({
                         where: {indexToken: `${tk}`},

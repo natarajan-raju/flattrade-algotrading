@@ -19,7 +19,7 @@ module.exports = {
    * run jobs, or perform some special logic.
    */ 
   bootstrap({ strapi }) {
-    
+    strapi.log.info('Strapi Restart as a part of Daily Maintenance task..');
     // Initialize WebSocket server     
     const setFoundation = async () => {      
       await strapi.service('api::web-socket.web-socket').initializeWebSocketServer();      
