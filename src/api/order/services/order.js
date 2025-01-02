@@ -36,132 +36,149 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     // Place BUY Order service
     async placeBuyOrder(orderData) {        
             const {  contractType, lp,quantity,index,indexToken, amount } = orderData;
-            const preferredContract = await this.getPreferredContract(index,contractType,amount);            
-            if(preferredContract.token){
-                const orderQuantity = quantity * preferredContract.ls;                
-                let orderStatus;
-                const norenordno = await this.placeOrderWithFlattrade('NFO',preferredContract.tsym,orderQuantity,'0','B','Order created from dashboard.rajaapp.in');
-                if(norenordno){
-                    orderStatus = await this.fetchOrderStatus(norenordno);
-                    if(orderStatus){
-                        console.log(orderStatus);
-                        const price = parseFloat(orderStatus.qty) * parseFloat(orderStatus.avgprc);
-                        const createdOrder = await strapi.db.query('api::order.order').create({
-                            data: {
-                                index,
-                                orderType: 'BUY',
-                                contractType,                       
-                                contractTsym: orderStatus.tsym,
-                                contractToken: orderStatus.token,
-                                indexLtp: lp,
-                                lotSize: parseInt(orderStatus.ls),
-                                price: typeof price === 'number'? price : 0,
-                                contractLp: parseFloat(orderStatus.avgprc) || preferredContract.lp,
-                                norenordno,
-                                orderStatus: orderStatus.status,
-                                remarks: orderStatus.rejreason.length > 0? orderStatus.rejreason : orderStatus.remarks,
-                                indexToken,
-                                quantity: parseInt(orderStatus.qty),
-                                realizedPL: 0,                                                        
-                            }               
-                        });
-                        console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
-                        if(orderStatus.status.toLowerCase() === 'complete'){
-                            const contractBought = {
-                                contractType,
-                                contractToken: preferredContract.token,
-                                tsym: preferredContract.tsym,
-                                quantity: parseInt(orderStatus.qty),
-                                costPrice: parseFloat(createdOrder.price) || price,                   
-                            }
-                            strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType, contractToken: preferredContract.token,tsym: preferredContract.tsym,lotSize: preferredContract.ls, quantity: orderStatus.qty, price } });
-                            strapi[`${index}`].set('contractBought', contractBought);
-                                                                           
-                            
-
-                            strapi.webSocket.broadcast({
-                                type: 'order',
-                                data: createdOrder,
-                                message: `Buy order for index ${index} with contract ${preferredContract.tsym} placed`,
-                                status: 'success',
+            const preferredContract = await this.getPreferredContract(index,contractType,amount);
+            try{            
+                if(preferredContract.token){
+                    const orderQuantity = quantity * preferredContract.ls;                
+                    let orderStatus;
+                    const norenordno = await this.placeOrderWithFlattrade('NFO',preferredContract.tsym,orderQuantity,'0','B','Order created from dashboard.rajaapp.in');
+                    if(norenordno){
+                        orderStatus = await this.fetchOrderStatus(norenordno);
+                        if(orderStatus){
+                            console.log(orderStatus);
+                            const price = parseFloat(orderStatus.qty) * parseFloat(orderStatus.avgprc);
+                            const createdOrder = await strapi.db.query('api::order.order').create({
+                                data: {
+                                    index,
+                                    orderType: 'BUY',
+                                    contractType,                       
+                                    contractTsym: orderStatus.tsym,
+                                    contractToken: orderStatus.token,
+                                    indexLtp: lp,
+                                    lotSize: parseInt(orderStatus.ls),
+                                    price: typeof price === 'number'? price : 0,
+                                    contractLp: parseFloat(orderStatus.avgprc) || preferredContract.lp,
+                                    norenordno,
+                                    orderStatus: orderStatus.status,
+                                    remarks: orderStatus.rejreason.length > 0? orderStatus.rejreason : orderStatus.remarks,
+                                    indexToken,
+                                    quantity: parseInt(orderStatus.qty),
+                                    realizedPL: 0,                                                        
+                                }               
                             });
-                            let awaitingOrderConfirmation = false;
-                            console.log('Order complete. Setting awaitingOrderConfirmation to false');                
-                            strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-                            strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
-                            return {
-                                status: true,
-                                message: 'Order placed successfully',
-                                data: createdOrder
-                            }    
+                            console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
+                            if(orderStatus.status.toLowerCase() === 'complete'){
+                                const contractBought = {
+                                    contractType,
+                                    contractToken: preferredContract.token,
+                                    tsym: preferredContract.tsym,
+                                    quantity: parseInt(orderStatus.qty),
+                                    costPrice: parseFloat(createdOrder.price) || price,                   
+                                }
+                                strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType, contractToken: preferredContract.token,tsym: preferredContract.tsym,lotSize: preferredContract.ls, quantity: orderStatus.qty, price } });
+                                strapi[`${index}`].set('contractBought', contractBought);
+                                                                            
+                                
 
-                        } else if(orderStatus.status.toLowerCase() === 'rejected'){
+                                strapi.webSocket.broadcast({
+                                    type: 'order',
+                                    data: createdOrder,
+                                    message: `Buy order for index ${index} with contract ${preferredContract.tsym} placed`,
+                                    status: 'success',
+                                });
+                                let awaitingOrderConfirmation = false;
+                                console.log('Order complete. Setting awaitingOrderConfirmation to false');                
+                                strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                                strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
+                                return {
+                                    status: true,
+                                    message: 'Order placed successfully',
+                                    data: createdOrder
+                                }    
+
+                            } else if(orderStatus.status.toLowerCase() === 'rejected'){
+                                strapi.webSocket.broadcast({
+                                    type: 'order',
+                                    data: createdOrder,
+                                    message: `Buy order for index ${index} with contract ${preferredContract.tsym} rejected`,
+                                    status: 'failure',
+                                });
+                                let awaitingOrderConfirmation = false;  
+                                console.log('Order rejected. Setting awaitingOrderConfirmation to false');              
+                                strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                                strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
+                                return {
+                                    status: false,
+                                    message: 'Order rejected',
+                                    data: createdOrder
+                                }
+                            }
+                        }else{
                             strapi.webSocket.broadcast({
                                 type: 'order',
-                                data: createdOrder,
-                                message: `Buy order for index ${index} with contract ${preferredContract.tsym} rejected`,
-                                status: 'failure',
+                                data: null,
+                                message: `Buy order for index ${index} with contract ${preferredContract.tsym} failed due to some error fetching order status from Flattrade`,
+                                status: false,
                             });
                             let awaitingOrderConfirmation = false;  
-                            console.log('Order rejected. Setting awaitingOrderConfirmation to false');              
+                            console.log('Error fetching order status from Flattrade. Setting awaitingOrderConfirmation to false');              
                             strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                             strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
                             return {
                                 status: false,
-                                message: 'Order rejected',
-                                data: createdOrder
+                                message: 'Error fetching order status from Flattrade'
                             }
                         }
-                    }else{
+                    }else {
                         strapi.webSocket.broadcast({
                             type: 'order',
                             data: null,
-                            message: `Buy order for index ${index} with contract ${preferredContract.tsym} failed due to some error fetching order status from Flattrade`,
+                            message: `Buy order for index ${index} with contract ${preferredContract.tsym} failed due to some error placing order with Flattrade`,
                             status: false,
                         });
-                        let awaitingOrderConfirmation = false;  
-                        console.log('Error fetching order status from Flattrade. Setting awaitingOrderConfirmation to false');              
+                        let awaitingOrderConfirmation = false;
+                        console.log('Error placing order with Flattrade. Setting awaitingOrderConfirmation to false');                
                         strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                         strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
                         return {
                             status: false,
-                            message: 'Error fetching order status from Flattrade'
+                            message: 'Error placing order with Flattrade'
                         }
                     }
-                }else {
+                    let awaitingOrderConfirmation = false;                
+                    strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                    console.log('Order placed successfully. Setting awaitingOrderConfirmation to false. This runs in case if any return is not handled above');
+                    strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });               
+                } else {
+                    let awaitingOrderConfirmation = false;                
+                    strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                    console.log('No suitable tokens found for the order. Setting awaitingOrderConfirmation to false');
+                    strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } }); 
                     strapi.webSocket.broadcast({
                         type: 'order',
                         data: null,
-                        message: `Buy order for index ${index} with contract ${preferredContract.tsym} failed due to some error placing order with Flattrade`,
-                        status: false,
+                        message: `Buy order for index ${index} with contract ${preferredContract.tsym} failed as no suitable tokens found`,
+                        status: 'failure',
                     });
-                    let awaitingOrderConfirmation = false;
-                    console.log('Error placing order with Flattrade. Setting awaitingOrderConfirmation to false');                
-                    strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-                    strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
                     return {
                         status: false,
-                        message: 'Error placing order with Flattrade'
+                        message: 'No suitable tokens found for the order.'
                     }
                 }
+            }catch(error){                
                 let awaitingOrderConfirmation = false;                
                 strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-                console.log('Order placed successfully. Setting awaitingOrderConfirmation to false. This runs in case if any return is not handled above');
-                strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });               
-            } else {
-                let awaitingOrderConfirmation = false;                
-                strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-                console.log('No suitable tokens found for the order. Setting awaitingOrderConfirmation to false');
+                console.log(`Error in placeBuyOrder: ${error}. Setting awaitingOrderConfirmation to false`);
                 strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } }); 
                 strapi.webSocket.broadcast({
                     type: 'order',
                     data: null,
-                    message: `Buy order for index ${index} with contract ${preferredContract.tsym} failed as no suitable tokens found`,
+                    message: `Buy order for index ${index} with contract ${preferredContract.tsym} failed due to some error in placeBuyOrder: ${error}`,
                     status: 'failure',
                 });
                 return {
                     status: false,
-                    message: 'No suitable tokens found for the order.'
+                    message: 'Error in placeBuyOrder'
                 }
             }          
         
@@ -179,124 +196,133 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             }
             let contractBought;
             try{
-                contractBought = strapi[`${index}`].get('contractBought');
-            } catch(error){
-                console.log('Error in fetching contract bought',error);
-                return {
-                    status: false,
-                    message: error
-                }
-            }
-            if(!contractBought.tsym || contractBought.tsym === undefined || contractBought.tsym === '' || contractBought.tsym === null){
-                strapi.webSocket.broadcast({
-                   type: 'order',
-                   data: null,
-                   message: `Sell order for index ${index} with contract ${contractBought.contractTsym} failed as no contract bought for this index`,
-                   status: false,  
-                });
-                return {
-                    status: false,
-                    message: 'No contract bought for this index'
-                }
-            }
-            //Insert Flattrade Sell Execution code here
-            let orderStatus;
-            const norenordno = await this.placeOrderWithFlattrade('NFO',contractBought.tsym,contractBought.quantity,'0','S','Order created from dashboard.rajaapp.in'   );
-            if(norenordno){
-                orderStatus = await this.fetchOrderStatus(norenordno);
-                if(orderStatus){
-
-                    const price = parseFloat(orderStatus.qty) * parseFloat(orderStatus.avgprc);
-                    const realizedPL = price - contractBought.costPrice;  
-                    const createdOrder = await strapi.db.query('api::order.order').create({
-                        data: {
-                            index,
-                            orderType: 'SELL',
-                            contractType,                       
-                            contractTsym: orderStatus.tsym,
-                            contractToken: orderStatus.token,
-                            indexLtp: lp,
-                            lotSize: parseInt(orderStatus.ls),
-                            price: typeof price === 'number'? price : 0,
-                            contractLp: parseFloat(orderStatus.avgprc),
-                            norenordno,
-                            orderStatus: orderStatus.status,
-                            remarks: orderStatus.rejreason.length > 0? orderStatus.rejreason : orderStatus.remarks,
-                            indexToken,
-                            quantity: parseInt(orderStatus.qty),
-                            realizedPL,                        
-                        }               
+                contractBought = strapi[`${index}`].get('contractBought');            
+                if(!contractBought.tsym || contractBought.tsym === undefined || contractBought.tsym === '' || contractBought.tsym === null){
+                    strapi.webSocket.broadcast({
+                    type: 'order',
+                    data: null,
+                    message: `Sell order for index ${index} with contract ${contractBought.contractTsym} failed as no contract bought for this index`,
+                    status: false,  
                     });
-                    console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
-                    if(orderStatus.status.toLowerCase() === 'complete'){
-                        const contractBought = {                                    
+                    return {
+                        status: false,
+                        message: 'No contract bought for this index'
+                    }
+                }
+                //Insert Flattrade Sell Execution code here
+                let orderStatus;
+                const norenordno = await this.placeOrderWithFlattrade('NFO',contractBought.tsym,contractBought.quantity,'0','S','Order created from dashboard.rajaapp.in'   );
+                if(norenordno){
+                    orderStatus = await this.fetchOrderStatus(norenordno);
+                    if(orderStatus){
+
+                        const price = parseFloat(orderStatus.qty) * parseFloat(orderStatus.avgprc);
+                        const realizedPL = price - contractBought.costPrice;  
+                        const createdOrder = await strapi.db.query('api::order.order').create({
+                            data: {
+                                index,
+                                orderType: 'SELL',
+                                contractType,                       
+                                contractTsym: orderStatus.tsym,
+                                contractToken: orderStatus.token,
+                                indexLtp: lp,
+                                lotSize: parseInt(orderStatus.ls),
+                                price: typeof price === 'number'? price : 0,
+                                contractLp: parseFloat(orderStatus.avgprc),
+                                norenordno,
+                                orderStatus: orderStatus.status,
+                                remarks: orderStatus.rejreason.length > 0? orderStatus.rejreason : orderStatus.remarks,
+                                indexToken,
+                                quantity: parseInt(orderStatus.qty),
+                                realizedPL,                        
+                            }               
+                        });
+                        console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
+                        if(orderStatus.status.toLowerCase() === 'complete'){
+                            const contractBought = {                                    
+                            }
+                            strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType: '', contractToken: '',tsym: '',lotSize: '', quantity: 0, price: 0 } });
+                            strapi[`${index}`].set('contractBought', contractBought);                      
+
+                            strapi.webSocket.broadcast({
+                                type: 'order',
+                                data: createdOrder,
+                                message: `Buy order for index ${index} with contract ${orderStatus.tsym} placed`,
+                                status: 'success',
+                            });
+                            let awaitingOrderConfirmation = false;  
+                            console.log('Order complete. Setting awaitingOrderConfirmation to false');              
+                            strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                            strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
+                            return {
+                                status: true,
+                                message: 'Order placed successfully',
+                                data: createdOrder
+                            }    
+
+                        } else if(orderStatus.status.toLowerCase() === 'rejected'){
+                            strapi.webSocket.broadcast({
+                                type: 'order',
+                                data: createdOrder,
+                                message: `Buy order for index ${index} with contract ${orderStatus.tsym} rejected`,
+                                status: 'failure',
+                            });
+                            let awaitingOrderConfirmation = false;                
+                            strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                            console.log('Order rejected. Setting awaitingOrderConfirmation to false');
+                            strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
+                            return {
+                                status: false,
+                                message: 'Order rejected',
+                                data: createdOrder
+                            }
                         }
-                        strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType: '', contractToken: '',tsym: '',lotSize: '', quantity: 0, price: 0 } });
-                        strapi[`${index}`].set('contractBought', contractBought);                      
-
+                    }else{
                         strapi.webSocket.broadcast({
                             type: 'order',
-                            data: createdOrder,
-                            message: `Buy order for index ${index} with contract ${orderStatus.tsym} placed`,
-                            status: 'success',
+                            data: null,
+                            message: `Buy order for index ${index} with contract ${orderStatus.tsym} failed due to some error fetching order status from Flattrade`,
+                            status: false,
                         });
-                        let awaitingOrderConfirmation = false;  
-                        console.log('Order complete. Setting awaitingOrderConfirmation to false');              
+                        let awaitingOrderConfirmation = false;      
+                        console.log('Error fetching order status from Flattrade. Setting awaitingOrderConfirmation to false');          
                         strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-                        strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
-                        return {
-                            status: true,
-                            message: 'Order placed successfully',
-                            data: createdOrder
-                        }    
-
-                    } else if(orderStatus.status.toLowerCase() === 'rejected'){
-                        strapi.webSocket.broadcast({
-                            type: 'order',
-                            data: createdOrder,
-                            message: `Buy order for index ${index} with contract ${orderStatus.tsym} rejected`,
-                            status: 'failure',
-                        });
-                        let awaitingOrderConfirmation = false;                
-                        strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-                        console.log('Order rejected. Setting awaitingOrderConfirmation to false');
                         strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
                         return {
                             status: false,
-                            message: 'Order rejected',
-                            data: createdOrder
+                            message: 'Error fetching order status from Flattrade'
                         }
                     }
-                }else{
+                }else {
                     strapi.webSocket.broadcast({
                         type: 'order',
                         data: null,
-                        message: `Buy order for index ${index} with contract ${orderStatus.tsym} failed due to some error fetching order status from Flattrade`,
+                        message: `Buy order for index ${index} with contract ${contractBought.tsym} failed due to some error placing order with Flattrade`,
                         status: false,
                     });
-                    let awaitingOrderConfirmation = false;      
-                    console.log('Error fetching order status from Flattrade. Setting awaitingOrderConfirmation to false');          
+                    let awaitingOrderConfirmation = false;                
                     strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                    console.log('Error placing order with Flattrade. Setting awaitingOrderConfirmation to false');
                     strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
                     return {
                         status: false,
-                        message: 'Error fetching order status from Flattrade'
+                        message: 'Error placing order with Flattrade'
                     }
                 }
-            }else {
+            } catch(error){
+                let awaitingOrderConfirmation = false;                
+                strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                console.log(`Error in placeSellOrder: ${error}. Setting awaitingOrderConfirmation to false`);
+                strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } }); 
                 strapi.webSocket.broadcast({
                     type: 'order',
                     data: null,
-                    message: `Buy order for index ${index} with contract ${contractBought.tsym} failed due to some error placing order with Flattrade`,
-                    status: false,
+                    message: `Sell order for index ${index} failed due to some error in placeSellOrder: ${error}`,
+                    status: 'failure',
                 });
-                let awaitingOrderConfirmation = false;                
-                strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-                console.log('Error placing order with Flattrade. Setting awaitingOrderConfirmation to false');
-                strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
                 return {
                     status: false,
-                    message: 'Error placing order with Flattrade'
+                    message: 'Error in placeBuyOrder'
                 }
             }
 
