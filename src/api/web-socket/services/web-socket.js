@@ -47,6 +47,20 @@ module.exports = ({ strapi }) => ({
   
 
   async connectFlattradeWebSocket(scripList) {
+
+    const handleSigint = function () {
+      if (this.flattradeWs && this.flattradeWs.readyState === WebSocket.OPEN) {
+        this.flattradeWs.close();
+        strapi.log.info('Flattrade WebSocket connection closed gracefully.');
+      }
+      process.exit(0);
+    }.bind(this);
+
+    // Remove any existing listener to avoid duplicates
+    process.removeAllListeners('SIGINT');
+
+    // Add the SIGINT listener
+    process.on('SIGINT', handleSigint);
     // Fetch all WebSocket configuration entries and get the first one
     
     const flattradeWsUrl = env('FLATTRADE_WS_URL');
@@ -78,7 +92,7 @@ module.exports = ({ strapi }) => ({
       const currentTime = new Date();
       const currentHour = currentTime.getHours();
       const currentMinute = currentTime.getMinutes();
-      if(currentHour >= 8  || (currentHour <= 15 && currentMinute <= 30)){        
+      if(currentHour >= 8  && (currentHour <= 15 && currentMinute <= 30)){        
         setTimeout(() => this.connectFlattradeWebSocket(scripList), 3000);
       } else {
         strapi.log.info('Outisde Market hours. Websocket will not attempt to reconnect.');
@@ -97,14 +111,8 @@ module.exports = ({ strapi }) => ({
       console.error('Flattrade WebSocket error:', error);
     });
 
-    // Graceful shutdown on SIGINT (Ctrl+C)
-    process.on('SIGINT', () => {
-      if (this.flattradeWs && this.flattradeWs.readyState === WebSocket.OPEN) {
-        this.flattradeWs.close();
-        strapi.log.info('Flattrade WebSocket connection closed gracefully.');
-      }
-      process.exit(0);
-    });
+      // Graceful shutdown on SIGINT (Ctrl+C)
+     
   },
 
   async sendConnectionRequest() {

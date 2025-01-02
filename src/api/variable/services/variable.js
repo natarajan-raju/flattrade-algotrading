@@ -239,7 +239,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               } else {
                 //LP in Passive zone. Do not take any action
                 previousTradedPrice = lp;
-                strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);          
+                strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);  
+                console.log(`No actions taken for index ${index} at LTP ${lp}. LP in passive zone, InitialSpectatorMode: ${initialSpectatorMode}`);        
                 strapi.webSocket.broadcast({ type: 'variable', message: `No actions taken for index ${index} at LTP ${lp}`, status: true});
                 return `No actions taken at LTP ${lp}`;
               }
@@ -269,6 +270,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   //   }
                   // });
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy CALL at LTP ${lp}`, status: true});
+                  console.log(`Reached Strategic Buy zone for ${index}. Application will attempt to buy CALL at LTP ${lp}`);
                   contractType = 'CE';              
                   const orderStatus = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken,amount});              
                   if(orderStatus.status === true || orderStatus.status === 'true'){
@@ -324,6 +326,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   //Buy PUT 
                   
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`, status: true});
+                  console.log(`Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`);
                   contractType = 'PE';
                   putOptionBought = true;
                   putBoughtAt = lp;
@@ -383,6 +386,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   || ((lp >= support2 && callBoughtAt < support2) || (lp <= support2 && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1))) //Stop loss at Support 2
                 ){              
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell CALL at LTP ${lp}`, status: true});     
+                  console.log(`Reached Strategic Sell zone for ${index}. Application will attempt to sell CALL at LTP ${lp}`);
                   //call sell API
                   
                     contractType = 'CE';              
@@ -440,6 +444,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   || ((lp <= resistance2 && putBoughtAt > resistance2) || (lp >= resistance2 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1))) //Stop loss at Resistance 2
                 ){                            
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell PUT at LTP ${lp}`, status: true}); 
+                  console.log(`Reached Strategic Sell zone for ${index}. Application will attempt to sell PUT at LTP ${lp}`);
                   //PUT sell API 
                 
                     contractType = 'PE';             

@@ -19,13 +19,13 @@ module.exports = {
    * run jobs, or perform some special logic.
    */ 
   bootstrap({ strapi }) {
-    strapi.log.info('Strapi Restart as a part of Daily Maintenance task..');
+    
     // Initialize WebSocket server     
     const setFoundation = async () => {      
       await strapi.service('api::web-socket.web-socket').initializeWebSocketServer();      
       await strapi.service('api::variable.variable').fetchIndexVariables();
       strapi.INDICES = ['26000','26009','26013','26014','26037'];
-      strapi.webSocket.broadcast({ type: 'action', message: 'Application is restarted. Please submit values to begin trading...', status: true });  
+      // strapi.webSocket.broadcast({ type: 'action', message: 'Application is restarted. Please submit values to begin trading...', status: true });  
       // strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket()
       const currentTime = new Date();
       const currentHour = currentTime.getHours();
