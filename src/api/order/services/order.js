@@ -44,6 +44,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 if(norenordno){
                     orderStatus = await this.fetchOrderStatus(norenordno);
                     if(orderStatus){
+                        console.log(orderStatus);
                         const price = parseFloat(orderStatus.qty) * parseFloat(orderStatus.avgprc);
                         const createdOrder = await strapi.db.query('api::order.order').create({
                             data: {
@@ -54,7 +55,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                 contractToken: orderStatus.token,
                                 indexLtp: lp,
                                 lotSize: parseInt(orderStatus.ls),
-                                price,
+                                price: typeof price === 'number'? price : 0,
                                 contractLp: parseFloat(orderStatus.avgprc) || preferredContract.lp,
                                 norenordno,
                                 orderStatus: orderStatus.status,
@@ -216,7 +217,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             contractToken: orderStatus.token,
                             indexLtp: lp,
                             lotSize: parseInt(orderStatus.ls),
-                            price,
+                            price: typeof price === 'number'? price : 0,
                             contractLp: parseFloat(orderStatus.avgprc),
                             norenordno,
                             orderStatus: orderStatus.status,

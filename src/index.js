@@ -38,6 +38,25 @@ module.exports = {
       }else {
         strapi.isTradingEnabled = true;
       }
+      let scripList = '';
+      let otherScripItems = await strapi.db.query('api::web-socket.web-socket').findMany({
+        where: { 
+            scripList: { $ne: '' } // Exclude the current indexToken
+        },
+        select: ['scripList'], // Select only the scripList field
+      });
+
+      if (otherScripItems && otherScripItems.length > 0) {
+          for (const otherScripItem of otherScripItems) {
+              if (otherScripItem.scripList) {
+                  scripList += `#${otherScripItem.scripList}`; // Concatenate with '#'
+              }
+          }
+      }
+    
+    await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
+
+
       strapi.log.info(`is Trading enabled? ${strapi.isTradingEnabled} | Current Time: ${currentTime} | Current Hour: ${currentHour} | Current Minute: ${currentMinute}`);
     };
     setFoundation().then((result) => {
@@ -46,5 +65,6 @@ module.exports = {
     }).catch((error) => {
       console.error('Either WebSocket server initialization failed or Fetching Index Variables failed :', error);
     });
+    
   },
 };
