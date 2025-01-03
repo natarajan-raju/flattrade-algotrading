@@ -47,8 +47,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                         if(orderStatus){
                             console.log(orderStatus);
                             let price;
-                            orderStatus.avgprc? price = orderStatus.qty * orderStatus.avgprc : orderStatus.qty * preferredContract.lp;
-                            // const createdOrder = await strapi.db.query('api::order.order').create({
+                            orderStatus.avgprc? price = orderStatus.qty * orderStatus.avgprc : orderStatus.qty * preferredContract.lp;                           
                             //     data: {
                             //         index,
                             //         orderType: 'BUY',
@@ -139,8 +138,8 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                             contractToken: orderStatus.token,
                                             indexLtp: lp,
                                             lotSize: `${orderStatus.ls}`,
-                                            price: `${price}`,
-                                            contractLp: `${orderStatus.avgprc}` || `${preferredContract.lp}`,
+                                            price: '0',
+                                            contractLp: '0',
                                             norenordno,
                                             orderStatus: orderStatus.status,
                                             remarks: orderStatus.rejreason.length > 0? orderStatus.rejreason : orderStatus.remarks,
@@ -350,14 +349,14 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                         contractToken: orderStatus.token,
                                         indexLtp: lp,
                                         lotSize: `${orderStatus.ls}`,
-                                        price: `${price}`,
-                                        contractLp: `${orderStatus.avgprc}`,
+                                        price: '0',
+                                        contractLp: '0',
                                         norenordno,
                                         orderStatus: orderStatus.status,
                                         remarks: orderStatus.rejreason.length > 0? orderStatus.rejreason : orderStatus.remarks,
                                         indexToken,
                                         quantity: `${orderStatus.qty}`,
-                                        realizedPL: `${realizedPL}`,                        
+                                        realizedPL: '0',                        
                                     }               
                                 });
                                 console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);                               

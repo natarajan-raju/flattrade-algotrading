@@ -137,13 +137,14 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             const contractBought = strapi[`${index}`].get('contractBought') || null;
             try{
               if(contractBought && contractBought.contractToken === tk){
-                const realizedPL = (parseFloat(lp) - contractBought.costPrice) * parseFloat(contractBought.quantity);              
+                const realizedPL = (parseFloat(lp) * parseFloat(contractBought.quantity)) - parseFloat(contractBought.costPrice);              
                 //send a Strapi web broadcast to client regarding the contract bought's token lp
-                strapi.log.info('Sending contract bought update to frontend');
+                strapi.log.info(`Sending contract bought update to frontend for ${contractBought.token}`);
                 strapi.webSocket.broadcast({
                   type: 'position',
                   data: {
-                    token: contractBought.token,
+                    tk,
+                    token: tk,
                     lp,
                     realizedPL
                   },
