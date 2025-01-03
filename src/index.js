@@ -54,7 +54,7 @@ module.exports = {
           }
       }
     
-    await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
+    scripList.length > 0 && await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
 
 
       strapi.log.info(`is Trading enabled? ${strapi.isTradingEnabled} | Current Time: ${currentTime} | Current Hour: ${currentHour} | Current Minute: ${currentMinute}`);

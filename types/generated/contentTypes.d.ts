@@ -443,7 +443,7 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
-    contractLp: Schema.Attribute.Decimal;
+    contractLp: Schema.Attribute.String;
     contractToken: Schema.Attribute.String;
     contractTsym: Schema.Attribute.String;
     contractType: Schema.Attribute.String;
@@ -456,14 +456,14 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::order.order'> &
       Schema.Attribute.Private;
-    lotSize: Schema.Attribute.Integer;
+    lotSize: Schema.Attribute.String;
     norenordno: Schema.Attribute.String;
     orderStatus: Schema.Attribute.String;
     orderType: Schema.Attribute.String;
-    price: Schema.Attribute.Decimal;
+    price: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
-    quantity: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
-    realizedPL: Schema.Attribute.Decimal & Schema.Attribute.DefaultTo<0>;
+    quantity: Schema.Attribute.String;
+    realizedPL: Schema.Attribute.String;
     remarks: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
