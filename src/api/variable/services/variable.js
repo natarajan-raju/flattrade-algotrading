@@ -579,7 +579,13 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       support2: 0,
       amount: 0,
       quantity: 0,
-      previousTradedPrice: 0,                                
+      previousTradedPrice: 0, 
+      initialSpectatorMode: true,
+      callOptionBought: false,
+      putOptionBought: false,
+      callBoughtAt: 0,
+      putBoughtAt: 0,
+      awaitingOrderConfirmation: false                               
     };
     const headers = {
       Authorization: `Bearer ${env('SPECIAL_TOKEN')}`,
@@ -631,24 +637,45 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       }catch(e){
         console.log(e);
       }
-      const variable = await strapi.db.query('api::variable.variable').findOne({
-        where: { indexToken },
-      });
-      if(variable){
-        if(variable.callOptionBought){
-          strapi.webSocket.broadcast({type: 'variable',message: 'Please sell all positions before starting to trade again.', status: true});        
-        }else{
-          defaultValues.initialSpectatorMode = true;
-        }      
-          strapi.db.query('api::variable.variable').update({
-            where: { id: variable.id }, // Specify the condition for the update
+      // const variable = await strapi.db.query('api::variable.variable').findOne({
+      //   where: { indexToken },
+      // });
+      // if(variable){
+        // if(variable.callOptionBought){
+        //   strapi.webSocket.broadcast({type: 'variable',message: 'Please sell all positions before starting to trade again.', status: true});        
+        // }else{
+        //   defaultValues.initialSpectatorMode = true;
+        // }      
+          const variable = await strapi.db.query('api::variable.variable').update({
+            where: { indexToken }, // Specify the condition for the update
             data: defaultValues,        // Specify the new data
           });
+          strapi[`${indexToken}`] = new Map(Object.entries(variable));
+          console.log(`Application is stopping. For sample basePrice in ${indexToken} is ${strapi[`${indexToken}`].get('basePrice')}`);
+          // strapi[`${indexToken}`].set('initialSpectatorMode', true);
+          // strapi[`${indexToken}`].set('basePrice', 0);
+          // strapi[`${indexToken}`].set('resistance1', 0);
+          // strapi[`${indexToken}`].set('resistance2', 0);
+          // strapi[`${indexToken}`].set('support1', 0);
+          // strapi[`${indexToken}`].set('support2', 0);
+          // strapi[`${indexToken}`].set('amount', 0);
+          // strapi[`${indexToken}`].set('quantity', 0);
+          // strapi[`${indexToken}`].set('previousTradedPrice', 0);
+          // strapi[`${indexToken}`].set('callOptionBought', false);
+          // strapi[`${indexToken}`].set('putOptionBought', false);
+          // strapi[`${indexToken}`].set('callBoughtAt', 0);
+          // strapi[`${indexToken}`].set('putBoughtAt', 0);
+          // strapi[`${indexToken}`].set('awaitingOrderConfirmation', false);
+
+          //Check if any position is available in DB and clear it
+          strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType: '', contractToken: '',tsym: '',lotSize: '', quantity: 0, price: 0 } });
+          const contractBought = {};
+          strapi[`${variable.index}`].set('contractBought', contractBought);
           // delete strapi[`${indexToken}`];
           // delete strapi[`${variable.index}`];
-          strapi.webSocket.broadcast({type: 'action', message: `Application is stopped now for index ${variable.index}.Please sell all positions before starting to trade again.`, status: true});
+          strapi.webSocket.broadcast({type: 'order', message: `Application is stopped now for index ${variable.index}.Please sell all positions before starting to trade again.`, status: true});
           return {status: true, message: `Application stopped now for index ${variable.index}...`};        
-      }
+      // }
     }
   },
 

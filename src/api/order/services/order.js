@@ -3,6 +3,7 @@ const { env } = require('@strapi/utils');
 const order = require('../controllers/order');
 
 
+
 // @ts-ignore
 const { createCoreService } = require('@strapi/strapi').factories;
 
@@ -335,6 +336,19 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                 message: `Sell order for index ${index} with contract ${orderStatus.tsym} rejected`,
                                 status: 'failure',
                             });
+                            const position = await this.checkOpenPosition(orderStatus.tsym);
+                            if(position && (position.opensellqty < contractBought.quantity) || (position.opensellqty === 0) ){
+                                console.log(`No open position for the contract with quantity ${contractBought.quantity} vs actual open position quantity ${position.opensellqty}`);
+                                strapi.webSocket.broadcast({
+                                    type: 'action',                                    
+                                    message: `rajaapp.in has found no open position for the contract with quantity ${contractBought.quantity} vs actual open position quantity ${position.opensellqty}`,
+                                    status: 'failure',
+                                });
+                                const contract = {                                    
+                                }
+                                strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType: '', contractToken: '',tsym: '',lotSize: '', quantity: 0, price: 0 } });
+                                strapi[`${index}`].set('contractBought', contract);
+                            }
                             let awaitingOrderConfirmation = false;                
                             strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                             console.log('Order rejected. Setting awaitingOrderConfirmation to false');
@@ -490,6 +504,33 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         }catch(error){
             console.log(error);
             return null;         
+        }
+    },
+
+    async checkOpenPosition(tsym){
+        try{            
+            const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}"}&jKey=${strapi.sessionToken}`;
+            const positionBookResponse = await fetch(`${env('FLATTRADE_POSITION_BOOK_URL')}`,{
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: payload,
+            });
+            const positionBook = await positionBookResponse.json();
+            console.log(positionBook);
+            if(Array.isArray(positionBook) && positionBook.length > 0){
+                const position = positionBook.find(position => position.tsym === tsym && position.opensellqty > 0);
+                if(position){
+                    console.log(`Available position for ${tsym}: ${JSON.stringify(position)}`);
+                    return position;
+                }else{
+                    return null;
+                }
+            }
+        }catch(error){
+            console.log(error);
+            return null;
         }
     },
 
