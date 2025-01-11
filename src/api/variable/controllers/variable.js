@@ -73,23 +73,23 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             return ctx.send({ message: 'Either expiry data provided is wrong or Session token expired', status: false });
         }        
        
-        //Fetch and create previousTradedPrice which is beneficial for initialSpectatorMode decisions
-        let previousTradedPrice;
-        try{
-            const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","exch":"NSE","token":"${strapi.sessionToken}"}&jKey=${strapi.sessionToken}`;
-            const quoteReponse = await fetch(`${env('FLATTRADE_GET_QUOTES_URL')}`,{
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: payload, 
-            });
-            const quote = await quoteReponse.json();                        
-            previousTradedPrice = quote.lp || 0;
+        // //Fetch and create previousTradedPrice which is beneficial for initialSpectatorMode decisions
+        // let previousTradedPrice;
+        // try{
+        //     const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","exch":"NSE","token":"${strapi.sessionToken}"}&jKey=${strapi.sessionToken}`;
+        //     const quoteReponse = await fetch(`${env('FLATTRADE_GET_QUOTES_URL')}`,{
+        //         method: 'POST',
+        //         headers: {
+        //             'Content-Type': 'application/json'
+        //         },
+        //         body: payload, 
+        //     });
+        //     const quote = await quoteReponse.json();                        
+        //     previousTradedPrice = quote.lp || 0;
             
-        }catch(error){
-            return ctx.send({ message: `Error in fetching LTP of the index from Flattrade with error:  ${error}`, status: false });            
-        }
+        // }catch(error){
+        //     return ctx.send({ message: `Error in fetching LTP of the index from Flattrade with error:  ${error}`, status: false });            
+        // }
 
               
         // Step 2: Update values for the found index
@@ -107,7 +107,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             callOptionBought: false,
             putOptionBought: false,           
             initialSpectatorMode: true,
-            previousTradedPrice,
+            previousTradedPrice: 0,
             callBoughtAt: 0,
             putBoughtAt: 0,
             awaitingOrderConfirmation: false,

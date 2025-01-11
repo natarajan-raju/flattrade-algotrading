@@ -37,6 +37,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     // Place BUY Order service
     async placeBuyOrder(orderData) {        
             const {  contractType, lp,quantity,index,indexToken, amount } = orderData;
+            console.log(`Received for Buy Order: Contract Type: ${contractType} Quantity: ${quantity} Index: ${index} Amount: ${amount}`);
             const preferredContract = await this.getPreferredContract(index,contractType,amount);
             try{            
                 if(preferredContract.token){
@@ -239,9 +240,11 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     message: 'Invalid payload provided'
                 }
             }
+            
             let contractBought;
             try{
-                contractBought = strapi[`${index}`].get('contractBought');            
+                contractBought = strapi[`${index}`].get('contractBought');
+                console.log(`Received sell order for ${JSON.stringify(contractBought)}`);            
                 if(!contractBought.tsym || contractBought.tsym === undefined || contractBought.tsym === '' || contractBought.tsym === null){
                     strapi.webSocket.broadcast({
                     type: 'order',
@@ -263,31 +266,13 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                         console.log(orderStatus);                        
                         const price = orderStatus.qty * orderStatus.avgprc;
                         const realizedPL = price - contractBought.costPrice;  
-                        // const createdOrder = await strapi.db.query('api::order.order').create({
-                        //     data: {
-                        //         index,
-                        //         orderType: 'SELL',
-                        //         contractType,                       
-                        //         contractTsym: orderStatus.tsym,
-                        //         contractToken: orderStatus.token,
-                        //         indexLtp: lp,
-                        //         lotSize: parseInt(orderStatus.ls),
-                        //         price: typeof price === 'number'? price : 0,
-                        //         contractLp: parseFloat(orderStatus.avgprc),
-                        //         norenordno,
-                        //         orderStatus: orderStatus.status,
-                        //         remarks: orderStatus.rejreason.length > 0? orderStatus.rejreason : orderStatus.remarks,
-                        //         indexToken,
-                        //         quantity: parseInt(orderStatus.qty),
-                        //         realizedPL,                        
-                        //     }               
-                        // });
-                        // console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
+                        
                         if(orderStatus.status.toLowerCase() === 'complete'){
                             const contractBought = {                                    
                             }
                             strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType: '', contractToken: '',tsym: '',lotSize: '', quantity: 0, price: 0 } });
-                            strapi[`${index}`].set('contractBought', contractBought);                      
+                            strapi[`${index}`].set('contractBought', contractBought);
+                            console.log(`Order complete, Contract bought reset: ${strapi[`index`].get('contractBought')}`);                      
 
                             strapi.webSocket.broadcast({
                                 type: 'order',
@@ -298,6 +283,16 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             let awaitingOrderConfirmation = false;  
                             console.log('Order complete. Setting awaitingOrderConfirmation to false');              
                             strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                            
+                            if(contractType.toUpperCase() === 'CE') {
+                                console.log(`Setting callOptionBought to false for ${indexToken}`);
+                                strapi[`${indexToken}`].set('callOptionBought', false);
+                                strapi[`${indexToken}`].set('callBoughtAt', 0); 
+                            } else if(contractType.toUpperCase() === 'PE'){
+                                console.log(`Setting putOptionBought to false for ${indexToken}`);
+                                strapi[`${indexToken}`].set('putOptionBought', false);
+                                strapi[`${indexToken}`].set('putBoughtAt', 0);
+                            }
                             strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
                             try{
                                 const createdOrder = await strapi.db.query('api::order.order').create({

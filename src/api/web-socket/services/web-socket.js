@@ -92,13 +92,13 @@ module.exports = ({ strapi }) => ({
       const currentTime = new Date();
       const currentHour = currentTime.getHours();
       const currentMinute = currentTime.getMinutes();
-      if(currentHour >= 8  && (currentHour <= 15 && currentMinute <= 30)){        
+      if ((currentHour > 8 && currentHour < 15) || (currentHour === 8 && currentMinute >= 0) || (currentHour === 15 && currentMinute <= 30)){        
         setTimeout(() => this.connectFlattradeWebSocket(scripList), 3000);
       } else {
         strapi.log.info('Outisde Market hours. Websocket will not attempt to reconnect.');
         strapi.webSocket.broadcast({
           type: 'action',
-          message: 'Outside Market hours. Please try again between 0900 hrs and 0330 hrs',
+          message: 'Outside Market hours. Please try again between 09:00 hrs and 03:30 hrs',
           status: false,
         });
       }     

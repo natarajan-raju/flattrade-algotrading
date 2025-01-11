@@ -82,6 +82,10 @@
     "indexToken": {
       "type": "string",
       "unique": true
+    },
+    "lossStep": {
+      "type": "integer",
+      "default": 2
     }
   }
 }
