@@ -283,17 +283,30 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             let awaitingOrderConfirmation = false;  
                             console.log('Order complete. Setting awaitingOrderConfirmation to false');              
                             strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                            strapi[`${indexToken}`].set('callOptionBought', false);
+                            strapi[`${indexToken}`].set('callBoughtAt', 0);
+                            strapi[`${indexToken}`].set('putOptionBought', false);
+                            strapi[`${indexToken}`].set('putBoughtAt', 0); 
                             
-                            if(contractType.toUpperCase() === 'CE') {
-                                console.log(`Setting callOptionBought to false for ${indexToken}`);
-                                strapi[`${indexToken}`].set('callOptionBought', false);
-                                strapi[`${indexToken}`].set('callBoughtAt', 0); 
-                            } else if(contractType.toUpperCase() === 'PE'){
-                                console.log(`Setting putOptionBought to false for ${indexToken}`);
-                                strapi[`${indexToken}`].set('putOptionBought', false);
-                                strapi[`${indexToken}`].set('putBoughtAt', 0);
-                            }
-                            strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
+                            // if(contractType.toUpperCase() === 'CE') {
+                            //     console.log(`Setting callOptionBought to false for ${indexToken}`);
+                            //     strapi[`${indexToken}`].set('callOptionBought', false);
+                            //     strapi[`${indexToken}`].set('callBoughtAt', 0); 
+                            // } else if(contractType.toUpperCase() === 'PE'){
+                            //     console.log(`Setting putOptionBought to false for ${indexToken}`);
+                            //     strapi[`${indexToken}`].set('putOptionBought', false);
+                            //     strapi[`${indexToken}`].set('putBoughtAt', 0);
+                            // }
+                            strapi.db.query('api::variable.variable').update(
+                                { where: { indexToken },
+                                    data: { 
+                                        awaitingOrderConfirmation,
+                                        callOptionBought: false,
+                                        putOptionBought: false,
+                                        callBoughtAt: 0,
+                                        putBoughtAt: 0
+                                    } 
+                                });
                             try{
                                 const createdOrder = await strapi.db.query('api::order.order').create({
                                     data: {

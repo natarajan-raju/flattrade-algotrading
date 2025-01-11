@@ -501,8 +501,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 }
               }
             }else{
-              strapi.log.info('Trading will be execercised only between 0915 and 1530 hrs. Please wait...');
-              strapi.webSocket.broadcast({ type: 'variable', message: `Trading will initiate only after 0930 hrs`, status: true});
+              strapi.log.info('Trading will be execercised only between 09:15 and 15:30 hrs. Please wait...');
+              strapi.webSocket.broadcast({ type: 'variable', message: `Trading will initiate only after 09:30 hrs`, status: true});
             }  
             strapi[`${tk}`].set('previousTradedPrice', lp);     
         
@@ -637,7 +637,13 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
       try{
         const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken }});
-        if(scrip.scripList){          
+        if(scrip.scripList){
+          try{
+            strapi.service('api::web-socket.web-socket').unsubscribeTouchline(scrip.scripList);
+            strapi[`${indexToken}`].set('scripList', '');
+          }catch(error){
+            console.log(error);
+          };                   
           strapi.db.query('api::web-socket.web-socket').update({where: { indexToken }, data: { scripList: '' }});          
         } 
       }catch(e){
