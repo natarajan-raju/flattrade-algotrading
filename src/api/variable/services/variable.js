@@ -788,6 +788,63 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     } 
     strapi.log.info('Variables fetched...');  
   },
+
+  //Fetch time price data from flattrade
+  async getTimePriceData(indexToken, interval) {
+    // console.log(indexToken,interval);
+    //Check if intervals have values only as 1,3,5,10,15,30,60,120
+    // if(interval != 1 || interval !== '3' || interval !== '5' || interval !== '10' || interval !== '15' || interval !== '30' || interval !== '60' || interval !== '120'){
+    //   return {
+    //     status: false,
+    //     message: 'Interval should be 1,3,5,10,15,30,60,120'
+    //   }
+    // }
+    //Current time in seconds since 1 Jan 1970
+    const currentTime = Math.floor(Date.now() / 1000);
+
+    //Create a Date object for today's 09:00 AM IST
+    const now = new Date();
+    const marketOpeningTime = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      9,
+      0,
+      0
+    );
+    
+    //Convert the market opening time to seconds since 1 Jan 1970
+    const startTime = Math.floor(marketOpeningTime.getTime() / 1000);
+    console.log(startTime,currentTime);
+    try{      
+      const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","exch":"NSE","token":"${indexToken}","st":"${startTime}","et":"${currentTime}","intrv":"${interval}"}&jKey=${strapi.sessionToken}`;
+      const timePriceResponse = await fetch(`${env('FLATTRADE_GET_TIME_PRICE_DATA_URL')}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: payload,
+      });
+      const timePrice = await timePriceResponse.json();
+      console.log(timePrice);
+      return {
+        status: true,
+        data: timePrice,
+        message: "Time price data fetched successfully for the given index token and interval"
+      }
+    }catch(error){
+      console.log(`Error in getting time price data: ${error}`);
+      return {
+        status: false,
+        message: error
+      }
+    }
+    return {
+      status: true,
+      indexToken,
+      interval
+    }
+  }
   
 }));
 

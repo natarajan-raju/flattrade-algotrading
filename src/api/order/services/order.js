@@ -272,7 +272,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             }
                             strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType: '', contractToken: '',tsym: '',lotSize: '', quantity: 0, price: 0 } });
                             strapi[`${index}`].set('contractBought', contractBought);
-                            console.log(`Order complete, Contract bought reset: ${strapi[`index`].get('contractBought')}`);                      
+                            // console.log(`Order complete, Contract bought reset: ${strapi[`index`].get('contractBought')}`);                      
 
                             strapi.webSocket.broadcast({
                                 type: 'order',

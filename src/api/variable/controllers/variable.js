@@ -164,6 +164,12 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
     async stopTrading(ctx) {
         const { indexToken } = ctx.request.body;
         return ctx.send(await strapi.service('api::variable.variable').stopTrading(indexToken));
-    }   
+    },
+    
+    //Get Time price data from Flattrade
+    async getTimePriceData(ctx) {
+        const { indexToken, interval } = ctx.request.body;
+        return ctx.send(await strapi.service('api::variable.variable').getTimePriceData(indexToken, interval));
+    },
 }));
 

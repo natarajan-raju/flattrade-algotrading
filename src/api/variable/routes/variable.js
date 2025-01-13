@@ -28,6 +28,15 @@ module.exports = {
             },
         },
         {
+            method: 'POST',
+            path: '/variables/getTimePriceData',
+            handler: 'api::variable.variable.getTimePriceData', // Your custom token handling logic
+            config: {
+              policies: [],
+              middlewares: [],
+            },
+        },
+        {
             method: 'GET',
             path: '/variables',
             handler: 'api::variable.variable.find', 
