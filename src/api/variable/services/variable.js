@@ -386,11 +386,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               //Sell CALL
               if(callOptionBought){
                 if(
-                  ((lp >= basePrice && (callBoughtAt >= support1 + targetStep && callBoughtAt < basePrice)) || ((lp <= callBoughtAt-lossStep || lp <= basePrice) && (callBoughtAt >= basePrice + targetStep && callBoughtAt < resistance1))) //Previously lp<= basePrice at stop loss initial check
-                  || ((lp >= resistance1 && (callBoughtAt >= basePrice + targetStep && callBoughtAt < resistance1)) || ((lp <= callBoughtAt-lossStep || lp <= resistance1) && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2))) //Previously lp<= resistance1 at stop loss initial check
-                  || ((lp >= support1 && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1)) || ((lp <= callBoughtAt-lossStep || lp <= support1) && (callBoughtAt >= support1 + targetStep && callBoughtAt < basePrice))) //Previously lp<= support1 at stop loss initial check
-                  || ((lp >=resistance2 && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2)) || ((lp <= resistance2 || lp <= callBoughtAt-lossStep) && callBoughtAt  >= resistance2 + targetStep)) //Previously lp<= resistance2 at stop loss initial check
-                  || ((lp >= support2 && callBoughtAt < support2) || ((lp <= support2 || lp <= callBoughtAt-lossStep) && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1))) //Previously lp<= support2 at stop loss initial check
+                  ((lp >= basePrice && (callBoughtAt >= support1 + targetStep && callBoughtAt < basePrice)) || ((lp <= callBoughtAt-lossStep) && (callBoughtAt >= basePrice + targetStep && callBoughtAt < resistance1))) //Previously lp<= basePrice at stop loss initial check
+                  || ((lp >= resistance1 && (callBoughtAt >= basePrice + targetStep && callBoughtAt < resistance1)) || ((lp <= callBoughtAt-lossStep) && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2))) //Previously lp<= resistance1 at stop loss initial check
+                  || ((lp >= support1 && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1)) || ((lp <= callBoughtAt-lossStep) && (callBoughtAt >= support1 + targetStep && callBoughtAt < basePrice))) //Previously lp<= support1 at stop loss initial check
+                  || ((lp >=resistance2 && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2)) || ((lp <= callBoughtAt-lossStep) && callBoughtAt  >= resistance2 + targetStep)) //Previously lp<= resistance2 at stop loss initial check
+                  || ((lp >= support2 && callBoughtAt < support2) || ((lp <= callBoughtAt-lossStep) && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1))) //Previously lp<= support2 at stop loss initial check
                 ){              
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell CALL at LTP ${lp}`, status: true});     
                   console.log(`Reached Strategic Sell zone for ${index}. Application will attempt to sell CALL at LTP ${lp}`);
@@ -444,11 +444,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               //Sell PUT
               if(putOptionBought){
                 if(
-                  ((lp <= basePrice && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)) || ((lp >= basePrice || lp >= putBoughtAt + lossStep) && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)))
-                  || ((lp <= support1 && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)) || ((lp >= support1 || lp >= putBoughtAt + lossStep) && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)))
-                  || ((lp <= resistance1 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1)) || ((lp >= resistance1 || lp >= putBoughtAt + lossStep) && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)))
-                  || ((lp <= support2 && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)) || ((lp >= support2 || lp >= putBoughtAt + lossStep) && putBoughtAt <= support2 - targetStep))
-                  || ((lp <= resistance2 && putBoughtAt > resistance2) || ((lp >= resistance2 || lp >= putBoughtAt + lossStep) && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1))) //Stop loss at Resistance 2
+                  ((lp <= basePrice && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)) || ((lp >= putBoughtAt + lossStep) && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)))
+                  || ((lp <= support1 && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)) || ((lp >= putBoughtAt + lossStep) && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)))
+                  || ((lp <= resistance1 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1)) || ((lp >= putBoughtAt + lossStep) && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)))
+                  || ((lp <= support2 && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)) || ((lp >= putBoughtAt + lossStep) && putBoughtAt <= support2 - targetStep))
+                  || ((lp <= resistance2 && putBoughtAt > resistance2) || ((lp >= putBoughtAt + lossStep) && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1))) //Stop loss at Resistance 2
                 ){                            
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell PUT at LTP ${lp}`, status: true}); 
                   console.log(`Reached Strategic Sell zone for ${index}. Application will attempt to sell PUT at LTP ${lp}`);
