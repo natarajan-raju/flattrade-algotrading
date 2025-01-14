@@ -345,17 +345,21 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                 status: 'failure',
                             });
                             const position = await this.checkOpenPosition(orderStatus.tsym);
-                            if(position && (position.opensellqty < contractBought.quantity) || (position.opensellqty === 0) ){
-                                console.log(`No open position for the contract with quantity ${contractBought.quantity} vs actual open position quantity ${position.opensellqty}`);
-                                strapi.webSocket.broadcast({
-                                    type: 'action',                                    
-                                    message: `rajaapp.in has found no open position for the contract with quantity ${contractBought.quantity} vs actual open position quantity ${position.opensellqty}`,
-                                    status: 'failure',
-                                });
-                                const contract = {                                    
+                            if(position){
+                                if(position.opensellqty < contractBought.quantity || position.opensellqty === 0 ){
+                                    console.log(`No open position for the contract with quantity ${contractBought.quantity} vs actual open position quantity ${position.opensellqty}`);
+                                    strapi.webSocket.broadcast({
+                                        type: 'action',                                    
+                                        message: `rajaapp.in has found no open position for the contract with quantity ${contractBought.quantity} vs actual open position quantity ${position.opensellqty}`,
+                                        status: 'failure',
+                                    });
+                                    const contract = {                                    
+                                    }
+                                    strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType: '', contractToken: '',tsym: '',lotSize: '', quantity: 0, price: 0 } });
+                                    strapi[`${index}`].set('contractBought', contract);
                                 }
-                                strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType: '', contractToken: '',tsym: '',lotSize: '', quantity: 0, price: 0 } });
-                                strapi[`${index}`].set('contractBought', contract);
+                            }else{
+                                console.log(`No open position for the contract with quantity ${contractBought.quantity}. Might be the case the position is squared off manually`);
                             }
                             let awaitingOrderConfirmation = false;                
                             strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
@@ -533,8 +537,12 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     console.log(`Available position for ${tsym}: ${JSON.stringify(position)}`);
                     return position;
                 }else{
+                    console.log(`No available position for ${tsym}`);
                     return null;
                 }
+            }else{
+                console.log('Error fetching position book');
+                return null;
             }
         }catch(error){
             console.log(error);
