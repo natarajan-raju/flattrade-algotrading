@@ -65,12 +65,12 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                 body: payload, 
             });
             contracts = await contractsResponse.json();                                    
-            // console.log(strapi.sessionToken);
+            // console.log(contracts);
             if(!contracts.values || contracts.values.length == 0 ){
                 return ctx.send({ message: 'Either expiry data provided is wrong or Session token expired', status: false });
             }
         } catch (error) {
-            return ctx.send({ message: 'Either expiry data provided is wrong or Session token expired', status: false });
+            return ctx.send({ message: 'Either expiry data provided is wrong or Session token expired',error: error, status: false });
         }        
        
         // //Fetch and create previousTradedPrice which is beneficial for initialSpectatorMode decisions

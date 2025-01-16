@@ -9,7 +9,7 @@ const { createCoreService } = require('@strapi/strapi').factories;
 
 module.exports = createCoreService('api::order.order', ({ strapi }) => ({
 
-    async getPreferredContract(index,contractType,amount) {
+    async getPreferredContract(index,contractType,amount,avoid = null) {
         let contractTokens;
         
         if(strapi[`${index}`]?.get('contractTokens')){
@@ -22,6 +22,8 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         let preferredContract = {token: null, lp: Infinity, tsym: null, lotSize: null};
         let smallestDifference = Infinity;
         contracts.forEach(contract => {
+            //Skip the contract if it matches the avoid token
+            if(contract.token === avoid) return;
             if(contract.lp >= amount){
                 const difference = Math.abs(contract.lp - amount);
                 if(difference < smallestDifference){
@@ -38,36 +40,20 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     async placeBuyOrder(orderData) {        
             const {  contractType, lp,quantity,index,indexToken, amount } = orderData;
             console.log(`Received for Buy Order: Contract Type: ${contractType} Quantity: ${quantity} Index: ${index} Amount: ${amount}`);
-            const preferredContract = await this.getPreferredContract(index,contractType,amount);
+            let preferredContract = await this.getPreferredContract(index,contractType,amount);
             try{            
                 if(preferredContract.token){
+                    console.log(`Found a suitable contract ${preferredContract.tsym} with price INR ${preferredContract.lp}`);
                     const orderQuantity = quantity * preferredContract.ls;                
                     let orderStatus;
-                    const norenordno = await this.placeOrderWithFlattrade('NFO',preferredContract.tsym,orderQuantity,'0','B','Order created from dashboard.rajaapp.in');
+                    const norenordno = await this.placeOrderWithFlattrade('NFO',preferredContract.tsym,orderQuantity,'0','B','Order created from rajaapp.in');
                     if(norenordno){
                         orderStatus = await this.fetchOrderStatus(norenordno);
                         if(orderStatus){
                             console.log(orderStatus);
                             let price;
                             orderStatus.avgprc? price = orderStatus.qty * orderStatus.avgprc : orderStatus.qty * preferredContract.lp;                           
-                            //     data: {
-                            //         index,
-                            //         orderType: 'BUY',
-                            //         contractType,                       
-                            //         contractTsym: orderStatus.tsym,
-                            //         contractToken: orderStatus.token,
-                            //         indexLtp: lp,
-                            //         lotSize: parseInt(orderStatus.ls),
-                            //         price: typeof price === 'number'? price : 0,
-                            //         contractLp: parseFloat(orderStatus.avgprc) || preferredContract.lp,
-                            //         norenordno,
-                            //         orderStatus: orderStatus.status,
-                            //         remarks: orderStatus.rejreason.length > 0? orderStatus.rejreason : orderStatus.remarks,
-                            //         indexToken,
-                            //         quantity: parseInt(orderStatus.qty),
-                            //         realizedPL: 0,                                                        
-                            //     }               
-                            // });
+                     
                             if(orderStatus.status.toLowerCase() === 'complete'){
                                 const contractBought = {
                                     contractType,
@@ -119,7 +105,15 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                     data: orderStatus
                                 }    
 
-                            } else if(orderStatus.status.toLowerCase() === 'rejected'){
+                            } else if(orderStatus.status.toLowerCase() === 'rejected'){                                
+                                // //Try again with a different Token once 
+                                // console.log(`Selling ${preferredContract.tsym} rejected by Flattrade with reason ${orderStatus.rejreason}`);
+                                // preferredContract = await this.getPreferredContract(index,contractType,amount,preferredContract.token);
+                                // console.log(`Attempting BUY once more with ${preferredContract.tsym} with price INR ${preferredContract.lp}`);
+                                // const reorder = await this.placeOrderWithFlattrade('NFO',preferredContract.tsym,orderQuantity,'0','B','Order created from rajaapp.in');
+                                // if(reorder){
+                                //     orderStatus
+                                // }
                                 strapi.webSocket.broadcast({
                                     type: 'order',
                                     data: orderStatus,
@@ -153,7 +147,10 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                     console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
                                 }catch(error){
                                     console.log(`Error in storing the order in database: ${error} `);                                    
-                                };return {
+                                };
+                                
+                                
+                                return {
                                     status: false,
                                     message: 'Order rejected',
                                     data: orderStatus
@@ -280,23 +277,15 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                 message: `Sell order for index ${index} with contract ${orderStatus.tsym} placed`,
                                 status: 'success',
                             });
-                            let awaitingOrderConfirmation = false;  
+                            let awaitingOrderConfirmation = false; 
                             console.log('Order complete. Setting awaitingOrderConfirmation to false');              
                             strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                             strapi[`${indexToken}`].set('callOptionBought', false);
                             strapi[`${indexToken}`].set('callBoughtAt', 0);
                             strapi[`${indexToken}`].set('putOptionBought', false);
                             strapi[`${indexToken}`].set('putBoughtAt', 0); 
-                            
-                            // if(contractType.toUpperCase() === 'CE') {
-                            //     console.log(`Setting callOptionBought to false for ${indexToken}`);
-                            //     strapi[`${indexToken}`].set('callOptionBought', false);
-                            //     strapi[`${indexToken}`].set('callBoughtAt', 0); 
-                            // } else if(contractType.toUpperCase() === 'PE'){
-                            //     console.log(`Setting putOptionBought to false for ${indexToken}`);
-                            //     strapi[`${indexToken}`].set('putOptionBought', false);
-                            //     strapi[`${indexToken}`].set('putBoughtAt', 0);
-                            // }
+                            let initialSpectatorMode = true; 
+                            strapi[`${indexToken}`].set('initialSpectatorMode', initialSpectatorMode);        
                             strapi.db.query('api::variable.variable').update(
                                 { where: { indexToken },
                                     data: { 
@@ -304,7 +293,8 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                         callOptionBought: false,
                                         putOptionBought: false,
                                         callBoughtAt: 0,
-                                        putBoughtAt: 0
+                                        putBoughtAt: 0,
+                                        initialSpectatorMode
                                     } 
                                 });
                             try{
@@ -345,22 +335,37 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                 status: 'failure',
                             });
                             const position = await this.checkOpenPosition(orderStatus.tsym);
-                            if(position){
-                                if(position.opensellqty < contractBought.quantity || position.opensellqty === 0 ){
-                                    console.log(`No open position for the contract with quantity ${contractBought.quantity} vs actual open position quantity ${position.opensellqty}`);
+                            if(!position){
+                                console.log(`No open position for the contract with quantity ${contractBought.quantity}. Might be the case the position is squared off manually`);
+                                const contract = {                                  
+                                };
+                                strapi[`${index}`].set('contractBought',contract);
+                                strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType: '', contractToken: '',tsym: '',lotSize: '', quantity: 0, price: 0 } });
+                                let awaitingOrderConfirmation = false;                                         
+                                strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
+                                strapi[`${indexToken}`].set('callOptionBought', false);
+                                strapi[`${indexToken}`].set('callBoughtAt', 0);
+                                strapi[`${indexToken}`].set('putOptionBought', false);
+                                strapi[`${indexToken}`].set('putBoughtAt', 0);
+                                let initialSpectatorMode = true; 
+                                strapi[`${indexToken}`].set('initialSpectatorMode', initialSpectatorMode);                                                        
+                                strapi.db.query('api::variable.variable').update(
+                                    { where: { indexToken },
+                                        data: { 
+                                            awaitingOrderConfirmation,
+                                            callOptionBought: false,
+                                            putOptionBought: false,
+                                            callBoughtAt: 0,
+                                            putBoughtAt: 0,
+                                            initialSpectatorMode
+                                        } 
+                                    });
                                     strapi.webSocket.broadcast({
                                         type: 'action',                                    
                                         message: `rajaapp.in has found no open position for the contract with quantity ${contractBought.quantity} vs actual open position quantity ${position.opensellqty}`,
                                         status: 'failure',
-                                    });
-                                    const contract = {                                    
-                                    }
-                                    strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType: '', contractToken: '',tsym: '',lotSize: '', quantity: 0, price: 0 } });
-                                    strapi[`${index}`].set('contractBought', contract);
-                                }
-                            }else{
-                                console.log(`No open position for the contract with quantity ${contractBought.quantity}. Might be the case the position is squared off manually`);
-                            }
+                                    });                                
+                            }                            
                             let awaitingOrderConfirmation = false;                
                             strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                             console.log('Order rejected. Setting awaitingOrderConfirmation to false');
@@ -442,53 +447,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     status: false,
                     message: 'Error in placeBuyOrder'
                 }
-            }
-
-
-
-            // const createdOrder = await strapi.db.query('api::order.order').create({
-            //     data: {
-            //         index,
-            //         orderType: 'SELL',
-            //         contractType,
-            //         contractTsym: contractBought.tsym,
-            //         contractToken: contractBought.contractToken,
-            //         indexLtp: lp,
-            //         lotSize: contractBought.lotSize,
-            //         contractLp: 0,
-            //         price: 0,                                       
-            //     }
-            // });
-            // console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractTsym} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.lotSize} ${createdOrder.price} `);
-            // strapi.webSocket.broadcast({
-            //     type: 'order',
-            //     data: createdOrder,
-            //     message: `Sell order for index ${index} with contract ${contractBought.contractTsym} placed`,
-            //     status: true,
-            // });
-            // let awaitingOrderConfirmation = false;
-            // strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
-            // strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-            // contractBought = {
-            //     contractType: '',
-            //     contractToken: '',
-            //     tsym: '',
-            //     lotSize: 0,
-            // }
-            // strapi[`${index}`].set('contractBought', contractBought);
-            // strapi.db.query('api::position.position').update({ where: { index }, data: { 
-            //     contractType: '',
-            //     contractToken: '',
-            //     tsym: '',
-            //     lotSize: 0 
-            // }});
-
-           
-            
-            // return {
-            //     status: true,
-            //     message: 'Order placed successfully',
-            // }        
+            }    
     },
 
     async placeOrderWithFlattrade(exchange,tsym,quantity,price,orderType,remarks){

@@ -52,13 +52,33 @@ module.exports = {
         tz: "Asia/Kolkata",  // Set to your desired timezone
       },
     },
-    monthlyJob: {
+    monthlyFirstJob: {
       task: async ({ strapi }) => {
         await strapi.service('api::purge.purge').deletePurgeTableMonthly();
         console.log('Purged data deleted');
       },
       options: {
         rule: "0 0 1 * *", // Monthly once on first day
+        tz: "Asia/Kolkata",  // Set to your desired timezone
+      },
+    },
+    monthlyFortnightJob: {
+      task: async ({ strapi }) => {
+        await strapi.service('api::purge.purge').deletePurgeTableMonthly();
+        console.log('Purged data deleted');
+      },
+      options: {
+        rule: "0 0 15 * *", // Monthly once on first day
+        tz: "Asia/Kolkata",  // Set to your desired timezone
+      },
+    },
+    monthlyEndJob: {
+      task: async ({ strapi }) => {
+        await strapi.service('api::purge.purge').deletePurgeTableMonthly();
+        console.log('Purged data deleted');
+      },
+      options: {
+        rule: "0 0 30 * *", // Monthly once on first day
         tz: "Asia/Kolkata",  // Set to your desired timezone
       },
     },
