@@ -228,11 +228,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           
             //Check if initialSpectatorMode is active
             if(initialSpectatorMode){
-              if((lp <= basePrice + targetStep && lp >= basePrice - targetStep)
-                || (lp <= resistance1 + targetStep && lp >= resistance1 - targetStep)
-                || (lp <= resistance2 + targetStep && lp >= resistance2 - targetStep)
-                || (lp <= support1 + targetStep && lp >= support1 - targetStep)
-                || (lp <= support2 + targetStep && lp >= support2 - targetStep)
+              if((lp <= parseFloat(basePrice) + parseFloat(targetStep) && lp >= basePrice - targetStep)
+                || (lp <= parseFloat(resistance1) + parseFloat(targetStep) && lp >= resistance1 - targetStep)
+                || (lp <= parseFloat(resistance2) + parseFloat(targetStep) && lp >= resistance2 - targetStep)
+                || (lp <= parseFloat(support1) + parseFloat(targetStep) && lp >= support1 - targetStep)
+                || (lp <= parseFloat(support2) + parseFloat(targetStep) && lp >= support2 - targetStep)
               ){
                 //LP in investment hot zone. Turn off Spectator mode
                 initialSpectatorMode = false;
@@ -257,11 +257,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               let contractType;           
               //Buy CALL
               if(!callOptionBought && !putOptionBought && !initialSpectatorMode ){                
-                if(((lp >= basePrice + targetStep && lp < resistance1 - targetStep) 
-                  || (lp >= resistance1 + targetStep && lp < resistance2 - targetStep)
-                  || (lp>= resistance2 + targetStep)
-                  || (lp >= support1 + targetStep && lp < basePrice - targetStep)
-                  || (lp >= support2 + targetStep && lp < support1 - targetStep))
+                if(((lp >= parseFloat(basePrice) + parseFloat(targetStep) && lp < resistance1 - targetStep) 
+                  || (lp >= parseFloat(resistance1) + parseFloat(targetStep) && lp < resistance2 - targetStep)
+                  || (lp>= parseFloat(resistance2) + parseFloat(targetStep))
+                  || (lp >= parseFloat(support1) + parseFloat(targetStep) && lp < basePrice - targetStep)
+                  || (lp >= parseFloat(support2) + parseFloat(targetStep) && lp < support1 - targetStep))
                   && ( previousTradedPrice < lp)
                 ){                 
                   //Buy CALL
@@ -323,11 +323,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   }                  
                   
                                      
-                } else if(((lp <= basePrice - targetStep && lp > support1 + targetStep) 
-                  || (lp <= support1 - targetStep && lp > support2 + targetStep)
+                } else if(((lp <= basePrice - targetStep && lp > parseFloat(support1) + parseFloat(targetStep)) 
+                  || (lp <= support1 - targetStep && lp > parseFloat(support2) + parseFloat(targetStep))
                   || (lp <= support2 - targetStep)
-                  || (lp <= resistance1 - targetStep && lp > basePrice + targetStep)
-                  || (lp <= resistance2 - targetStep && lp > resistance1 + targetStep))
+                  || (lp <= resistance1 - targetStep && lp > parseFloat(basePrice) + parseFloat(targetStep))
+                  || (lp <= resistance2 - targetStep && lp > parseFloat(resistance1) + parseFloat(targetStep)))
                   && (previousTradedPrice > lp)
                 ){             
                   //Buy PUT 
@@ -386,11 +386,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               //Sell CALL
               if(callOptionBought){
                 if(
-                  ((lp >= basePrice && (callBoughtAt >= support1 + targetStep && callBoughtAt < basePrice)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= basePrice + targetStep && callBoughtAt < resistance1))) //Previously lp<= basePrice at stop loss initial check
-                  || ((lp >= resistance1 && (callBoughtAt >= basePrice + targetStep && callBoughtAt < resistance1)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2))) //Previously lp<= resistance1 at stop loss initial check
-                  || ((lp >= support1 && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= support1 + targetStep && callBoughtAt < basePrice))) //Previously lp<= support1 at stop loss initial check
-                  || ((lp >=resistance2 && (callBoughtAt >= resistance1 + targetStep && callBoughtAt < resistance2)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && callBoughtAt  >= resistance2 + targetStep)) //Previously lp<= resistance2 at stop loss initial check
-                  || ((lp >= support2 && callBoughtAt < support2) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= support2 + targetStep && callBoughtAt < support1))) //Previously lp<= support2 at stop loss initial check
+                  ((lp >= basePrice && (callBoughtAt >= parseFloat(support1) + parseFloat(targetStep) && callBoughtAt < basePrice)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(basePrice) + parseFloat(targetStep) && callBoughtAt < resistance1))) //Previously lp<= basePrice at stop loss initial check
+                  || ((lp >= resistance1 && (callBoughtAt >= parseFloat(basePrice) + parseFloat(targetStep) && callBoughtAt < resistance1)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(resistance1) + parseFloat(targetStep) && callBoughtAt < resistance2))) //Previously lp<= resistance1 at stop loss initial check
+                  || ((lp >= support1 && (callBoughtAt >= parseFloat(support2) + parseFloat(targetStep) && callBoughtAt < support1)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(support1) + parseFloat(targetStep) && callBoughtAt < basePrice))) //Previously lp<= support1 at stop loss initial check
+                  || ((lp >=resistance2 && (callBoughtAt >= parseFloat(resistance1) + parseFloat(targetStep) && callBoughtAt < resistance2)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && callBoughtAt  >= parseFloat(resistance2) + parseFloat(targetStep))) //Previously lp<= resistance2 at stop loss initial check
+                  || ((lp >= support2 && callBoughtAt < support2) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(support2) + parseFloat(targetStep) && callBoughtAt < support1))) //Previously lp<= support2 at stop loss initial check
                 ){              
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell CALL at LTP ${lp}`, status: true});     
                   console.log(`Reached Strategic Sell zone for ${index}. Application will attempt to sell CALL at LTP ${lp}`);
@@ -665,20 +665,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           });
           strapi[`${indexToken}`] = new Map(Object.entries(variable));
           console.log(`Application is stopping. For sample basePrice in ${indexToken} is ${strapi[`${indexToken}`].get('basePrice')}`);
-          // strapi[`${indexToken}`].set('initialSpectatorMode', true);
-          // strapi[`${indexToken}`].set('basePrice', 0);
-          // strapi[`${indexToken}`].set('resistance1', 0);
-          // strapi[`${indexToken}`].set('resistance2', 0);
-          // strapi[`${indexToken}`].set('support1', 0);
-          // strapi[`${indexToken}`].set('support2', 0);
-          // strapi[`${indexToken}`].set('amount', 0);
-          // strapi[`${indexToken}`].set('quantity', 0);
-          // strapi[`${indexToken}`].set('previousTradedPrice', 0);
-          // strapi[`${indexToken}`].set('callOptionBought', false);
-          // strapi[`${indexToken}`].set('putOptionBought', false);
-          // strapi[`${indexToken}`].set('callBoughtAt', 0);
-          // strapi[`${indexToken}`].set('putBoughtAt', 0);
-          // strapi[`${indexToken}`].set('awaitingOrderConfirmation', false);
+
 
           //Check if any position is available in DB and clear it
           strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType: '', contractToken: '',tsym: '',lotSize: '', quantity: 0, price: 0 } });
@@ -709,10 +696,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     if(contracts.length > 0){
       for (const contract of contracts) {
         strapi[`${contract.index}`] = new Map();
-        // strapi[`${contract.index}`].set('preferredCallToken', contract.preferredCallToken || '');
-        // strapi[`${contract.index}`].set('preferredPutToken', contract.preferredPutToken || '');
-        // strapi[`${contract.index}`].set('preferredCallTokenLp', contract.preferredCallTokenLp || Infinity);
-        // strapi[`${contract.index}`].set('preferredPutTokenLp', contract.preferredPutTokenLp || Infinity);
+
         strapi[`${contract.index}`].set('contractTokens', contract.contractTokens || {});
         
         
@@ -733,14 +717,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           strapi[`${token}`].set('ls', ls);
           strapi[`${token}`].set('index', index);
         });
-        // for (const [token, tokenData] of Object.entries(contractTokens)) {
-        //   strapi[`${token}`] = new Map();
-        //   strapi[`${token}`].set('optt', tokenData.optt);
-        //   strapi[`${token}`].set('tsym', tokenData.tsym);
-        //   strapi[`${token}`].set('ls', tokenData.ls);
-        //   strapi[`${token}`].set('index', tokenData.index);
-          
-        // } 
+        
              
       }
     }
