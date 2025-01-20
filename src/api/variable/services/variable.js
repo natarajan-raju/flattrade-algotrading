@@ -770,63 +770,70 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   //Fetch time price data from flattrade
   async getTimePriceData(indexToken, interval, startDate) {
     const currentDate = new Date();
-    
-    // If startDate is not provided, default to 01 January of the current year
-    const startTime = startDate 
-      ? new Date(startDate).getTime() / 1000 
-      : new Date(`${currentDate.getFullYear()}-01-01T00:00:00Z`).getTime() / 1000;
 
-    // If endDate is not provided, default to the current date
+    // Calculate startTime and endTime
+    const startTime = new Date(startDate).getTime() / 1000;
     const endTime = Math.floor(currentDate.getTime() / 1000);
-    console.log(startTime, endTime);
-    try{      
-      const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","exch":"NSE","token":"${indexToken}","st":"${startTime}","et":"${endTime}","intrv":"${interval}"}&jKey=${strapi.sessionToken}`;
-      const timePriceResponse = await fetch(`${env('FLATTRADE_GET_TIME_PRICE_DATA_URL')}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: payload,
-      });
-      const timePrice = await timePriceResponse.json();
-      if(!Array.isArray(timePrice) || timePrice.length === 0){
-        throw new Error(timePrice.emsg || 'Error fetching time price data');
-      }
-      console.log(timePrice)
-      const data = timePrice.map((item) => {
-        // Parse the date in "DD-MM-YYYY HH:mm:ss" format
-        const [day, month, yearAndTime] = item.time.split("-");
-        const [year, time] = yearAndTime.split(" ");
-        let parsedDate = new Date(`${year}-${month}-${day}T${time}`);
-         // Manually adjust for IST (UTC+5:30)
-        const IST_OFFSET = 5.5 * 60 * 60 * 1000; // Offset in milliseconds
-        parsedDate = new Date(parsedDate.getTime() + IST_OFFSET);
-        const open = parseFloat(item.into);
-        const close = parseFloat(item.intc);
-        const percentageChange = ((close - open) / open ) * 100;
-        return {
-          date: parsedDate.toISOString(),
-          open,
-          high: parseFloat(item.inth),
-          low: parseFloat(item.intl),
-          close,
-          pc: parseFloat(percentageChange.toFixed(2))
+
+    // console.log(`StartTime: ${startTime}, EndTime: ${endTime}, Interval: ${interval}`);
+
+    try {
+        const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","exch":"NSE","token":"${indexToken}","st":"${startTime}","et":"${endTime}","intrv":"${interval}"}&jKey=${strapi.sessionToken}`;
+        const timePriceResponse = await fetch(`${env('FLATTRADE_GET_TIME_PRICE_DATA_URL')}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: payload,
+        });
+
+        const timePrice = await timePriceResponse.json();
+
+        console.log(timePrice);
+        if (!Array.isArray(timePrice) || timePrice.length === 0) {
+            throw new Error(timePrice.emsg || 'Error fetching time price data');
         }
-      });
-      return {
-        status: true,
-        data,
-        message: "Time price data fetched successfully for the given index token and interval"
-      }
-    }catch(error){
-      console.log(`Error in getting time price data: ${error}`);
-      return {
-        status: false,
-        message: `${error}`,
-        data: []
-      }
+
+        const data = timePrice.map((item) => {
+            const [day, month, yearAndTime] = item.time.split('-');
+            const [year, time] = yearAndTime.split(' ');
+            let parsedDate = new Date(`${year}-${month}-${day}T${time}`);
+
+            // Adjust for IST (UTC+5:30)
+            const IST_OFFSET = 5.5 * 60 * 60 * 1000; // Offset in milliseconds
+            parsedDate = new Date(parsedDate.getTime() + IST_OFFSET);
+
+            const open = parseFloat(item.into);
+            const close = parseFloat(item.intc);
+            const percentageChange = ((close - open) / open) * 100;
+
+            return {
+                date: parsedDate.toISOString(),
+                open,
+                high: parseFloat(item.inth),
+                low: parseFloat(item.intl),
+                close,
+                pc: parseFloat(percentageChange.toFixed(2)),
+            };
+        });
+
+        return {
+            status: true,
+            data,
+            indexToken,
+            interval,
+            message: 'Time price data fetched successfully for the given index token and interval',
+        };
+    } catch (error) {
+        console.log(`Error in getting time price data: ${error}`);
+        return {
+            status: false,
+            message: `${error}`,
+            data: [],
+        };
     }
-  }
+}
+
   
 }));
 

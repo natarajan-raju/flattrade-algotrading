@@ -168,8 +168,55 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
     
     //Get Time price data from Flattrade
     async getTimePriceData(ctx) {
-        const { indexToken, interval, startDate } = ctx.request.body;
-        return ctx.send(await strapi.service('api::variable.variable').getTimePriceData(indexToken, interval, startDate));
-    },
+        try{
+        const { indexToken, interval, days } = ctx.request.body;
+        
+        // Calculate startDate and interval based on days
+        const currentDate = new Date();
+        let calculatedInterval = interval;
+        let calculatedStartDate;
+    
+        if (days) {
+            const dayToMs = 24 * 60 * 60 * 1000; // Milliseconds in a day
+            calculatedStartDate = new Date(currentDate.getTime() - days * dayToMs);
+            
+            // Set default intervals based on the days
+            switch (days) {
+                case 1:
+                    calculatedInterval = interval || 1;
+                    break;
+                case 5:
+                    calculatedInterval = interval || 5;
+                    break;
+                case 30:
+                    calculatedInterval = interval || 30;
+                    break;
+                case 90:
+                    calculatedInterval = interval || 60;
+                    break;
+                case 180:
+                    calculatedInterval = interval || 120;
+                    break;
+                default:
+                    calculatedInterval = interval || 1; // Default to 1 if no match
+            }
+        } else {
+            // If days are not provided, default to today's date
+            calculatedStartDate = new Date(currentDate);
+            calculatedStartDate.setHours(0, 0, 0, 0);
+            calculatedInterval = interval || 1; // Default interval is 1
+        }
+    
+        // Pass the calculated startDate and interval to the service
+        return ctx.send(await strapi.service('api::variable.variable').getTimePriceData(
+            indexToken,
+            calculatedInterval,
+            calculatedStartDate.toISOString()
+        ));
+    }catch(error){
+        return ctx.send({ message: `Error in getting time price data with error:  ${error}`, status: false });
+    }
+    }
+    
 }));
 
