@@ -159,19 +159,56 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         return { message: 'NFO Price updation received' }; 
       }           
     } else {
-        // const indexData = {
-        //   tk,
-        //   date: new Date(),
-        //   volume: v,
-        //   open: o,
-        //   high: h,
-        //   low: l,
-        //   close: c,
-        //   ap,
-        //   lp,
-        //   pc,
-        //   e,
-        // }  
+      try {
+        // Parse the lookback period once
+        const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 14), 10);
+      
+        // Sideways market detection strategy
+        if (!strapi.rollingData[`${tk}`]) {
+          strapi.rollingData[`${tk}`] = {
+            prices: [],
+            isSidewaysMarket: false,
+          };
+        }
+      
+        strapi.rollingData[`${tk}`].prices.push({ lp, timestamp: new Date().toISOString() });
+      
+        // Keep only the required number of points
+        if (strapi.rollingData[`${tk}`].prices.length > lookbackPeriod) {
+          strapi.rollingData[`${tk}`].prices.shift();
+        }
+      
+        // Ensure sufficient data for sideways market calculation
+        if (strapi.rollingData[`${tk}`].prices.length >= lookbackPeriod) {
+          // Calculate metrics for Sideways market detection
+          const isSidewaysMarket = await this.calculateSidewaysMarket(tk, strapi.rollingData[`${tk}`].prices);
+      
+          // Handle Websocket broadcast for sideways market detection
+          if (isSidewaysMarket && !strapi.rollingData[`${tk}`].isSidewaysMarket) {
+            // Send a Strapi web broadcast to client regarding sideways market detection
+            strapi.log.info(`Index ${tk} entering a sideways market...`);
+            strapi.webSocket.broadcast({
+              type: 'action',
+              message: `Index ${tk} entering a sideways market...`,
+              status: true,
+            });
+            strapi.rollingData[`${tk}`].isSidewaysMarket = true;
+          } else if (!isSidewaysMarket && strapi.rollingData[`${tk}`].isSidewaysMarket) {
+            // Broadcast sideways market end
+            strapi.log.info(`Index ${tk} exiting a sideways market...`);
+            strapi.webSocket.broadcast({
+              type: 'action',
+              message: `Index ${tk} exiting a sideways market...`,
+              status: true,
+            });
+            strapi.rollingData[`${tk}`].isSidewaysMarket = false;
+          }
+        }
+      } catch (error) {
+        console.log(`Error calculating sideways market for ${tk}: ${error}`);
+      }
+      
+
         strapi.webSocket.broadcast({
           type: 'index',
           data: feedData,          
@@ -512,7 +549,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   // Custom function to reset investment variables
   async resetInvestmentVariables() {
     try {
-      
+      strapi.rollingData = {};
       const defaultValues = {
         basePrice: 0,
         resistance1: 0,
@@ -570,6 +607,62 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     
   },
 
+  //Sideways market detection logic
+  async calculateSidewaysMarket(tk, data) {
+    const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 14), 10);
+    const percentageThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_PERCENTAGE_CHANGE', 2));
+    const atrThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_ATR', 0.5));
+    const bbwThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 10));
+  
+    // Extract last traded prices
+    const prices = data.map(entry => entry.lp);
+  
+    // Dynamically calculate high and low for the current sample
+    const currentHigh = Math.max(...prices);
+    const currentLow = Math.min(...prices);
+  
+    // Calculate percentage change
+    const percentageChange = ((currentHigh - currentLow) / currentLow) * 100;
+  
+    // ATR Calculation
+    const trueRanges = data.map((entry, index) => {
+      if (index === 0) return 0; // Skip the first entry, no previous data to compare
+      const previousClose = data[index - 1].lp;
+  
+      // True range based on current sample's high and low
+      const highLowRange = currentHigh - currentLow;
+      const highCloseRange = Math.abs(currentHigh - previousClose);
+      const lowCloseRange = Math.abs(currentLow - previousClose);
+  
+      return Math.max(highLowRange, highCloseRange, lowCloseRange);
+    });
+  
+    const atr =
+      trueRanges.slice(1).reduce((sum, tr) => sum + tr, 0) / lookbackPeriod;
+  
+    // BBW Calculation (Bollinger Band Width)
+    const sma = prices.reduce((sum, price) => sum + price, 0) / lookbackPeriod;
+  
+    const squaredDiffs = prices.map(price => Math.pow(price - sma, 2));
+    const variance =
+      squaredDiffs.reduce((sum, squaredDiff) => sum + squaredDiff, 0) / lookbackPeriod;
+    const stdDev = Math.sqrt(variance);
+  
+    const upperBand = sma + 2 * stdDev;
+    const lowerBand = sma - 2 * stdDev;
+    const bbw = ((upperBand - lowerBand) / sma) * 100;
+  
+    // Check if sideways market conditions are met
+    return (
+      Math.abs(percentageChange) <= percentageThreshold &&
+      atr <= atrThreshold &&
+      bbw <= bbwThreshold
+    );
+  }
+  ,
+
+
+
   //Cron function to stop market at 3.15pm daily
   async stopTrading(indexToken) {
     if(!indexToken){
@@ -577,7 +670,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     }
    
     
-    
+    strapi.rollingData = {};
     const defaultValues = {
       basePrice: 0,
       resistance1: 0,
@@ -764,6 +857,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         
       }      
     } 
+    
     strapi.log.info('Variables fetched...');  
   },
 

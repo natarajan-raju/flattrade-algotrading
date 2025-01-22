@@ -147,7 +147,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             };
                             if(retry === 1){
                                 console.log('Buy order failed once. Retrying...');
-                                break;
+                                continue;
                             } else if(retry > 1){
                                 console.log('Buy order failed two times. Exiting buy attempt...');
                                 return {
@@ -247,8 +247,8 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     //Place SELL order Service
     async placeSellOrder(orderData) {
         
-            const { contractType, lp, index, indexToken, quantity } = orderData;
-            if(!contractType || !lp || !index || !indexToken || !quantity){
+            const { lp, index, indexToken, quantity } = orderData;
+            if( !lp || !index || !indexToken || !quantity){
                 return {
                     status: false,
                     message: 'Invalid payload provided'
@@ -256,9 +256,11 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             }
             
             let contractBought;
+            let contractType;
             try{
                 contractBought = strapi[`${index}`].get('contractBought');
-                console.log(`Received sell order for ${JSON.stringify(contractBought)}`);            
+                console.log(`Received sell order for ${JSON.stringify(contractBought)}`);
+                contractType = contractBought.contractType;            
                 if(!contractBought.tsym || contractBought.tsym === undefined || contractBought.tsym === '' || contractBought.tsym === null){
                     strapi.webSocket.broadcast({
                     type: 'order',
