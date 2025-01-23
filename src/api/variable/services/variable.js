@@ -883,7 +883,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
         const timePrice = await timePriceResponse.json();
 
-        console.log(timePrice);
+        // console.log(timePrice);
         if (!Array.isArray(timePrice) || timePrice.length === 0) {
             throw new Error(timePrice.emsg || 'Error fetching time price data');
         }
