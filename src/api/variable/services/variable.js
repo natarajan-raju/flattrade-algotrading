@@ -162,7 +162,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       try {
         // Parse the lookback period once
         const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 14), 10);
-      
+        console.log(`Lookback period: ${lookbackPeriod}`);
         // Sideways market detection strategy
         if (!strapi.rollingData[`${tk}`]) {
           strapi.rollingData[`${tk}`] = {
@@ -182,7 +182,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         if (strapi.rollingData[`${tk}`].prices.length >= lookbackPeriod) {
           // Calculate metrics for Sideways market detection
           const isSidewaysMarket = await this.calculateSidewaysMarket(tk, strapi.rollingData[`${tk}`].prices);
-      
+          console.log(`Sideways market detection for ${tk}: ${isSidewaysMarket}`);
           // Handle Websocket broadcast for sideways market detection
           if (isSidewaysMarket && !strapi.rollingData[`${tk}`].isSidewaysMarket) {
             // Send a Strapi web broadcast to client regarding sideways market detection
@@ -651,7 +651,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const upperBand = sma + 2 * stdDev;
     const lowerBand = sma - 2 * stdDev;
     const bbw = ((upperBand - lowerBand) / sma) * 100;
-  
+    console.log(`ATR: ${atr} ATR Threshold: ${atrThreshold}, BBW: ${bbw} BBW Threshold: ${bbwThreshold}, Percentage Change: ${percentageChange} PC threshold: ${percentageThreshold}`);
     // Check if sideways market conditions are met
     return (
       Math.abs(percentageChange) <= percentageThreshold &&
