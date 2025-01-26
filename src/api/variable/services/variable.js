@@ -184,7 +184,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             type: 'market',
             message: `Application trying to deduct market status for Index token ${tk}...`,
             isSideWays: false,
-            status: '003'
+            status: '003',
+            tk
           });
         }
       
@@ -202,6 +203,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               message: `Index ${tk} entering a sideways market.Trading not advised.. Pause for Stop loss...`,
               isSideWays: true,
               status: '001',
+              tk
             });
             strapi.rollingData[`${tk}`].isSidewaysMarket = true;
           } else if (!isSidewaysMarket && strapi.rollingData[`${tk}`].isSidewaysMarket) {
@@ -211,7 +213,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               type: 'market',
               message: `Market is trending now for Index ${tk}`,
               status: '002',              
-              isSideWays: false
+              isSideWays: false,
+              tk
             });
             strapi.rollingData[`${tk}`].isSidewaysMarket = false;
           }
