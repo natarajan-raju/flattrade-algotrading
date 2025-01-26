@@ -21,10 +21,36 @@ module.exports = {
   bootstrap({ strapi }) {
     
     // Initialize WebSocket server     
-    const setFoundation = async () => {      
+    const setFoundation = async () => {          
+      
       await strapi.service('api::web-socket.web-socket').initializeWebSocketServer();      
-      await strapi.service('api::variable.variable').fetchIndexVariables();
+      await strapi.service('api::variable.variable').fetchIndexVariables();      
       strapi.rollingData = {};
+      //Simulate market
+      // const generateFeedObject = () => {
+      //   return {
+      //     t: 'tf',
+      //     e: 'NSE',
+      //     tk: '26009', // Random token
+      //     lp: (48000 + Math.random() * 1000).toFixed(2), // Random last price
+      //     pc: (-1 + Math.random() * 2).toFixed(2), // Random price change
+      //     h: (48000 + Math.random() * 25).toFixed(2), // Random high price
+      //     l: (48000 + Math.random() * 25).toFixed(2), // Random low price
+      //   };
+      // };
+      // const variableService = strapi.service('api::variable.variable');
+
+      // for (let i = 0; i < 30; i++) {
+      //   const feed = generateFeedObject();
+        
+      //   try {
+      //     variableService.handleFeed(feed);
+          
+      //   } catch (error) {
+      //     console.error(`Error processing feed: ${error.message}`);
+      //   }
+      // }
+
       strapi.INDICES = ['26000','26009','26013','26014','26037'];
       // strapi.webSocket.broadcast({ type: 'action', message: 'Application is restarted. Please submit values to begin trading...', status: true });  
       // strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket()
