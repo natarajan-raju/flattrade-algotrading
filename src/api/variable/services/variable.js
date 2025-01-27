@@ -625,11 +625,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   //Sideways market detection logic
   async calculateSidewaysMarket(tk, data) {
     const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 14), 10);
-    const percentageThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_PERCENTAGE_CHANGE', 2));
-    const bbwThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 10));
-  
+    const percentageThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_PERCENTAGE_CHANGE', 1)) / 100).toFixed(2));
+    const bbwThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 2)) / 100).toFixed(2));
+
     // ATR percentage threshold (e.g., 0.5% of the index value)
-    const atrPercentageThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_ATR', 0.75)) / 100;
+    const atrPercentageThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_ATR', 0.075)) / 100).toFixed(2));
   
     // Extract last traded prices
     const prices = data.map(entry => parseFloat(entry.lp));
@@ -639,7 +639,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const currentLow = Math.min(...prices);
   
     // Calculate percentage change
-    const percentageChange = ((currentHigh - currentLow) / currentLow) * 100;
+    const percentageChange = parseFloat((((currentHigh - currentLow) / currentLow) * 100).toFixed(2));
   
     // ATR Calculation
     const trueRanges = [];
@@ -659,12 +659,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     });
   
     // Calculate ATR as the average of true ranges over the lookback period
-    const atr = trueRanges.slice(-lookbackPeriod).reduce((sum, tr) => sum + tr, 0) / lookbackPeriod;
-  
+    const atr = parseFloat((trueRanges.slice(-lookbackPeriod).reduce((sum, tr) => sum + tr, 0) / lookbackPeriod).toFixed(2));
     // Dynamically calculate ATR threshold as a percentage of the current index price (average of prices)
     const currentIndexValue = prices.reduce((sum, price) => sum + price, 0) / prices.length;
-    const atrThreshold = currentIndexValue * atrPercentageThreshold;
-  
+    const atrThreshold = parseFloat((currentIndexValue * atrPercentageThreshold).toFixed(2));
     // Bollinger Band Width (BBW) Calculation
     const sma = prices.slice(-lookbackPeriod).reduce((sum, price) => sum + price, 0) / lookbackPeriod;
   
@@ -676,7 +674,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   
     const upperBand = sma + 2 * stdDev;
     const lowerBand = sma - 2 * stdDev;
-    const bbw = ((upperBand - lowerBand) / sma) * 100;
+    const bbw = parseFloat((((upperBand - lowerBand) / sma) * 100).toFixed(2));
   
     console.log(`Index: ${tk}, ATR: ${atr}, ATR Threshold: ${atrThreshold}, BBW: ${bbw}, BBW Threshold: ${bbwThreshold}, Percentage Change: ${percentageChange}, PC Threshold: ${percentageThreshold}`);
   
