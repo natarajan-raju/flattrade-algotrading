@@ -175,14 +175,14 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         }
       
         strapi.rollingData[`${tk}`].prices.push({ lp, timestamp: new Date().toISOString() });
-      
+        const index = strapi[`${tk}`]?.get('index') || tk;
         // Keep only the required number of points
         if (strapi.rollingData[`${tk}`].prices.length > lookbackPeriod) {
           strapi.rollingData[`${tk}`].prices.shift();
         } else {
           strapi.webSocket.broadcast({
             type: 'market',
-            message: `Application trying to deduct market status for Index token ${tk}...`,
+            message: `Application trying to deduct market status for Index token ${index}...`,
             isSideWays: false,
             status: '003',
             tk
@@ -200,7 +200,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             strapi.log.info(`Index ${tk} entering a sideways market...`);
             strapi.webSocket.broadcast({
               type: 'market',
-              message: `Index ${tk} entering a sideways market.Trading not advised.. Pause for Stop loss...`,
+              message: `Index ${index} entering a sideways market.Trading not advised.. Pause for Stop loss...`,
               isSideWays: true,
               status: '001',
               tk
@@ -208,10 +208,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             strapi.rollingData[`${tk}`].isSidewaysMarket = true;
           } else if (!isSidewaysMarket && strapi.rollingData[`${tk}`].isSidewaysMarket) {
             // Broadcast sideways market end
-            strapi.log.info(`Index ${tk} exiting a sideways market...`);
+            strapi.log.info(`Index ${index} exiting a sideways market...`);
             strapi.webSocket.broadcast({
               type: 'market',
-              message: `Market is trending now for Index ${tk}`,
+              message: `Market is trending now for Index ${index}`,
               status: '002',              
               isSideWays: false,
               tk
@@ -625,7 +625,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   //Sideways market detection logic
   async calculateSidewaysMarket(tk, data) {
     const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 14), 10);
-    const percentageThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_PERCENTAGE_CHANGE', 1)) / 100).toFixed(2));
+    const percentageThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_PERCENTAGE_CHANGE', 2)) / 100).toFixed(2));
     const bbwThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 2)) / 100).toFixed(2));
 
     // ATR percentage threshold (e.g., 0.5% of the index value)
