@@ -164,7 +164,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     } else {
       try {
         // Parse the lookback period once
-        const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 14), 10);
+        const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 30), 10);
         // console.log(`Lookback period: ${lookbackPeriod}`);
         // Sideways market detection strategy
         if (!strapi.rollingData[`${tk}`]) {
@@ -624,12 +624,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
   //Sideways market detection logic
   async calculateSidewaysMarket(tk, data) {
-    const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 14), 10);
-    const percentageThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_PERCENTAGE_CHANGE', 2)) / 100).toFixed(2));
-    const bbwThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 2)) / 100).toFixed(2));
+    const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 30), 10);
+    const percentageThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_PERCENTAGE_CHANGE', 2.5)) / 100).toFixed(2));
+    const bbwThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 2.5)) / 100).toFixed(2));
 
     // ATR percentage threshold (e.g., 0.5% of the index value)
-    const atrPercentageThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_ATR', 0.075)) / 100;
+    const atrPercentageThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_ATR', 0.05)) / 100;
     console.log(atrPercentageThreshold);
     // Extract last traded prices
     const prices = data.map(entry => parseFloat(entry.lp));
