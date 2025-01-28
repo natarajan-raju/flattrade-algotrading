@@ -629,8 +629,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const bbwThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 2)) / 100).toFixed(2));
 
     // ATR percentage threshold (e.g., 0.5% of the index value)
-    const atrPercentageThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_ATR', 0.075)) / 100).toFixed(2));
-  
+    const atrPercentageThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_ATR', 0.075)) / 100;
+    console.log(atrPercentageThreshold);
     // Extract last traded prices
     const prices = data.map(entry => parseFloat(entry.lp));
   
