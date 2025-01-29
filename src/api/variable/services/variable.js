@@ -140,9 +140,24 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             const contractBought = strapi[`${index}`].get('contractBought') || null;
             try{
               if(contractBought && contractBought.contractToken === tk){
-                const realizedPL = (parseFloat(lp) * parseFloat(contractBought.quantity)) - parseFloat(contractBought.costPrice);              
+                const currentValue = parseFloat(lp) * parseFloat(contractBought.quantity);
+                const costPrice = parseFloat(contractBought.costPrice);
+                const realizedPL = currentValue - costPrice;
+                const stopLossThreshold = parseFloat(contractBought.costPrice) * 0.90;
+                strapi[`${index}`].set('currentValue', currentValue);
+                strapi[`${index}`].set('stopLossThreshold', stopLossThreshold);
+                const contractUpdate = {
+                  index,
+                  contract: contactBought.tsym,
+                  quantity: contractBought.quantity,
+                  costPrice,
+                  currentValue,
+                  realizedPL,
+                  stopLossThreshold
+                };                           
                 //send a Strapi web broadcast to client regarding the contract bought's token lp
-                strapi.log.info(`Sending contract bought update to frontend for ${contractBought.contractToken}`);
+                strapi.log.info(`${index} contract Cost Price: ${contractBought.costPrice} Current Value: ${parseFloat(lp) * parseFloat(contractBought.quantity)} Realized PL: ${realizedPL} Stop Loss sales will be triggered on or below ${stopLossThreshold}`);
+                console.table(contractUpdate);
                 strapi.webSocket.broadcast({
                   type: 'position',
                   data: {
@@ -308,7 +323,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             if(strapi.isTradingEnabled){
               let contractType;           
               //Buy CALL
-              if(!callOptionBought && !putOptionBought && !initialSpectatorMode ){                
+              if(!callOptionBought && !putOptionBought && !initialSpectatorMode && !strapi.rollingData[`${tk}`].isSidewaysMarket){                
                 if(((lp >= parseFloat(basePrice) + parseFloat(targetStep) && lp < resistance1 - targetStep) 
                   || (lp >= parseFloat(resistance1) + parseFloat(targetStep) && lp < resistance2 - targetStep)
                   || (lp>= parseFloat(resistance2) + parseFloat(targetStep))
@@ -434,11 +449,17 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   }                    
                 }
               }
-          
+              let stopLossTriggered;
+              if(strapi[`${index}`].get('currentValue') <= strapi[`${index}`].get('stopLossThreshold')){
+                stopLossTriggered = true;
+              } else {
+                stopLossTriggered = false;
+              }
               //Sell CALL
               if(callOptionBought){
                 if(
-                  ((lp >= basePrice && (callBoughtAt >= parseFloat(support1) + parseFloat(targetStep) && callBoughtAt < basePrice)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(basePrice) + parseFloat(targetStep) && callBoughtAt < resistance1))) //Previously lp<= basePrice at stop loss initial check
+                  stopLossTriggered
+                  || ((lp >= basePrice && (callBoughtAt >= parseFloat(support1) + parseFloat(targetStep) && callBoughtAt < basePrice)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(basePrice) + parseFloat(targetStep) && callBoughtAt < resistance1))) //Previously lp<= basePrice at stop loss initial check
                   || ((lp >= resistance1 && (callBoughtAt >= parseFloat(basePrice) + parseFloat(targetStep) && callBoughtAt < resistance1)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(resistance1) + parseFloat(targetStep) && callBoughtAt < resistance2))) //Previously lp<= resistance1 at stop loss initial check
                   || ((lp >= support1 && (callBoughtAt >= parseFloat(support2) + parseFloat(targetStep) && callBoughtAt < support1)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(support1) + parseFloat(targetStep) && callBoughtAt < basePrice))) //Previously lp<= support1 at stop loss initial check
                   || ((lp >=resistance2 && (callBoughtAt >= parseFloat(resistance1) + parseFloat(targetStep) && callBoughtAt < resistance2)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && callBoughtAt  >= parseFloat(resistance2) + parseFloat(targetStep))) //Previously lp<= resistance2 at stop loss initial check
@@ -496,7 +517,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               //Sell PUT
               if(putOptionBought){
                 if(
-                  ((lp <= basePrice && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)) || ((lp >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)))
+                  stopLossTriggered
+                  || ((lp <= basePrice && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)) || ((lp >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)))
                   || ((lp <= support1 && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)) || ((lp >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)))
                   || ((lp <= resistance1 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1)) || ((lp >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)))
                   || ((lp <= support2 && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)) || ((lp >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && putBoughtAt <= support2 - targetStep))
@@ -624,9 +646,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
   //Sideways market detection logic
   async calculateSidewaysMarket(tk, data) {
-    const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 30), 10);
-    const percentageThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_PERCENTAGE_CHANGE', 2.5)) / 100).toFixed(2));
-    const bbwThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 2.5)) / 100).toFixed(2));
+    const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 14), 10);
+    const percentageThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_PERCENTAGE_CHANGE', 2)) / 100).toFixed(2));
+    const bbwThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 2)) / 100).toFixed(2));
 
     // ATR percentage threshold (e.g., 0.5% of the index value)
     const atrPercentageThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_ATR', 0.05)) / 100;
@@ -639,7 +661,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const currentLow = Math.min(...prices);
   
     // Calculate percentage change
-    const percentageChange = parseFloat((((currentHigh - currentLow) / currentLow) * 100).toFixed(2));
+    const percentageChange = parseFloat((((currentHigh - currentLow) / currentLow) * 100).toFixed(4));
   
     // ATR Calculation
     const trueRanges = [];
@@ -659,10 +681,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     });
   
     // Calculate ATR as the average of true ranges over the lookback period
-    const atr = parseFloat((trueRanges.slice(-lookbackPeriod).reduce((sum, tr) => sum + tr, 0) / lookbackPeriod).toFixed(2));
+    const atr = parseFloat((trueRanges.slice(-lookbackPeriod).reduce((sum, tr) => sum + tr, 0) / lookbackPeriod).toFixed(4));
     // Dynamically calculate ATR threshold as a percentage of the current index price (average of prices)
     const currentIndexValue = prices.reduce((sum, price) => sum + price, 0) / prices.length;
-    const atrThreshold = parseFloat((currentIndexValue * atrPercentageThreshold).toFixed(2));
+    const atrThreshold = parseFloat((currentIndexValue * atrPercentageThreshold).toFixed(4));
     // Bollinger Band Width (BBW) Calculation
     const sma = prices.slice(-lookbackPeriod).reduce((sum, price) => sum + price, 0) / lookbackPeriod;
   
@@ -674,7 +696,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   
     const upperBand = sma + 2 * stdDev;
     const lowerBand = sma - 2 * stdDev;
-    const bbw = parseFloat((((upperBand - lowerBand) / sma) * 100).toFixed(2));
+    const bbw = parseFloat((((upperBand - lowerBand) / sma) * 100).toFixed(4));
   
     console.log(`Index: ${tk}, ATR: ${atr}, ATR Threshold: ${atrThreshold}, BBW: ${bbw}, BBW Threshold: ${bbwThreshold}, Percentage Change: ${percentageChange}, PC Threshold: ${percentageThreshold}`);
   
