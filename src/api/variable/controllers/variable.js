@@ -114,6 +114,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             },
         });
         strapi[`${indexToken}`] = new Map(Object.entries(updatedIndexItem));
+        strapi[`${indexToken}`].set('index', indexItem.index);
         strapi[`${indexItem.index}`] = new Map();
 
         let scripList;
