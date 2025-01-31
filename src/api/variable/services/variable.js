@@ -615,7 +615,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   // Custom function to reset investment variables
   async resetInvestmentVariables() {
     try {
-      strapi.rollingData = {};
+      strapi.rollingData = {
+        prices_lookback_period: [],
+        isSidewaysMarket: false,
+        atrValues: []                      
+      };
       const defaultValues = {
         basePrice: 0,
         resistance1: 0,
@@ -802,7 +806,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           });
           delete strapi[`${entry.index}`];
           delete strapi[`${entry.indexToken}`];
-          strapi.rollingData[`${entry.indexToken}`] = {};
+          strapi.rollingData[`${entry.indexToken}`] = {
+            prices_lookback_period: [],
+            isSidewaysMarket: false,
+            atrValues: []                      
+          };
         } 
         //Reset scrip list in database and cache
         const scrips = await strapi.db.query('api::web-socket.web-socket').findMany(
@@ -819,7 +827,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         strapi.webSocket.broadcast({type: 'action', message: 'Application is stopped now.Please sell all positions before starting to trade again.', status: true});
         return {status: true, message: 'Application stopped now..'};      
     }else{
-      strapi.rollingData[`${indexToken}`] = {};
+      strapi.rollingData[`${indexToken}`] = {
+        prices_lookback_period: [],
+        isSidewaysMarket: false,
+        atrValues: []                      
+      };
       try{
         const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken }});
         if(scrip.scripList){
