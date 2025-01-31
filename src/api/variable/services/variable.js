@@ -676,10 +676,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   //Sideways market detection logic
   async calculateSidewaysMarket(tk, data) {
     const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 14), 10);
-    const percentageThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_PERCENTAGE_CHANGE', 2)) / 100).toFixed(4));
-    const bbwThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 2)) / 100).toFixed(4));
+    const percentageThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_PERCENTAGE_CHANGE', 2.5)) / 100).toFixed(4));
+    const bbwThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 2.5)) / 100).toFixed(4));
     // ATR percentage threshold (e.g., 0.5% of the index value)
-    const atrPercentageThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_ATR', 0.1)) / 100;
+    const atrPercentageThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_ATR', 0.5)) / 100;
     // console.log(atrPercentageThreshold);
     // Extract last traded prices
     const prices = data.map(entry => parseFloat(entry.lp));
@@ -734,11 +734,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     
     if(strapi.rollingData[`${tk}`].atrValues.length === 20){ 
       const atrMA = strapi.rollingData[`${tk}`].atrValues.reduce((sum, value) => sum + value, 0) / strapi.rollingData[`${tk}`].atrValues.length;
-      console.log(`Index: ${tk}, ATR: ${atr}, ATR Threshold: ${atrThreshold}, ATR MA: ${atrMA}, BBW: ${bbw}, BBW Threshold: ${bbwThreshold}, Percentage Change: ${percentageChange}, PC Threshold: ${percentageThreshold}`);
+      console.log(`Index: ${tk}, ATR: ${atr}, ATR MA: ${atrMA}, BBW: ${bbw}, BBW Threshold: ${bbwThreshold}, Percentage Change: ${percentageChange}, PC Threshold: ${percentageThreshold}`);
       // Check if sideways market conditions are met
       return (
-        Math.abs(percentageChange) <= percentageThreshold &&
-        atr <= atrThreshold &&
+        Math.abs(percentageChange) <= percentageThreshold &&        
         atr <= atrMA &&
         bbw <= bbwThreshold
       );
