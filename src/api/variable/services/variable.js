@@ -144,7 +144,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 const costPrice = parseFloat(contractBought.costPrice);
                 const realizedPL = currentValue - costPrice;
                 const profitThreshold = parseFloat(contractBought.costPrice) * 1.30;
-                const stopLossThreshold = parseFloat(contractBought.costPrice) * 0.90;
+                const stopLossThreshold = parseFloat(contractBought.costPrice) * 0.95;
                 strapi[`${index}`].set('currentValue', currentValue);
                 strapi[`${index}`].set('stopLossThreshold', stopLossThreshold);
                 strapi[`${index}`].set('profitThreshold', profitThreshold);
@@ -155,6 +155,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   costPrice,
                   currentValue,
                   realizedPL,
+                  profitThreshold,
                   stopLossThreshold
                 };                           
                 //send a Strapi web broadcast to client regarding the contract bought's token lp
@@ -206,7 +207,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           // Handle Websocket broadcast for sideways market detection
           if (isSidewaysMarket && !strapi.rollingData[`${tk}`].isSidewaysMarket) {
             // Send a Strapi web broadcast to client regarding sideways market detection
-            strapi.log.info(`Index ${tk} entering a sideways market...`);
+            strapi.log.info(`Index ${index} entering a sideways market...`);
             strapi.webSocket.broadcast({
               type: 'market',
               message: `Index ${index} entering a sideways market.Trading not advised.. Pause for Stop loss...`,
@@ -532,6 +533,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 let stopLossTriggered;
                 if(strapi[`${index}`].get('currentValue') <= strapi[`${index}`].get('stopLossThreshold')){
                   stopLossTriggered = true;
+                  console.info(`Reached stop loss threshold for ${index}. Application will attempt to sell PUT at LTP ${lp}`);
                 } else {
                   stopLossTriggered = false;
                 }
@@ -539,6 +541,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 let takeProfitTriggered;
                 if(strapi[`${index}`].get('currentValue') >= strapi[`${index}`].get('profitThreshold')){
                   takeProfitTriggered = true;
+                  console.info(`Reached take profit threshold for ${index}. Application will attempt to sell PUT at LTP ${lp}`);
                 } else {
                   takeProfitTriggered = false;
                 }
@@ -680,8 +683,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   //Sideways market detection logic
   async calculateSidewaysMarket(tk, data) {
     const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 14), 10);
-    const percentageThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_PERCENTAGE_CHANGE', 2.5)) / 100).toFixed(4));
-    const bbwThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 2.5)) / 100).toFixed(4));
+    const percentageThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_PERCENTAGE_CHANGE', 3)) / 100).toFixed(4));
+    const bbwThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 3)) / 100).toFixed(4));
     // ATR percentage threshold (e.g., 0.5% of the index value)
     const atrPercentageThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_ATR', 0.5)) / 100;
     // console.log(atrPercentageThreshold);
@@ -737,7 +740,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const bbw = parseFloat((((upperBand - lowerBand) / sma) * 100).toFixed(4));
     
     if(strapi.rollingData[`${tk}`].atrValues.length === 20){ 
-      const atrMA = strapi.rollingData[`${tk}`].atrValues.reduce((sum, value) => sum + value, 0) / strapi.rollingData[`${tk}`].atrValues.length;
+      const atrMA = parseFloat((strapi.rollingData[`${tk}`].atrValues.reduce((sum, value) => sum + value, 0) / strapi.rollingData[`${tk}`].atrValues.length).toFixed(4));
       console.log(`Index: ${tk}, ATR: ${atr}, ATR MA: ${atrMA}, BBW: ${bbw}, BBW Threshold: ${bbwThreshold}, Percentage Change: ${percentageChange}, PC Threshold: ${percentageThreshold}`);
       // Check if sideways market conditions are met
       return (
@@ -893,7 +896,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       for (const contract of contracts) {
         strapi[`${contract.index}`] = new Map();
 
-        strapi[`${contract.index}`].set('contractTokens', contract.contractTokens || {});
+        strapi[`${contract.index}`].set('contractTokens', contract.contractTokens || {
+          ce: [],
+          pe: [],        
+        });
         
         
         const contractTokens = contract.contractTokens;

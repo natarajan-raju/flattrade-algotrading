@@ -528,31 +528,31 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         }
     },
 
-    // async handleOrderbookFeed(feedData){
-        
-    //         const { norenordno,prc,status, qty } = feedData;
-    //         const order = await strapi.db.query('api::order.order').findOne({
-    //             where: { norenordno },
-    //         });
-    //         if(order){
-    //             const updatedOrder = await strapi.db.query('api::order.order').update({ where: { id: order.id }, data: {
-    //                 orderStatus: status,
-    //                 prc,
-    //                 qty
-    //             } 
-    //             });
-    //             strapi.webSocket.broadcast({                
-    //                 type: 'order',
-    //                 data: updatedOrder,
-    //                 message: `Your order for index ${order.index} with contract ${order.contractTsym} has now a new status of ${status}`,
-    //                 status: true,                   
-    //             });
-    //         }else{
-    //             return {'status': false, message: 'Order not found'};
-    //         }
-    //         return {'status': true, message: 'Orderbook feed processed successfully'};
+    async handleOrderbookFeed(feedData){
+            console.log(feedData);
+            const { norenordno,prc,status, qty } = feedData;
+            const order = await strapi.db.query('api::order.order').findOne({
+                where: { norenordno },
+            });
+            if(order){
+                const updatedOrder = await strapi.db.query('api::order.order').update({ where: { id: order.id }, data: {
+                    orderStatus: status,
+                    prc,
+                    qty
+                } 
+                });
+                strapi.webSocket.broadcast({                
+                    type: 'order',
+                    data: updatedOrder,
+                    message: `Your order for index ${order.index} with contract ${order.contractTsym} has now a new status of ${status}`,
+                    status: true,                   
+                });
+            }else{
+                return {'status': false, message: 'Order not found'};
+            }
+            return {'status': true, message: 'Orderbook feed processed successfully'};
             
-    // },
+    },
 
     async fetchOrderStatus(norenordno,retryCount=0,maxRetries=3){
         try{
