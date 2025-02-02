@@ -188,7 +188,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           strapi.rollingData[`${tk}`] = {
             prices_lookback_period: [],
             isSidewaysMarket: false,
-            atrValues: []                      
+            atrValues: [],
+            rsiSeries: []                      
           };
         }
       
@@ -621,7 +622,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       strapi.rollingData = {
         prices_lookback_period: [],
         isSidewaysMarket: false,
-        atrValues: []                      
+        atrValues: [],
+        rsiSeries: []                       
       };
       const defaultValues = {
         basePrice: 0,
@@ -690,7 +692,71 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     // console.log(atrPercentageThreshold);
     // Extract last traded prices
     const prices = data.map(entry => parseFloat(entry.lp));
-   
+
+    //calculate RSI
+    
+    function calculateRSI(prices, period) {
+      let gains = [];
+      let losses = [];
+
+      for (let i = 1; i < prices.length; i++) {
+          let change = prices[i] - prices[i - 1];
+          if (change > 0) {
+              gains.push(change);
+              losses.push(0);
+          } else {
+              losses.push(Math.abs(change));
+              gains.push(0);
+          }
+      }
+
+      // Calculate initial average gain and loss
+      let avgGain = gains.slice(0, period).reduce((sum, g) => sum + g, 0) / period;
+      let avgLoss = losses.slice(0, period).reduce((sum, l) => sum + l, 0) / period;
+
+      // Calculate RSI using a smoothed average
+      for (let i = period; i < gains.length; i++) {
+          avgGain = (avgGain * (period - 1) + gains[i]) / period;
+          avgLoss = (avgLoss * (period - 1) + losses[i]) / period;
+      }
+
+      // Compute RSI
+      let rs = avgGain / avgLoss;
+      let rsi = 100 - (100 / (1 + rs));
+
+      return parseFloat(rsi.toFixed(2));
+    }
+
+    const rsi = calculateRSI(prices, lookbackPeriod);
+    strapi[`${tk}`].rsiSeries.push(rsi);
+
+    if (strapi[`${tk}`].rsiSeries.length > lookbackPeriod) {
+      strapi[`${tk}`].rsiSeries.shift();
+    }
+
+    // Identify Failure Swing Tops & Bottoms
+    function detectFailureSwing() {  
+      let lastRSI = strapi[`${tk}`].rsiSeries[strapi[`${tk}`].rsiSeries.length - 1];
+      let prevRSI = strapi[`${tk}`].rsiSeries[strapi[`${tk}`].rsiSeries.length - 2];
+      let secondPrevRSI = strapi[`${tk}`].rsiSeries[strapi[`${tk}`].rsiSeries.length - 3];
+      let thirdPrevRSI = strapi[`${tk}`].rsiSeries[strapi[`${tk}`].rsiSeries - 4];
+  
+      // Failure Swing Top (Bearish)
+      if (thirdPrevRSI > secondPrevRSI && secondPrevRSI > prevRSI && lastRSI > prevRSI) {
+          return 'top'; 
+      }
+  
+      // Failure Swing Bottom (Bullish)
+      if (thirdPrevRSI < secondPrevRSI && secondPrevRSI < prevRSI && lastRSI < prevRSI) {
+          return 'bottom'; 
+      }  
+      return null;
+    }
+    let failureSwing = 'Not enough RSI Series to calculate..';
+    if(strapi[`${tk}`].rsiSeries.length > 4) {
+      failureSwing = detectFailureSwing();
+    }
+    
     // Dynamically calculate high and low for the current sample
     const currentHigh = Math.max(...prices);
     const currentLow = Math.min(...prices);
@@ -741,19 +807,22 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     
     if(strapi.rollingData[`${tk}`].atrValues.length === 20){ 
       const atrMA = parseFloat((strapi.rollingData[`${tk}`].atrValues.reduce((sum, value) => sum + value, 0) / strapi.rollingData[`${tk}`].atrValues.length).toFixed(4));
-      console.log(`Index: ${tk}, ATR: ${atr}, ATR MA: ${atrMA}, BBW: ${bbw}, BBW Threshold: ${bbwThreshold}, Percentage Change: ${percentageChange}, PC Threshold: ${percentageThreshold}`);
+      console.log(`Index: ${tk}, RSI: ${rsi}, ATR: ${atr}, ATR MA: ${atrMA}, BBW: ${bbw}, BBW Threshold: ${bbwThreshold}, Percentage Change: ${percentageChange}, PC Threshold: ${percentageThreshold}, Failure Swing: ${failureSwing}`);
       // Check if sideways market conditions are met
       return (
         Math.abs(percentageChange) <= percentageThreshold &&        
         atr <= atrMA &&
-        bbw <= bbwThreshold
+        bbw <= bbwThreshold &&
+        // failureSwing === null &&
+        rsi >= 40 && rsi <= 60
       );
     } else {
-      console.log(`Index: ${tk}, ATR: ${atr}, ATR Threshold: ${atrThreshold}, BBW: ${bbw}, BBW Threshold: ${bbwThreshold}, Percentage Change: ${percentageChange}, PC Threshold: ${percentageThreshold}`);
+      console.log(`Index: ${tk}, RSI: ${rsi}, ATR: ${atr}, ATR Threshold: ${atrThreshold}, BBW: ${bbw}, BBW Threshold: ${bbwThreshold}, Percentage Change: ${percentageChange}, PC Threshold: ${percentageThreshold}, Failure Swing: ${failureSwing}`);
       return (
         Math.abs(percentageChange) <= percentageThreshold &&
         atr <= atrThreshold &&
-        bbw <= bbwThreshold
+        bbw <= bbwThreshold &&
+        rsi >= 40 && rsi <= 60
       );
     } 
   },
@@ -812,7 +881,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           strapi.rollingData[`${entry.indexToken}`] = {
             prices_lookback_period: [],
             isSidewaysMarket: false,
-            atrValues: []                      
+            atrValues: [],
+            rsiSeries: []                       
           };
         } 
         //Reset scrip list in database and cache
@@ -833,7 +903,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       strapi.rollingData[`${indexToken}`] = {
         prices_lookback_period: [],
         isSidewaysMarket: false,
-        atrValues: []                      
+        atrValues: [],
+        rsiSeries: []                       
       };
       try{
         const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken }});
