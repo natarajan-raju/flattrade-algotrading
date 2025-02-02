@@ -180,19 +180,23 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         return { message: 'NFO Price updation received' }; 
       }           
     } else {
+      
       try {
         // Parse the lookback period once
-        const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 14), 10);       
+        const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 14), 10);
+               
         // Sideways market detection strategy
         if (!strapi.rollingData[`${tk}`]) {
           strapi.rollingData[`${tk}`] = {
             prices_lookback_period: [],
             isSidewaysMarket: false,
             atrValues: [],
-            rsiSeries: []                      
+            rsiSeries: [],
+            ticks: []                      
           };
         }
-      
+        
+        
         strapi.rollingData[`${tk}`].prices_lookback_period.push({ lp });        
         const index = strapi[`${tk}`].get('index') || tk;
         // Keep only the required number of points
@@ -272,7 +276,19 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               basePrice, resistance1, resistance2, support1, support2, targetStep, lossStep,
               callOptionBought, putOptionBought,callBoughtAt, putBoughtAt, indexToken, index,initialSpectatorMode,previousTradedPrice, amount, quantity, awaitingOrderConfirmation
             } = indexItem;
+
+
+            strapi.rollingData[`${tk}`].ticks.push(parseFloat(lp.toFixed(2)));
+            if(strapi.rollingData[`${tk}`].ticks.length > 2){
+              strapi.rollingData[`${tk}`].ticks.shift();          
+            }
             
+            let comparisonPrice = 0;
+            if(strapi.rollingData[`${tk}`].ticks.length === 2){
+              comparisonPrice = strapi.rollingData[`${tk}`].ticks.reduce((sum, tick) => sum + tick, 0) / strapi.rollingData[`${tk}`].ticks.length;
+            } else {
+              comparisonPrice = previousTradedPrice;
+            }
             
             if (basePrice === 0 || resistance1 === 0 || resistance2 === 0 || support1 === 0 || support2 === 0){        
               return { message: `Investment variables not defined for ${index}`};
@@ -333,7 +349,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   || (lp>= parseFloat(resistance2) + parseFloat(targetStep))
                   || (lp >= parseFloat(support1) + parseFloat(targetStep) && lp < basePrice - targetStep)
                   || (lp >= parseFloat(support2) + parseFloat(targetStep) && lp < support1 - targetStep))
-                  && ( previousTradedPrice < lp)
+                  && ( comparisonPrice < lp)
                 ){                 
                   //Buy CALL
                   callOptionBought = true;
@@ -348,7 +364,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   //   }
                   // });
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy CALL at LTP ${lp}`, status: true});
-                  console.log(`Reached Strategic Buy zone for ${index}. Application will attempt to buy CALL at LTP ${lp}`);
+                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${comparisonPrice}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp}. Application will attempt to buy CALL at LTP ${lp}`);
                   contractType = 'CE';              
                   const orderStatus = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken,amount});              
                   if(orderStatus.status === true || orderStatus.status === 'true'){
@@ -399,12 +415,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   || (lp <= support2 - targetStep)
                   || (lp <= resistance1 - targetStep && lp > parseFloat(basePrice) + parseFloat(targetStep))
                   || (lp <= resistance2 - targetStep && lp > parseFloat(resistance1) + parseFloat(targetStep)))
-                  && (previousTradedPrice > lp)
+                  && (comparisonPrice > lp)
                 ){             
                   //Buy PUT 
                   
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`, status: true});
-                  console.log(`Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`);
+                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${comparisonPrice}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp} Application will attempt to buy PUT at LTP ${lp}`);
                   contractType = 'PE';
                   putOptionBought = true;
                   putBoughtAt = lp;
@@ -623,7 +639,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         prices_lookback_period: [],
         isSidewaysMarket: false,
         atrValues: [],
-        rsiSeries: []                       
+        rsiSeries: [],
+        ticks: []                       
       };
       const defaultValues = {
         basePrice: 0,
@@ -882,7 +899,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             prices_lookback_period: [],
             isSidewaysMarket: false,
             atrValues: [],
-            rsiSeries: []                       
+            rsiSeries: [],
+            ticks: []                       
           };
         } 
         //Reset scrip list in database and cache
@@ -904,7 +922,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         prices_lookback_period: [],
         isSidewaysMarket: false,
         atrValues: [],
-        rsiSeries: []                       
+        rsiSeries: [],
+        ticks: []                       
       };
       try{
         const scrip = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken }});
@@ -952,6 +971,13 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
 
   async fetchIndexVariables(){
+    strapi.rollingData = {
+      prices_lookback_period: [],
+      isSidewaysMarket: false,
+      atrValues: [],
+      rsiSeries: [],
+      ticks: []                       
+    };
     await strapi.service('api::authentication.authentication').fetchRequestToken();
     const contracts = await strapi.db.query('api::contract.contract').findMany({
       where: {
