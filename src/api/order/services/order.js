@@ -66,7 +66,9 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                 costPrice: price,                   
                             }
                             strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType, contractToken: preferredContract.token,tsym: preferredContract.tsym,lotSize: preferredContract.ls, quantity: orderStatus.qty, price } });
-                            strapi[`${index}`].set('contractBought', contractBought);                                
+                            strapi[`${index}`].set('contractBought', contractBought);
+                            strapi[`${index}`].set('profitStage', 0); 
+                            strapi[`${index}`].set('downwardProfitTrigger', false);                              
                             strapi.webSocket.broadcast({
                                 type: 'order',
                                 data: orderStatus,
@@ -286,6 +288,9 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                         if(orderStatus.status.toLowerCase() === 'complete'){
                             const contractBought = {                                    
                             }
+                            strapi[`${index}`].set('stopLossThreshold', 0);   
+                            strapi[`${index}`].set('profitThreshold', Infinity); 
+                            strapi[`${index}`].set('downwardProfitTrigger', false); 
                             strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType: '', contractToken: '',tsym: '',lotSize: '', quantity: 0, price: 0 } });
                             strapi[`${index}`].set('contractBought', contractBought);
                             // console.log(`Order complete, Contract bought reset: ${strapi[`index`].get('contractBought')}`);                      
