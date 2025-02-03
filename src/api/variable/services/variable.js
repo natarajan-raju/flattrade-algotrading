@@ -1051,6 +1051,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           
         }
         strapi[`${position.index}`].set('contractBought', contractBought);
+        strapi[`${position.index}`].set('stopLossThreshold', 0);   
+        strapi[`${position.index}`].set('profitThreshold', Infinity); 
+        strapi[`${position.index}`].set('downwardProfitTrigger', false);
       }
     }
     strapi.log.info('Positions fetched...');
