@@ -210,8 +210,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         if(strapi.rollingData[`${tk}`].prices_lookback_period.length > lookbackPeriod){
          strapi.rollingData[`${tk}`].prices_lookback_period.shift();
         }
-        const isSidewaysMarket = this.calculateSidewaysMarket(tk, strapi.rollingData[`${tk}`].prices_lookback_period);
+        const isSidewaysMarket = await this.calculateSidewaysMarket(tk, strapi.rollingData[`${tk}`].prices_lookback_period);
         const index = strapi[`${tk}`].get('index') || tk;
+        console.log('issidewaysMarket:',isSidewaysMarket)
         if(isSidewaysMarket === null ){
           console.log(`Application trying to deduct market status for Index token ${index}...`);          
           strapi.webSocket.broadcast({
