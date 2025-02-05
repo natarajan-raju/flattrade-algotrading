@@ -212,7 +212,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         }
         const isSidewaysMarket = this.calculateSidewaysMarket(tk, strapi.rollingData[`${tk}`].prices_lookback_period);
         const index = strapi[`${tk}`].get('index') || tk;
-        if(isSidewaysMarket === null ){          
+        if(isSidewaysMarket === null ){
+          console.log(`Application trying to deduct market status for Index token ${index}...`);          
           strapi.webSocket.broadcast({
             type: 'market',
             message: `Application trying to deduct market status for Index token ${index}...`,
@@ -220,10 +221,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             status: '003',
             tk
           });
-        }
-        
-        // Handle Websocket broadcast for sideways market detection
-        if (isSidewaysMarket && !strapi.rollingData[`${tk}`].isSidewaysMarket) {
+        } else if (isSidewaysMarket && !strapi.rollingData[`${tk}`].isSidewaysMarket) {
             // Send a Strapi web broadcast to client regarding sideways market detection
             strapi.log.info(`Index ${index} entering a sideways market...`);
             strapi.webSocket.broadcast({
@@ -786,14 +784,16 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const upperBand = sma + 2 * stdDev;
     const lowerBand = sma - 2 * stdDev;
     const bbw = parseFloat((((upperBand - lowerBand) / sma) * 100).toFixed(4));
-    console.info(`Analysing sideways market.. Strength: Stage 1 >>  PC: ${percentageChange}, BBW: ${bbw}, ATR: ${atr}, RSI: ${rsi}`);
     // console.log(rollingData);
     //Prepare collecting RSI & ATR over lookback period
     strapi.rollingData[`${tk}`].rsiSeries.push(rsi);
     strapi.rollingData[`${tk}`].atrValues.push(atr);
-
+    
     //Check RSI Series readiness
-    if(strapi.rollingData[`${tk}`].rsiSeries.length < 4) return null;
+    if(strapi.rollingData[`${tk}`].rsiSeries.length < 4){      
+      console.info(`Analysing sideways market.. Strength: Stage 1 >>  PC: ${percentageChange}, BBW: ${bbw}, ATR: ${atr}, RSI: ${rsi}`);
+      return null;
+    } 
     if (strapi.rollingData[`${tk}`].rsiSeries.length > 4) {
       strapi.rollingData[`${tk}`].rsiSeries.shift();
     }
@@ -817,11 +817,13 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     }    
     const failureSwing = detectFailureSwing();
 
-    console.info(`Analysing sideways market.. Strength: Stage 2 >> PC: ${percentageChange}, BBW: ${bbw}, ATR: ${atr}, RSI: ${rsi}, failureSwing: ${failureSwing || 'No swings'} `);
     
     //Check ATR MA readiness
     const ma = lookbackPeriod * 1.5;
-    if(strapi.rollingData[`${tk}`].atrValues.length < ma) return null;
+    if(strapi.rollingData[`${tk}`].atrValues.length < ma){
+      console.info(`Analysing sideways market.. Strength: Stage 2 >> PC: ${percentageChange}, BBW: ${bbw}, ATR: ${atr}, RSI: ${rsi}, failureSwing: ${failureSwing || 'No swings'} `);
+      return null;
+    } 
     if (strapi.rollingData[`${tk}`].atrValues.length > ma) {
       strapi.rollingData[`${tk}`].atrValues.shift();
     }
