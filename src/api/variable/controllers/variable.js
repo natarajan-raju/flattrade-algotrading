@@ -116,6 +116,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         strapi[`${indexToken}`] = new Map(Object.entries(updatedIndexItem));
         strapi[`${indexToken}`].set('index', indexItem.index);
         strapi[`${indexItem.index}`] = new Map();
+        
 
         let scripList;
         //Find if a scripList is already subscribed for the given token or generate scripList and subscribe to Flattrade websocket

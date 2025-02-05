@@ -151,7 +151,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 } else if( profitStage > 0 && realizedPL <= (0.40 * profitStage)) {                  
                   strapi[`${index}`].set('downwardProfitTrigger', true);
                 }                
-                const stopLossThreshold = parseFloat(contractBought.costPrice) * 0.95;
+                const stopLossThreshold = parseFloat(contractBought.costPrice) * 0.97;
                 strapi[`${index}`].set('currentValue', currentValue);                
                 strapi[`${index}`].set('stopLossThreshold', stopLossThreshold);
                 strapi[`${index}`].set('profitThreshold', profitThreshold);
@@ -167,7 +167,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   downwardProfitTrigger: strapi[`${index}`].get('downwardProfitTrigger') || false,
                 };                           
                 //send a Strapi web broadcast to client regarding the contract bought's token lp
-                strapi.log.info(`${index} contract Cost Price: ${contractBought.costPrice} Current Value: ${parseFloat(lp) * parseFloat(contractBought.quantity)} Realized PL: ${realizedPL} Stop Loss sales will be triggered on or below ${stopLossThreshold}`);
+                // strapi.log.info(`${index} contract Cost Price: ${contractBought.costPrice} Current Value: ${parseFloat(lp) * parseFloat(contractBought.quantity)} Realized PL: ${realizedPL} Stop Loss sales will be triggered on or below ${stopLossThreshold}`);
                 console.table(contractUpdate);
                 strapi.webSocket.broadcast({
                   type: 'position',
@@ -179,6 +179,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   },
                   status: true
                 });
+
               }
             }catch(error){
               console.log(error);
@@ -371,40 +372,40 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   contractType = 'CE';              
                   const orderStatus = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken,amount});              
                   if(orderStatus.status === true || orderStatus.status === 'true'){
-                    console.log('CALL buy Order status true from variable service. Resetting awaitingOrderConfirmation to false');
-                    strapi[`${tk}`].set('callOptionBought', callOptionBought);
-                    strapi[`${tk}`].set('callBoughtAt', callBoughtAt);
-                    strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
-                    strapi[`${tk}`].set('awaitingOrderConfirmation', false);
-                    strapi.db.query('api::variable.variable').update({
-                      where: {indexToken : `${tk}`},
-                      data: {
-                        callOptionBought,
-                        callBoughtAt,
-                        previousTradedPrice,
-                        awaitingOrderConfirmation: false,
-                      }
-                    });
+                    // console.log('CALL buy Order status true from variable service. Resetting awaitingOrderConfirmation to false');
+                    // strapi[`${tk}`].set('callOptionBought', callOptionBought);
+                    // strapi[`${tk}`].set('callBoughtAt', callBoughtAt);
+                    // strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
+                    // strapi[`${tk}`].set('awaitingOrderConfirmation', false);
+                    // strapi.db.query('api::variable.variable').update({
+                    //   where: {indexToken : `${tk}`},
+                    //   data: {
+                    //     callOptionBought,
+                    //     callBoughtAt,
+                    //     previousTradedPrice,
+                    //     awaitingOrderConfirmation: false,
+                    //   }
+                    // });
                     return {
                       status: true,
                       message: 'CALL buy Order placed successfully',
                       
                     } 
                   }else{
-                    console.log('CALL buy Order status false from variable service. Resetting awaitingOrderConfirmation to false');
-                    strapi[`${tk}`].set('callOptionBought', false);
-                    strapi[`${tk}`].set('callBoughtAt', 0);
-                    strapi[`${tk}`].set('previousTradedPrice', lp);
-                    strapi[`${tk}`].set('awaitingOrderConfirmation', false);
-                    strapi.db.query('api::variable.variable').update({
-                      where: {indexToken : `${tk}`},
-                      data: {
-                        callOptionBought: false,
-                        callBoughtAt: 0,
-                        previousTradedPrice,
-                        awaitingOrderConfirmation: false,
-                      }
-                    });
+                    // console.log('CALL buy Order status false from variable service. Resetting awaitingOrderConfirmation to false');
+                    // strapi[`${tk}`].set('callOptionBought', false);
+                    // strapi[`${tk}`].set('callBoughtAt', 0);
+                    // strapi[`${tk}`].set('previousTradedPrice', lp);
+                    // strapi[`${tk}`].set('awaitingOrderConfirmation', false);
+                    // strapi.db.query('api::variable.variable').update({
+                    //   where: {indexToken : `${tk}`},
+                    //   data: {
+                    //     callOptionBought: false,
+                    //     callBoughtAt: 0,
+                    //     previousTradedPrice,
+                    //     awaitingOrderConfirmation: false,
+                    //   }
+                    // });
                     return {
                       status: false,
                       message: 'CALL buy Order failed',
@@ -820,18 +821,18 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
     
     //Check ATR MA readiness
-    const ma = lookbackPeriod * 1.5;
-    if(strapi.rollingData[`${tk}`].atrValues.length < ma){
+    // const ma = Math.floor(lookbackPeriod * 1.5);
+    if(strapi.rollingData[`${tk}`].atrValues.length < 20){
       console.info(`Analysing sideways market.. Strength: Stage 2 >> PC: ${percentageChange}, BBW: ${bbw}, ATR: ${atr}, RSI: ${rsi}, failureSwing: ${failureSwing || 'No swings'} `);
       return null;
     } 
-    if (strapi.rollingData[`${tk}`].atrValues.length > ma) {
+    if (strapi.rollingData[`${tk}`].atrValues.length > 20) {
       strapi.rollingData[`${tk}`].atrValues.shift();
     }
     
     //7. Calculate ATR MA
     const atrMA = parseFloat((strapi.rollingData[`${tk}`].atrValues.reduce((sum, value) => sum + value, 0) / strapi.rollingData[`${tk}`].atrValues.length).toFixed(4));
-    console.info(`Sideways detection complete with full strength: High-Low PC: ${percentageChange}, BBW: ${bbw}, ATR: ${atr}, RSI: ${rsi}, failureSwing: ${failureSwing || 'No swings'}, ATR MA${ma}: ${atrMA}`)
+    console.info(`Sideways detection complete with full strength: High-Low PC: ${percentageChange} against ${percentageThreshold}, BBW: ${bbw} against ${bbwThreshold}, ATR: ${atr} against ${atrThreshold}, RSI: ${rsi}, failureSwing: ${failureSwing || 'No swings'}, ATR MA20: ${atrMA}`)
     
     return (
       Math.abs(percentageChange) <= percentageThreshold &&
