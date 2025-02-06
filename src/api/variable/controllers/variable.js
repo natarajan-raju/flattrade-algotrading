@@ -52,7 +52,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         if(!strapi.sessionToken){
             return ctx.send({ message: 'Request token not found', status: false });
         }
-        
+        console.log(strapi.sessionToken);
         //Check expiry data by submitting a random contract detail fetch with the given expiry date to Flattrade
         try{            
             const date = await strapi.service('api::variable.variable').convertDateFormat(expiry);

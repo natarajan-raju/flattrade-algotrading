@@ -535,7 +535,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     },
 
     async handleOrderbookFeed(feedData){
-            console.log(feedData);
+            // console.log(feedData);
             const { norenordno,prc,status, qty } = feedData;
             const order = await strapi.db.query('api::order.order').findOne({
                 where: { norenordno },
