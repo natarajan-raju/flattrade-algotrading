@@ -169,23 +169,35 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 //send a Strapi web broadcast to client regarding the contract bought's token lp
                 // strapi.log.info(`${index} contract Cost Price: ${contractBought.costPrice} Current Value: ${parseFloat(lp) * parseFloat(contractBought.quantity)} Realized PL: ${realizedPL} Stop Loss sales will be triggered on or below ${stopLossThreshold}`);
                 console.table(contractUpdate);
-                strapi.webSocket.broadcast({
-                  type: 'position',
-                  data: {
-                    tk,
-                    token: tk,
-                    lp,
-                    realizedPL
-                  },
-                  status: true
-                });
-
+                let orderStatus;
+                if(currentValue >= profitThreshold || currentValue <= stopLossThreshold || strapi[`${index}`].get('downwardProfitTrigger')){
+                  let message;
+                  currentValue >= profitThreshold? message = 'Sell triggered as current value exceeded profit threshold' 
+                    : currentValue <= stopLossThreshold? message = 'Sell triggered as current value gone below stoploss threshold'
+                    : message = 'Sell triggered as current value gone below profit stage' 
+                  console.warn(message);
+                  let indexToken = contractBought.indexToken;
+                  let lp = strapi.rollingData[`${indexToken}`].ticks[0];
+                  let quantity = contractBought.quantity;
+                  orderStatus = await strapi.service('api::order.order').placeSellOrder({lp,index,indexToken,quantity});
+                }
+                if(orderStatus.status === false || orderStatus.status === 'false'){
+                  strapi.webSocket.broadcast({
+                    type: 'position',
+                    data: {
+                      tk,
+                      token: tk,
+                      lp,
+                      realizedPL
+                    },
+                    status: true
+                  });
+                }                
               }
             }catch(error){
               console.log(error);
-            }
-            
-        }
+            }            
+          }
         return { message: 'NFO Price updation received' }; 
       }           
     } else {      
@@ -1060,6 +1072,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           tsym: position.tsym,
           quantity: position.quantity || 0,
           costPrice: position.price || 0,
+          indexToken: position.indexToken
           
         }
         strapi[`${position.index}`].set('contractBought', contractBought);

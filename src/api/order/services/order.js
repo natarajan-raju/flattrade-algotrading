@@ -63,7 +63,8 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                 contractToken: preferredContract.token,
                                 tsym: preferredContract.tsym,
                                 quantity: parseInt(orderStatus.qty),
-                                costPrice: price,                   
+                                costPrice: price,
+                                indexToken                   
                             }
                             strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType, contractToken: preferredContract.token,tsym: preferredContract.tsym,lotSize: preferredContract.ls, quantity: orderStatus.qty, price } });
                             strapi[`${index}`].set('contractBought', contractBought);
