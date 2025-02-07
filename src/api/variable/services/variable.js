@@ -185,7 +185,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 let orderStatus;
                 let awaitingOrderConfirmation = strapi[`${index}`].get('awaitingOrderConfirmation') || false;
                 if((!awaitingOrderConfirmation) && currentValue >= profitThreshold || currentValue <= stopLossThreshold || strapi[`${index}`].get('downwardProfitTrigger')){
-                  strapi[`${contractUpdate.indexToken}`].set('awaitingOrderConfirmation', true);
+                  strapi[`${contractBought.indexToken}`].set('awaitingOrderConfirmation', true);
                   let message;
                   currentValue >= profitThreshold? message = 'Sell triggered as current value exceeded profit threshold' 
                     : currentValue <= stopLossThreshold? message = 'Sell triggered as current value gone below stoploss threshold'
