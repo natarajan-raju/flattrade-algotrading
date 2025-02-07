@@ -139,10 +139,21 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             strapi[`${index}`].set('contractTokens', contractTokens);
             const contractBought = strapi[`${index}`].get('contractBought') || null;
             try{
+              const currentValue = parseFloat(lp) * parseFloat(contractBought.quantity);
+              const costPrice = parseFloat(contractBought.costPrice);
+              const realizedPL = currentValue - costPrice;
               if(contractBought && contractBought.contractToken === tk){
-                const currentValue = parseFloat(lp) * parseFloat(contractBought.quantity);
-                const costPrice = parseFloat(contractBought.costPrice);
-                const realizedPL = currentValue - costPrice;
+                strapi.webSocket.broadcast({
+                  type: 'position',
+                  data: {
+                    tk,
+                    token: tk,
+                    lp,
+                    realizedPL
+                  },
+                  status: true
+                });
+                
                 let profitThreshold = 1.30 * costPrice;            
                 let profitStage = strapi[`${index}`].get('profitStage') || 0;
                 if((profitStage === 0 && realizedPL >= 50) || (profitStage >=50 && realizedPL > profitStage)){
@@ -162,6 +173,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   costPrice,
                   currentValue,
                   realizedPL,
+                  profitStage,
                   profitThreshold,
                   stopLossThreshold,
                   downwardProfitTrigger: strapi[`${index}`].get('downwardProfitTrigger') || false,
@@ -186,13 +198,16 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     let callOptionBought = false;
                     let callBoughtAt = 0;
                     let previousTradedPrice = 0;
+                    let putOptionBought = false;
+                    let putBoughtAt = 0;
                     strapi[`${index}`].set('stopLossThreshold', 0);   
                     strapi[`${index}`].set('profitThreshold', Infinity); 
                     strapi[`${index}`].set('downwardProfitTrigger', false);                  
                     console.log('sell Order status true from variable service. Resetting awaitingOrderConfirmation to false');
-                    strapi[`${contractBought.indexToken}`].set('callOptionBought', callOptionBought);
-                    strapi[`${contractBought.indexToken}`].set('callBoughtAt', callBoughtAt);
-                    strapi[`${contractBought.indexToken}`].set('previousTradedPrice', previousTradedPrice);
+                    strapi[`${contractBought.indexToken}`].set('callOptionBought', false);
+                    strapi[`${contractBought.indexToken}`].set('callBoughtAt', 0);
+                    strapi[`${contractBought.indexToken}`].set('putOptionBought', false);
+                    strapi[`${contractBought.indexToken}`].set('putBoughtAt', 0);
                     strapi[`${contractBought.indexToken}`].set('awaitingOrderConfirmation', false);
                     strapi.db.query('api::variable.variable').update({
                           where: {indexToken : `${contractBought.indexToken}`},
@@ -200,6 +215,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                             callOptionBought,                  
                             previousTradedPrice,
                             callBoughtAt,
+                            putBoughtAt,
+                            putOptionBought,
                             awaitingOrderConfirmation: false,
                     }
                   });
@@ -212,17 +229,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                           data: {
                             awaitingOrderConfirmation: false,
                           }
-                        });
-                    strapi.webSocket.broadcast({
-                      type: 'position',
-                      data: {
-                        tk,
-                        token: tk,
-                        lp,
-                        realizedPL
-                      },
-                      status: true
-                    });
+                        });                   
                 }        
                 }
                         
@@ -259,16 +266,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         const isSidewaysMarket = await this.calculateSidewaysMarket(tk, strapi.rollingData[`${tk}`].prices_lookback_period);
         const index = strapi[`${tk}`].get('index') || tk;
         console.log('issidewaysMarket:',isSidewaysMarket)
-        if(isSidewaysMarket === null ){
-          console.log(`Application trying to deduct market status for Index token ${index}...`);          
-          strapi.webSocket.broadcast({
-            type: 'market',
-            message: `Application trying to deduct market status for Index token ${index}...`,
-            isSideWays: false,
-            status: '003',
-            tk
-          });
-        } else if (isSidewaysMarket && !strapi.rollingData[`${tk}`].isSidewaysMarket) {
+      
+       if (isSidewaysMarket == true && !strapi.rollingData[`${tk}`].isSidewaysMarket) {
             // Send a Strapi web broadcast to client regarding sideways market detection
             strapi.log.info(`Index ${index} entering a sideways market...`);
             strapi.webSocket.broadcast({
@@ -279,7 +278,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               tk
             });
             strapi.rollingData[`${tk}`].isSidewaysMarket = true;
-        } else if (!isSidewaysMarket && strapi.rollingData[`${tk}`].isSidewaysMarket) {
+        } else if (isSidewaysMarket == false && strapi.rollingData[`${tk}`].isSidewaysMarket) {
             // Broadcast sideways market end
             strapi.log.info(`Index ${index} exiting a sideways market...`);
             strapi.webSocket.broadcast({
@@ -290,7 +289,16 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               tk
             });
             strapi.rollingData[`${tk}`].isSidewaysMarket = false;
-        }
+        }  else {
+          console.log(`Application trying to deduct market status for Index token ${index}...`);          
+          strapi.webSocket.broadcast({
+            type: 'market',
+            message: `Application trying to deduct market status for Index token ${index}...`,
+            isSideWays: false,
+            status: '003',
+            tk
+          });
+        } 
       }catch(error){
         console.warn(`Some error calculating sideways market: ${error}`);
       }
