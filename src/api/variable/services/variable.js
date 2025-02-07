@@ -139,10 +139,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             strapi[`${index}`].set('contractTokens', contractTokens);
             const contractBought = strapi[`${index}`].get('contractBought') || null;
             try{
-              const currentValue = parseFloat(lp) * parseFloat(contractBought.quantity);
-              const costPrice = parseFloat(contractBought.costPrice);
-              const realizedPL = currentValue - costPrice;
+              
               if(contractBought && contractBought.contractToken === tk){
+                const currentValue = parseFloat(lp) * parseFloat(contractBought.quantity);
+                const costPrice = parseFloat(contractBought.costPrice);
+                const realizedPL = currentValue - costPrice;
                 strapi.webSocket.broadcast({
                   type: 'position',
                   data: {
