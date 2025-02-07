@@ -174,6 +174,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   currentValue,
                   realizedPL,
                   profitStage,
+                  profitStageThreshold: profitStage * 0.40,
                   profitThreshold,
                   stopLossThreshold,
                   downwardProfitTrigger: strapi[`${index}`].get('downwardProfitTrigger') || false,
