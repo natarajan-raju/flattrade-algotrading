@@ -15,6 +15,7 @@ module.exports = createCoreController('api::order.order', ({strapi}) => ({
         if( !contractType || !lp || !index || !indexToken || !quantity){
             return ctx.send('Invalid payload provided');
         }
+        strapi.log.info('Manual Sell order received from dashboard.rajaapp.in');
         const orderResponse = await strapi.service('api::order.order').placeSellOrder({contractType, lp, index, indexToken, quantity });
         if(orderResponse.status){
             return ctx.send("Order placed successfully");

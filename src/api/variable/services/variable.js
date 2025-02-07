@@ -157,13 +157,14 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 
                 let profitThreshold = 1.30 * costPrice;            
                 let profitStage = strapi[`${index}`].get('profitStage') || 0;
+                let profitStageThreshold = Math.max(0.50 * profitStage,profitStage - 150);
                 if((profitStage === 0 && realizedPL >= 50) || (profitStage >=50 && realizedPL > profitStage)){
                   profitStage = Math.floor(realizedPL / 50) * 50;
                   strapi[`${index}`].set('profitStage', profitStage);
-                } else if( profitStage > 0 && realizedPL <= (0.40 * profitStage)) {                  
+                } else if( profitStage > 0 && realizedPL <= profitStageThreshold) {                  
                   strapi[`${index}`].set('downwardProfitTrigger', true);
                 }                
-                const stopLossThreshold = parseFloat(contractBought.costPrice) * 0.95;
+                const stopLossThreshold = Math.min(parseFloat(contractBought.costPrice) - 50,parseFloat(contractBought.costPrice) * 0.97);
                 strapi[`${index}`].set('currentValue', currentValue);                
                 strapi[`${index}`].set('stopLossThreshold', stopLossThreshold);
                 strapi[`${index}`].set('profitThreshold', profitThreshold);
@@ -175,22 +176,24 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   currentValue,
                   realizedPL,
                   profitStage,
-                  profitStageThreshold: profitStage * 0.40,
+                  profitStageThreshold,
                   profitThreshold,
                   stopLossThreshold,
-                  downwardProfitTrigger: strapi[`${index}`].get('downwardProfitTrigger') || false,
+                  downwardProfitTrigger: strapi[`${index}`].get('downwardProfitTrigger'),
+                  awaitingOrderConfirmation: strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation') || null
                 };                           
                 //send a Strapi web broadcast to client regarding the contract bought's token lp
                 // strapi.log.info(`${index} contract Cost Price: ${contractBought.costPrice} Current Value: ${parseFloat(lp) * parseFloat(contractBought.quantity)} Realized PL: ${realizedPL} Stop Loss sales will be triggered on or below ${stopLossThreshold}`);
                 console.table(contractUpdate);
                 let orderStatus;
-                let awaitingOrderConfirmation = strapi[`${index}`].get('awaitingOrderConfirmation') || false;
+                let awaitingOrderConfirmation = strapi[`${contractBought.awaitingOrderConfirmation}`].get('awaitingOrderConfirmation');
                 if((!awaitingOrderConfirmation) && currentValue >= profitThreshold || currentValue <= stopLossThreshold || strapi[`${index}`].get('downwardProfitTrigger')){
                   strapi[`${contractBought.indexToken}`].set('awaitingOrderConfirmation', true);
                   let message;
-                  currentValue >= profitThreshold? message = 'Sell triggered as current value exceeded profit threshold' 
-                    : currentValue <= stopLossThreshold? message = 'Sell triggered as current value gone below stoploss threshold'
-                    : message = 'Sell triggered as current value gone below profit stage' 
+                  if(currentValue >= profitThreshold) message = 'Sell triggered as current value exceeded profit threshold';
+                  if(currentValue <= stopLossThreshold) message = 'Sell triggered as current value gone below stoploss threshold';
+                  if(currentValue <= profitStageThreshold) message = 'Sell triggered as current value gone below profit stage';
+                  
                   console.warn(message);
                   let indexToken = contractBought.indexToken;
                   let lp = strapi.rollingData[`${indexToken}`].ticks[0];
@@ -337,16 +340,18 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             } = indexItem;
 
 
-            strapi.rollingData[`${tk}`].ticks.push(parseFloat(parseFloat(lp).toFixed(2)));
-            if(strapi.rollingData[`${tk}`].ticks.length > 2){
-              strapi.rollingData[`${tk}`].ticks.shift();          
-            }
             
-            let comparisonPrice = 0;
+            
+            let comparisonPrice;
             if(strapi.rollingData[`${tk}`].ticks.length === 2){
               comparisonPrice = strapi.rollingData[`${tk}`].ticks.reduce((sum, tick) => sum + tick, 0) / strapi.rollingData[`${tk}`].ticks.length;
             } else {
               comparisonPrice = previousTradedPrice;
+            }
+
+            strapi.rollingData[`${tk}`].ticks.push(parseFloat(parseFloat(lp).toFixed(2)));
+            if(strapi.rollingData[`${tk}`].ticks.length > 2){
+              strapi.rollingData[`${tk}`].ticks.shift();          
             }
             
             if (basePrice === 0 || resistance1 === 0 || resistance2 === 0 || support1 === 0 || support2 === 0){        

@@ -282,7 +282,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 if(norenordno){
                     orderStatus = await this.fetchOrderStatus(norenordno);
                     if(orderStatus){
-                        console.log(orderStatus);                        
+                        console.table(orderStatus);                        
                         const price = orderStatus.qty * orderStatus.avgprc;
                         const realizedPL = price - contractBought.costPrice;  
                         

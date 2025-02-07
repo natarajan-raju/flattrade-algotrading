@@ -271,7 +271,7 @@ module.exports = ({ strapi }) => ({
   },
 
   async handleOrderbookFeed(feedData) {
-    strapi.log.info('Order update received..');
+    // strapi.log.info('Order update received..');
     try {
       await strapi.service('api::order.order').handleOrderbookFeed(feedData);
     } catch (error) {
