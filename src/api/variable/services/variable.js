@@ -269,7 +269,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         const index = strapi[`${tk}`].get('index') || tk;
         console.log('issidewaysMarket:',isSidewaysMarket)
       
-       if (isSidewaysMarket == true && !strapi.rollingData[`${tk}`].isSidewaysMarket) {
+       if (isSidewaysMarket === true && !strapi.rollingData[`${tk}`].isSidewaysMarket) {
             // Send a Strapi web broadcast to client regarding sideways market detection
             strapi.log.info(`Index ${index} entering a sideways market...`);
             strapi.webSocket.broadcast({
@@ -280,7 +280,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               tk
             });
             strapi.rollingData[`${tk}`].isSidewaysMarket = true;
-        } else if (isSidewaysMarket == false && strapi.rollingData[`${tk}`].isSidewaysMarket) {
+        } else if (isSidewaysMarket === false && strapi.rollingData[`${tk}`].isSidewaysMarket) {
             // Broadcast sideways market end
             strapi.log.info(`Index ${index} exiting a sideways market...`);
             strapi.webSocket.broadcast({
@@ -291,7 +291,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               tk
             });
             strapi.rollingData[`${tk}`].isSidewaysMarket = false;
-        }  else {
+        }  else if(isSidewaysMarket === null ) {
           console.log(`Application trying to deduct market status for Index token ${index}...`);          
           strapi.webSocket.broadcast({
             type: 'market',
