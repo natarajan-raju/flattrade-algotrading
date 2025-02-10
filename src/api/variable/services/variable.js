@@ -853,48 +853,49 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     strapi.rollingData[`${tk}`].rsiSeries.push(rsi);
     strapi.rollingData[`${tk}`].atrValues.push(atr);
     
-    //Check RSI Series readiness
-    if(strapi.rollingData[`${tk}`].rsiSeries.length < 4){      
-      console.info(`Analysing sideways market.. Strength: Stage 1 >>  PC: ${percentageChange}, BBW: ${bbw}, ATR: ${atr}`);
-      return null;
-    } 
-    if (strapi.rollingData[`${tk}`].rsiSeries.length > 4) {
-      strapi.rollingData[`${tk}`].rsiSeries.shift();
-    }
+    // //Check RSI Series readiness
+    // if(strapi.rollingData[`${tk}`].rsiSeries.length < 4){      
+    //   console.info(`Analysing sideways market.. Strength: Stage 1 >>  PC: ${percentageChange}, BBW: ${bbw}, ATR: ${atr}, RSI: ${rsi}`);
+    //   return null;
+    // } 
+    // if (strapi.rollingData[`${tk}`].rsiSeries.length > 4) {
+    //   strapi.rollingData[`${tk}`].rsiSeries.shift();
+    // }
     //6. Identify Failure Swing Tops & Bottoms
-    let detectFailureSwing = () => {  
-      let lastRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 1];
-      let prevRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 2];
-      let secondPrevRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 3];
-      let thirdPrevRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 4];
+    // let detectFailureSwing = () => {  
+    //   let lastRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 1];
+    //   let prevRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 2];
+    //   let secondPrevRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 3];
+    //   let thirdPrevRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 4];
   
-      // Failure Swing Top (Bearish)
-      if (thirdPrevRSI > secondPrevRSI && secondPrevRSI > prevRSI && lastRSI > prevRSI) {
-          return 'top'; 
-      }
+    //   // Failure Swing Top (Bearish)
+    //   if (thirdPrevRSI > secondPrevRSI && secondPrevRSI > prevRSI && lastRSI > prevRSI) {
+    //       return 'top'; 
+    //   }
   
-      // Failure Swing Bottom (Bullish)
-      if (thirdPrevRSI < secondPrevRSI && secondPrevRSI < prevRSI && lastRSI < prevRSI) {
-          return 'bottom'; 
-      }  
-      return null;
-    }    
-    const failureSwing = detectFailureSwing();
+    //   // Failure Swing Bottom (Bullish)
+    //   if (thirdPrevRSI < secondPrevRSI && secondPrevRSI < prevRSI && lastRSI < prevRSI) {
+    //       return 'bottom'; 
+    //   }  
+    //   return null;
+    // }    
+    // const failureSwing = detectFailureSwing();
 
     
     //Check ATR MA readiness
-    // const ma = Math.floor(lookbackPeriod * 1.5);
-    if(strapi.rollingData[`${tk}`].atrValues.length < 30){
-      console.info(`Analysing sideways market.. Strength: Stage 2 >> PC: ${percentageChange}, BBW: ${bbw}, ATR: ${atr}, failureSwing: ${failureSwing || 'No swings'} `);
+    const ma_multiplier = parseFloat(env('SIDEWAYS_THRESHOLD_ATRMA_MULTIPLIER',4));
+    const ma= lookbackPeriod * ma_multiplier;
+    if(strapi.rollingData[`${tk}`].atrValues.length < ma){
+      console.info(`Analysing sideways market.. Strength: Stage 2 >> PC: ${percentageChange}, BBW: ${bbw}, ATR: ${atr}, RSI: ${rsi}`);
       return null;
     } 
-    if (strapi.rollingData[`${tk}`].atrValues.length > 30) {
+    if (strapi.rollingData[`${tk}`].atrValues.length > ma) {
       strapi.rollingData[`${tk}`].atrValues.shift();
     }
     
     //7. Calculate ATR MA
     const atrMA = parseFloat((strapi.rollingData[`${tk}`].atrValues.reduce((sum, value) => sum + value, 0) / strapi.rollingData[`${tk}`].atrValues.length).toFixed(4));
-    console.info(`Sideways detection complete with full strength: High-Low PC: ${percentageChange} against ${percentageThreshold}, BBW: ${bbw} against ${bbwThreshold}, ATR: ${atr} against ${atrThreshold}, failureSwing: ${failureSwing || 'No swings'}, ATR MA60: ${atrMA}`)
+    console.info(`Sideways detection complete with full strength: High-Low PC: ${percentageChange} against ${percentageThreshold}, BBW: ${bbw} against ${bbwThreshold}, ATR: ${atr} against ${atrThreshold}, RSI: ${rsi}}, ATR MA${ma}: ${atrMA}`)
     
     return (
       Math.abs(percentageChange) <= percentageThreshold &&
