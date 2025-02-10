@@ -52,7 +52,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 if(norenordno){
                     orderStatus = await this.fetchOrderStatus(norenordno);
                     if(orderStatus){
-                        console.log(orderStatus);
+                        console.table(orderStatus);
                         let price;
                         orderStatus.avgprc? price = orderStatus.qty * orderStatus.avgprc : orderStatus.qty * preferredContract.lp;                           
                 
@@ -77,7 +77,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                 status: 'success',
                             });
                             let awaitingOrderConfirmation = false;
-                            console.log('Order complete. Setting awaitingOrderConfirmation to false');                
+                            // console.log('Order complete. Setting awaitingOrderConfirmation to false');                
                             strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                             strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
                             try{
@@ -100,7 +100,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                         realizedPL: '0',                                                        
                                     }               
                                 });
-                                console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
+                                // console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
                             }catch(error){
                                 console.log(`Error in storing the order in database: ${error} `);                                    
                             };
@@ -113,7 +113,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
 
                         } else if(orderStatus.status.toLowerCase() === 'rejected'){                                   
                             let awaitingOrderConfirmation = false;  
-                            console.log(`Order rejected for contract ${preferredContract.tsym} with reason ${orderStatus.rejreason}.. Setting awaitingOrderConfirmation to false`);              
+                            // console.log(`Order rejected for contract ${preferredContract.tsym} with reason ${orderStatus.rejreason}.. Setting awaitingOrderConfirmation to false`);              
                             strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                             avoid = preferredContract.token;
                             retry++;                            
@@ -144,7 +144,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                         realizedPL: '0',                                                        
                                     }               
                                 });
-                                console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
+                                // console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
                             }catch(error){
                                 console.log(`Error in storing the order in database: ${error} `);                                    
                             };
@@ -303,7 +303,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                 status: 'success',
                             });
                             let awaitingOrderConfirmation = false; 
-                            console.log('Order complete. Setting awaitingOrderConfirmation to false');              
+                            // console.log('Order complete. Setting awaitingOrderConfirmation to false');              
                             strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                             strapi[`${indexToken}`].set('callOptionBought', false);
                             strapi[`${indexToken}`].set('callBoughtAt', 0);
@@ -342,7 +342,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                         realizedPL: `${realizedPL}`,                        
                                     }               
                                 });
-                                console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);                               
+                                // console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);                               
                             }catch(error){
                                 console.log(`Error in storing the order in database: ${error}`);
                             };
@@ -415,7 +415,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                         realizedPL: '0',                        
                                     }               
                                 });
-                                console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);                               
+                                // console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);                               
                             }catch(error){
                                 console.log(`Error in storing the order in database: ${error}`);
                             };
@@ -450,7 +450,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     });
                     let awaitingOrderConfirmation = false;                
                     strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-                    console.log('Error placing order with Flattrade. Setting awaitingOrderConfirmation to false');
+                    // console.log('Error placing order with Flattrade. Setting awaitingOrderConfirmation to false');
                     strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });
                     return {
                         status: false,
@@ -514,7 +514,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 body: payload,
             });
             const positionBook = await positionBookResponse.json();
-            console.log(positionBook);
+            // console.log(positionBook);
             if(Array.isArray(positionBook) && positionBook.length > 0){
                 const position = positionBook.find(position => position.tsym === tsym && position.opensellqty > 0);
                 if(position){

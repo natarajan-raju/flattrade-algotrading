@@ -163,8 +163,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   strapi[`${index}`].set('profitStage', profitStage);
                 } else if( profitStage > 0 && realizedPL <= profitStageThreshold) {                  
                   strapi[`${index}`].set('downwardProfitTrigger', true);
-                }                
-                const stopLossThreshold = Math.min(parseFloat(contractBought.costPrice) - 50,parseFloat(contractBought.costPrice) * 0.97);
+                }
+                // let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation');                
+                const stopLossThreshold = parseFloat(contractBought.costPrice) * 0.98;
                 strapi[`${index}`].set('currentValue', currentValue);                
                 strapi[`${index}`].set('stopLossThreshold', stopLossThreshold);
                 strapi[`${index}`].set('profitThreshold', profitThreshold);
@@ -181,19 +182,19 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   profitThreshold,
                   stopLossThreshold,
                   downwardProfitTrigger: strapi[`${index}`].get('downwardProfitTrigger'),
-                  awaitingOrderConfirmation: strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation') || null
+                  awaitingOrderConfirmation: strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation')
                 };                           
                 //send a Strapi web broadcast to client regarding the contract bought's token lp
                 // strapi.log.info(`${index} contract Cost Price: ${contractBought.costPrice} Current Value: ${parseFloat(lp) * parseFloat(contractBought.quantity)} Realized PL: ${realizedPL} Stop Loss sales will be triggered on or below ${stopLossThreshold}`);
                 console.table(contractUpdate);
-                let orderStatus;
+                
                 let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation');
                 if((!awaitingOrderConfirmation) && currentValue >= profitThreshold || currentValue <= stopLossThreshold || strapi[`${index}`].get('downwardProfitTrigger')){
                   strapi[`${contractBought.indexToken}`].set('awaitingOrderConfirmation', true);
                   let message;
                   if(currentValue >= profitThreshold) message = 'Sell triggered as current value exceeded profit threshold';
                   if(currentValue <= stopLossThreshold) message = 'Sell triggered as current value gone below stoploss threshold';
-                  if(currentValue <= profitStageThreshold) message = 'Sell triggered as current value gone below profit stage';
+                  if(strapi[`${index}`].get('downwardProfitTrigger')) message = 'Sell triggered as current value gone below profit stage';
                   
                   console.warn(message);
                   let indexToken = contractBought.indexToken;
@@ -209,7 +210,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     strapi[`${index}`].set('stopLossThreshold', 0);   
                     strapi[`${index}`].set('profitThreshold', Infinity); 
                     strapi[`${index}`].set('downwardProfitTrigger', false);                  
-                    console.log('sell Order status true from variable service. Resetting awaitingOrderConfirmation to false');
+                    // console.log('sell Order status true from variable service. Resetting awaitingOrderConfirmation to false');
                     strapi[`${contractBought.indexToken}`].set('callOptionBought', false);
                     strapi[`${contractBought.indexToken}`].set('callBoughtAt', 0);
                     strapi[`${contractBought.indexToken}`].set('putOptionBought', false);
@@ -228,7 +229,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   });
                 }
                 if(orderStatus.status === false || orderStatus.status === 'false'){
-                    console.log('sell Order status false from variable service. Resetting awaitingOrderConfirmation to false');
+                    // console.log('sell Order status false from variable service. Resetting awaitingOrderConfirmation to false');
                         strapi[`${contractBought.indexToken}`].set('awaitingOrderConfirmation', false);                      
                         strapi.db.query('api::variable.variable').update({
                           where: {indexToken : `${contractBought.indexToken}`},
@@ -344,14 +345,14 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             
             
             let comparisonPrice;
-            if(strapi.rollingData[`${tk}`].ticks.length === 2){
+            if(strapi.rollingData[`${tk}`].ticks.length === 3){
               comparisonPrice = strapi.rollingData[`${tk}`].ticks.reduce((sum, tick) => sum + tick, 0) / strapi.rollingData[`${tk}`].ticks.length;
             } else {
               comparisonPrice = previousTradedPrice;
             }
 
-            strapi.rollingData[`${tk}`].ticks.push(parseFloat(parseFloat(lp).toFixed(2)));
-            if(strapi.rollingData[`${tk}`].ticks.length > 2){
+            strapi.rollingData[`${tk}`].ticks.push(parseFloat(parseFloat(lp).toFixed(4)));
+            if(strapi.rollingData[`${tk}`].ticks.length > 3){
               strapi.rollingData[`${tk}`].ticks.shift();          
             }
             
@@ -394,7 +395,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   data: {initialSpectatorMode},
                 });
                 strapi.webSocket.broadcast({ type: 'variable', message: `Reaching strategic position.Spectator mode turned off for index ${index}`, status: true});
-                strapi.log.info('Reaching strategic position.Spectator mode turned off');
+                strapi.log.info(`Reaching strategic position.Spectator mode turned off for index ${index}`);
               } else {
                 //LP in Passive zone. Do not take any action
                 previousTradedPrice = lp;
@@ -433,7 +434,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   contractType = 'CE';              
                   const orderStatus = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken,amount});              
                   if(orderStatus.status === true || orderStatus.status === 'true'){
-                    console.log('CALL buy Order status true from variable service. Resetting awaitingOrderConfirmation to false');
+                    // console.log('CALL buy Order status true from variable service. Resetting awaitingOrderConfirmation to false');
                     strapi[`${tk}`].set('callOptionBought', callOptionBought);
                     strapi[`${tk}`].set('callBoughtAt', callBoughtAt);
                     strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
@@ -453,7 +454,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                       
                     } 
                   }else{
-                    console.log('CALL buy Order status false from variable service. Resetting awaitingOrderConfirmation to false');
+                    // console.log('CALL buy Order status false from variable service. Resetting awaitingOrderConfirmation to false');
                     strapi[`${tk}`].set('callOptionBought', false);
                     strapi[`${tk}`].set('callBoughtAt', 0);
                     strapi[`${tk}`].set('previousTradedPrice', lp);
@@ -494,7 +495,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                   const orderStatus = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken, amount});
                   if(orderStatus.status === true || orderStatus.status === 'true'){
-                    console.log('PUT buy Order status true from variable service. Resetting awaitingOrderConfirmation to false');
+                    // console.log('PUT buy Order status true from variable service. Resetting awaitingOrderConfirmation to false');
                     strapi[`${tk}`].set('putOptionBought', putOptionBought);
                     strapi[`${tk}`].set('putBoughtAt', putBoughtAt);
                     strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
@@ -513,7 +514,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                       message: 'PUT buy Order placed successfully',                            
                     }                    
                   } else {
-                    console.log('PUT buy Order status false from variable service. Resetting awaitingOrderConfirmation to false');
+                    // console.log('PUT buy Order status false from variable service. Resetting awaitingOrderConfirmation to false');
                     strapi[`${tk}`].set('putOptionBought', false);
                     strapi[`${tk}`].set('putBoughtAt', 0);
                     strapi[`${tk}`].set('previousTradedPrice', lp);
@@ -537,19 +538,19 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               
               //Sell CALL
               if(callOptionBought){
-                let stopLossTriggered;
-                if(strapi[`${index}`].get('currentValue') <= strapi[`${index}`].get('stopLossThreshold')){
-                  stopLossTriggered = true;
-                } else {
-                  stopLossTriggered = false;
-                }
+                // let stopLossTriggered;
+                // if(strapi[`${index}`].get('currentValue') <= strapi[`${index}`].get('stopLossThreshold')){
+                //   stopLossTriggered = true;
+                // } else {
+                //   stopLossTriggered = false;
+                // }
 
-                let takeProfitTriggered;
-                if((strapi[`${index}`].get('currentValue') >= strapi[`${index}`].get('profitThreshold')) || strapi[`${index}`].get('downwardProfitTrigger')){
-                  takeProfitTriggered = true;
-                } else {
-                  takeProfitTriggered = false;
-                }
+                // let takeProfitTriggered;
+                // if((strapi[`${index}`].get('currentValue') >= strapi[`${index}`].get('profitThreshold')) || strapi[`${index}`].get('downwardProfitTrigger')){
+                //   takeProfitTriggered = true;
+                // } else {
+                //   takeProfitTriggered = false;
+                // }
                 if(
                   // takeProfitTriggered
                   // ||stopLossTriggered ||
@@ -560,7 +561,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   || ((lp >= support2 && callBoughtAt < support2) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(support2) + parseFloat(targetStep) && callBoughtAt < support1))) //Previously lp<= support2 at stop loss initial check
                 ){              
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell CALL at LTP ${lp}`, status: true});     
-                  console.log(`Reached Strategic Sell zone for ${index}. Application will attempt to sell CALL at LTP ${lp}`);
+                  console.log(`Reached Strategic Sell zone for ${index}. Comparison price ${comparisonPrice} Previous Traed Price ${previousTradedPrice} Application will attempt to sell CALL at LTP ${lp}`);
                   //call sell API
                   
                     contractType = 'CE';              
@@ -574,7 +575,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                       strapi[`${index}`].set('stopLossThreshold', 0);   
                       strapi[`${index}`].set('profitThreshold', Infinity); 
                       strapi[`${index}`].set('downwardProfitTrigger', false);                  
-                      console.log('CALL sell Order status true from variable service. Resetting awaitingOrderConfirmation to false');
+                      // console.log('CALL sell Order status true from variable service. Resetting awaitingOrderConfirmation to false');
                       strapi[`${tk}`].set('callOptionBought', callOptionBought);
                       strapi[`${tk}`].set('callBoughtAt', callBoughtAt);
                       strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
@@ -593,7 +594,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                         message: 'CALL sell Order placed successfully',
                       }
                     } else {
-                      console.log('CALL sell Order status false from variable service. Resetting awaitingOrderConfirmation to false');
+                      // console.log('CALL sell Order status false from variable service. Resetting awaitingOrderConfirmation to false');
                       strapi[`${tk}`].set('awaitingOrderConfirmation', false);                      
                       strapi.db.query('api::variable.variable').update({
                         where: {indexToken : `${tk}`},
@@ -613,21 +614,21 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           
               //Sell PUT
               if(putOptionBought){
-                let stopLossTriggered;
-                if(strapi[`${index}`].get('currentValue') <= strapi[`${index}`].get('stopLossThreshold')){
-                  stopLossTriggered = true;
-                  console.info(`Reached stop loss threshold for ${index}. Application will attempt to sell PUT at LTP ${lp}`);
-                } else {
-                  stopLossTriggered = false;
-                }
+                // let stopLossTriggered;
+                // if(strapi[`${index}`].get('currentValue') <= strapi[`${index}`].get('stopLossThreshold')){
+                //   stopLossTriggered = true;
+                //   console.info(`Reached stop loss threshold for ${index}. Application will attempt to sell PUT at LTP ${lp}`);
+                // } else {
+                //   stopLossTriggered = false;
+                // }
 
-                let takeProfitTriggered;
-                if((strapi[`${index}`].get('currentValue') >= strapi[`${index}`].get('profitThreshold')) || strapi[`${index}`].get('downwardProfitTrigger')){
-                  takeProfitTriggered = true;
-                  console.info(`Reached take profit threshold for ${index}. Application will attempt to sell PUT at LTP ${lp}`);
-                } else {
-                  takeProfitTriggered = false;
-                }
+                // let takeProfitTriggered;
+                // if((strapi[`${index}`].get('currentValue') >= strapi[`${index}`].get('profitThreshold')) || strapi[`${index}`].get('downwardProfitTrigger')){
+                //   takeProfitTriggered = true;
+                //   console.info(`Reached take profit threshold for ${index}. Application will attempt to sell PUT at LTP ${lp}`);
+                // } else {
+                //   takeProfitTriggered = false;
+                // }
                 if(
                   // takeProfitTriggered
                   // || stopLossTriggered ||
@@ -639,7 +640,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 ){                            
                   
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell PUT at LTP ${lp}`, status: true}); 
-                  console.log(`Reached Strategic Sell zone for ${index}. Application will attempt to sell PUT at LTP ${lp}`);
+                  console.log(`Reached Strategic Sell zone for ${index}.Comparison price ${comparisonPrice} Previous Traded Price ${previousTradedPrice} Application will attempt to sell PUT at LTP ${lp}`);
                   //PUT sell API 
                 
                     contractType = 'PE';             
@@ -653,7 +654,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                       strapi[`${index}`].set('stopLossThreshold', 0);
                       strapi[`${index}`].set('profitThreshold', Infinity);
                       strapi[`${index}`].set('downwardProfitTrigger', false);
-                      console.log('PUT sell Order status true from variable service. Resetting awaitingOrderConfirmation to false');
+                      // console.log('PUT sell Order status true from variable service. Resetting awaitingOrderConfirmation to false');
                       strapi[`${tk}`].set('putOptionBought', putOptionBought);
                       strapi[`${tk}`].set('putBoughtAt', putBoughtAt);
                       strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);
@@ -674,7 +675,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                         updatedVariable,
                       } 
                     } else {
-                      console.log('PUT sell Order status false from variable service. Resetting awaitingOrderConfirmation to false');
+                      // console.log('PUT sell Order status false from variable service. Resetting awaitingOrderConfirmation to false');
                       strapi[`${tk}`].set('awaitingOrderConfirmation', false);
                       let updatedVariable = await strapi.db.query('api::variable.variable').update({
                         where: {indexToken: `${tk}`},
