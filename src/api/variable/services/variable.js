@@ -170,6 +170,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 strapi[`${index}`].set('profitThreshold', profitThreshold);
                 const contractUpdate = {
                   index,
+                  indexToken: contractBought.indexToken,
                   contract: contractBought.tsym,
                   quantity: contractBought.quantity,
                   costPrice,
@@ -186,7 +187,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 // strapi.log.info(`${index} contract Cost Price: ${contractBought.costPrice} Current Value: ${parseFloat(lp) * parseFloat(contractBought.quantity)} Realized PL: ${realizedPL} Stop Loss sales will be triggered on or below ${stopLossThreshold}`);
                 console.table(contractUpdate);
                 let orderStatus;
-                let awaitingOrderConfirmation = strapi[`${contractBought.awaitingOrderConfirmation}`].get('awaitingOrderConfirmation');
+                let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation');
                 if((!awaitingOrderConfirmation) && currentValue >= profitThreshold || currentValue <= stopLossThreshold || strapi[`${index}`].get('downwardProfitTrigger')){
                   strapi[`${contractBought.indexToken}`].set('awaitingOrderConfirmation', true);
                   let message;
