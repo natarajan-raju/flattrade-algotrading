@@ -155,7 +155,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   status: true
                 });
                 
-                let profitThreshold = 1.30 * costPrice;            
+                let profitThreshold = 4.10 * costPrice;            
                 let profitStage = strapi[`${index}`].get('profitStage') || 0;
                 let profitStageThreshold = Math.max(0.50 * profitStage,profitStage - 150);
                 if((profitStage === 0 && realizedPL >= 50) || (profitStage >=50 && realizedPL > profitStage)){
