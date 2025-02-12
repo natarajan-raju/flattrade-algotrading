@@ -165,7 +165,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   strapi[`${index}`].set('downwardProfitTrigger', true);
                 }
                 // let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation');                
-                const stopLossThreshold = parseFloat(contractBought.costPrice) * 0.98;
+                const stopLossThreshold = parseFloat(contractBought.costPrice) * 0.96;
                 strapi[`${index}`].set('currentValue', currentValue);                
                 strapi[`${index}`].set('stopLossThreshold', stopLossThreshold);
                 strapi[`${index}`].set('profitThreshold', profitThreshold);
@@ -192,11 +192,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 if((!awaitingOrderConfirmation) && currentValue >= profitThreshold || currentValue <= stopLossThreshold || strapi[`${index}`].get('downwardProfitTrigger')){
                   strapi[`${contractBought.indexToken}`].set('awaitingOrderConfirmation', true);
                   let message;
-                  if(currentValue >= profitThreshold) message = 'Sell triggered as current value exceeded profit threshold';
-                  if(currentValue <= stopLossThreshold) message = 'Sell triggered as current value gone below stoploss threshold';
-                  if(strapi[`${index}`].get('downwardProfitTrigger')) message = 'Sell triggered as current value gone below profit stage';
+                  if(currentValue >= profitThreshold) message = `Sell triggered as current value ${currentValue} exceeded profit threshold ${profitThreshold}`;
+                  if(currentValue <= stopLossThreshold) message = `Sell triggered as current value ${currentValue} gone below stoploss threshold ${stopLossThreshold}`;
+                  if(strapi[`${index}`].get('downwardProfitTrigger')) message = `Sell triggered as current value ${currentValue} gone below profit stage ${profitStage}`;
                   
-                  console.warn(message);
+                  strapi.log.info(message);
                   let indexToken = contractBought.indexToken;
                   let lp = strapi.rollingData[`${indexToken}`].ticks[0];
                   let quantity = contractBought.quantity;
@@ -307,7 +307,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           });
         } 
       }catch(error){
-        console.warn(`Some error calculating sideways market: ${error}`);
+        console.log(`Some error calculating sideways market: ${error}`);
       }
         
 
@@ -316,7 +316,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           data: feedData,          
           status: true
       })
-      console.log(feedData);
+      strapi.log.info(JSON.stringify(feedData));
         
           const headers = {
               Authorization: `Bearer ${env('SPECIAL_TOKEN')}`, // Including the special token in the Authorization header
@@ -400,7 +400,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 //LP in Passive zone. Do not take any action
                 previousTradedPrice = lp;
                 strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);  
-                console.log(`No actions taken for index ${index} at LTP ${lp}. LP in passive zone, InitialSpectatorMode: ${initialSpectatorMode}`);        
+                console.log(`No actions taken for index ${index} at LTP ${lp}. Index in passive zone, InitialSpectatorMode: ${initialSpectatorMode}`);        
                 strapi.webSocket.broadcast({ type: 'variable', message: `No actions taken for index ${index} at LTP ${lp}`, status: true});
                 return `No actions taken at LTP ${lp}`;
               }
@@ -415,11 +415,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   || (lp>= parseFloat(resistance2) + parseFloat(targetStep))
                   || (lp >= parseFloat(support1) + parseFloat(targetStep) && lp < basePrice - targetStep)
                   || (lp >= parseFloat(support2) + parseFloat(targetStep) && lp < support1 - targetStep))
-                  && ( comparisonPrice < lp)
+                  && ( Math.max(comparisonPrice,previousTradedPrice) < lp)
                 ){                 
                   //Buy CALL
                   callOptionBought = true;
                   callBoughtAt = lp;
+                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${comparisonPrice}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp}. Application will attempt to buy CALL at LTP ${lp}`);
                   previousTradedPrice = lp;
                   awaitingOrderConfirmation = true;                  
                   strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
@@ -430,7 +431,6 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   //   }
                   // });
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy CALL at LTP ${lp}`, status: true});
-                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${comparisonPrice}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp}. Application will attempt to buy CALL at LTP ${lp}`);
                   contractType = 'CE';              
                   const orderStatus = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken,amount});              
                   if(orderStatus.status === true || orderStatus.status === 'true'){
@@ -481,7 +481,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   || (lp <= support2 - targetStep)
                   || (lp <= resistance1 - targetStep && lp > parseFloat(basePrice) + parseFloat(targetStep))
                   || (lp <= resistance2 - targetStep && lp > parseFloat(resistance1) + parseFloat(targetStep)))
-                  && (comparisonPrice > lp)
+                  && (Math.min(comparisonPrice,previousTradedPrice) > lp)
                 ){             
                   //Buy PUT 
                   
@@ -774,7 +774,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 14), 10);
     // const rollingData = strapi[`${tk}`].rollingData;
     if(data.length < lookbackPeriod) return null;    
-
+    
     //Calculate current high and low for Sideways calculation strategies
     const prices = data.map(entry => parseFloat(entry.lp));    
     const currentHigh = Math.max(...prices);
@@ -783,7 +783,19 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     //1. High low percentage change calculation
     const percentageThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_PERCENTAGE_CHANGE', 3)) / 100).toFixed(4));
     const percentageChange = parseFloat((((currentHigh - currentLow) / currentLow) * 100).toFixed(4));
-
+    
+    //5. Bollinger Band Width (BBW) Calculation for lookback period
+    const bbwThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 3)) / 100).toFixed(4));
+    const sma = prices.slice(-lookbackPeriod).reduce((sum, price) => sum + price, 0) / lookbackPeriod;    
+    const squaredDiffs = prices
+    .slice(-lookbackPeriod)
+    .map(price => Math.pow(price - sma, 2));
+    const variance = squaredDiffs.reduce((sum, squaredDiff) => sum + squaredDiff, 0) / lookbackPeriod;
+    const stdDev = Math.sqrt(variance);    
+    const upperBand = sma + 2 * stdDev;
+    const lowerBand = sma - 2 * stdDev;
+    const bbw = parseFloat((((upperBand - lowerBand) / sma) * 100).toFixed(4));
+    
 
     //2. Calculate ATR as the average of true ranges over the lookback period
     const trueRanges = [];
@@ -799,9 +811,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const atr = parseFloat((trueRanges.slice(-lookbackPeriod).reduce((sum, tr) => sum + tr, 0) / lookbackPeriod).toFixed(4));
 
     //3. Calculate ATR Threshold as a percentage of Index current value
-    const atrPercentageThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_ATR', 1)) / 100;
-    const currentIndexValue = prices.reduce((sum, price) => sum + price, 0) / prices.length;
-    const atrThreshold = parseFloat((currentIndexValue * atrPercentageThreshold).toFixed(4));
+    // const atrPercentageThreshold = parseFloat(env('SIDEWAYS_THRESHOLD_ATR', 1)) / 100;
+    // const currentIndexValue = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+    // const atrThreshold = parseFloat((currentIndexValue * atrPercentageThreshold).toFixed(4));
     
     //4. calculate RSI for lookback period    
     function calculateRSI(prices, period) {
@@ -837,57 +849,62 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     }
     const rsi = calculateRSI(prices, lookbackPeriod);
     
-    //5. Bollinger Band Width (BBW) Calculation for lookback period
-    const bbwThreshold = parseFloat((parseFloat(env('SIDEWAYS_THRESHOLD_BBW', 3)) / 100).toFixed(4));
-    const sma = prices.slice(-lookbackPeriod).reduce((sum, price) => sum + price, 0) / lookbackPeriod;    
-    const squaredDiffs = prices
-    .slice(-lookbackPeriod)
-    .map(price => Math.pow(price - sma, 2));
-    const variance = squaredDiffs.reduce((sum, squaredDiff) => sum + squaredDiff, 0) / lookbackPeriod;
-    const stdDev = Math.sqrt(variance);    
-    const upperBand = sma + 2 * stdDev;
-    const lowerBand = sma - 2 * stdDev;
-    const bbw = parseFloat((((upperBand - lowerBand) / sma) * 100).toFixed(4));
+   
     // console.log(rollingData);
     //Prepare collecting RSI & ATR over lookback period
     strapi.rollingData[`${tk}`].rsiSeries.push(rsi);
     strapi.rollingData[`${tk}`].atrValues.push(atr);
     
-    // //Check RSI Series readiness
-    // if(strapi.rollingData[`${tk}`].rsiSeries.length < 4){      
-    //   console.info(`Analysing sideways market.. Strength: Stage 1 >>  PC: ${percentageChange}, BBW: ${bbw}, ATR: ${atr}, RSI: ${rsi}`);
-    //   return null;
-    // } 
-    // if (strapi.rollingData[`${tk}`].rsiSeries.length > 4) {
-    //   strapi.rollingData[`${tk}`].rsiSeries.shift();
-    // }
-    //6. Identify Failure Swing Tops & Bottoms
-    // let detectFailureSwing = () => {  
-    //   let lastRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 1];
-    //   let prevRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 2];
-    //   let secondPrevRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 3];
-    //   let thirdPrevRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 4];
+    //Check RSI Series readiness
+    if(strapi.rollingData[`${tk}`].rsiSeries.length < 4){      
+      console.info(`Analysing sideways market.. Strength: Stage 1 >>  PC: ${percentageChange}, BBW: ${bbw}, ATR: ${atr}, RSI: ${rsi}`);
+      return (
+        (Math.abs(percentageChange) <= percentageThreshold &&
+        // atr <= atrThreshold &&        
+        bbw <= bbwThreshold)
+        ||
+        (rsi >= 30 &&
+        rsi <= 70)
+      );
+    } 
+    if (strapi.rollingData[`${tk}`].rsiSeries.length > 4) {
+      strapi.rollingData[`${tk}`].rsiSeries.shift();
+    }
+    // 6. Identify Failure Swing Tops & Bottoms
+    let detectFailureSwing = () => {  
+      let lastRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 1];
+      let prevRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 2];
+      let secondPrevRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 3];
+      let thirdPrevRSI = strapi.rollingData[`${tk}`].rsiSeries[strapi.rollingData[`${tk}`].rsiSeries.length - 4];
   
-    //   // Failure Swing Top (Bearish)
-    //   if (thirdPrevRSI > secondPrevRSI && secondPrevRSI > prevRSI && lastRSI > prevRSI) {
-    //       return 'top'; 
-    //   }
+      // Failure Swing Top (Bearish)
+      if (thirdPrevRSI > secondPrevRSI && secondPrevRSI > prevRSI && lastRSI > prevRSI) {
+          return 'top'; 
+      }
   
-    //   // Failure Swing Bottom (Bullish)
-    //   if (thirdPrevRSI < secondPrevRSI && secondPrevRSI < prevRSI && lastRSI < prevRSI) {
-    //       return 'bottom'; 
-    //   }  
-    //   return null;
-    // }    
-    // const failureSwing = detectFailureSwing();
+      // Failure Swing Bottom (Bullish)
+      if (thirdPrevRSI < secondPrevRSI && secondPrevRSI < prevRSI && lastRSI < prevRSI) {
+          return 'bottom'; 
+      }  
+      return null;
+    }    
+    const failureSwing = detectFailureSwing();
 
     
     //Check ATR MA readiness
     const ma_multiplier = parseFloat(env('SIDEWAYS_THRESHOLD_ATRMA_MULTIPLIER',4));
     const ma= lookbackPeriod * ma_multiplier;
     if(strapi.rollingData[`${tk}`].atrValues.length < ma){
-      console.info(`Analysing sideways market.. Strength: Stage 2 >> PC: ${percentageChange}, BBW: ${bbw}, ATR: ${atr}, RSI: ${rsi}`);
-      return null;
+      console.info(`Analysing sideways market.. Strength: Stage 2 >> PC: ${percentageChange}, BBW: ${bbw}, ATR: ${atr}, RSI: ${rsi}, Failure Swing: ${failureSwing}`);
+      return (
+        (Math.abs(percentageChange) <= percentageThreshold &&
+        // atr <= atrThreshold &&        
+        bbw <= bbwThreshold)
+        ||
+        (rsi >= 30 &&
+        rsi <= 70 &&
+        failureSwing === null)
+      );      
     } 
     if (strapi.rollingData[`${tk}`].atrValues.length > ma) {
       strapi.rollingData[`${tk}`].atrValues.shift();
@@ -895,16 +912,16 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     
     //7. Calculate ATR MA
     const atrMA = parseFloat((strapi.rollingData[`${tk}`].atrValues.reduce((sum, value) => sum + value, 0) / strapi.rollingData[`${tk}`].atrValues.length).toFixed(4));
-    console.info(`Sideways detection complete with full strength: High-Low PC: ${percentageChange} against ${percentageThreshold}, BBW: ${bbw} against ${bbwThreshold}, ATR: ${atr} against ${atrThreshold}, RSI: ${rsi}}, ATR MA${ma}: ${atrMA}`)
+    console.info(`Sideways detection complete with full strength: High-Low PC: ${percentageChange} against ${percentageThreshold}, BBW: ${bbw} against ${bbwThreshold}, ATR: ${atr} against ATR MA${ma}: ${atrMA}, RSI: ${rsi}}, Failure Swing: ${failureSwing} `)
     
     return (
-      Math.abs(percentageChange) <= percentageThreshold &&
-      atr <= atrThreshold &&
-      atr <= atrMA &&
-      // failureSwing === null &&
-      // rsi >= 40 &&
-      // rsi <= 60 &&
-      bbw <= bbwThreshold
+      (Math.abs(percentageChange) <= percentageThreshold &&
+      atr <= atrMA &&        
+      bbw <= bbwThreshold)
+      ||
+      (rsi >= 30 &&
+      rsi <= 70 &&
+      failureSwing === null)
     );   
     
     // if(strapi.rollingData[`${tk}`].atrValues.length === 20){ 
