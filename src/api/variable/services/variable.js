@@ -921,54 +921,43 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     
     
   // },
-  async calculateSidewaysMarket(tk, data) {   
-    const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 21), 10);
-    if (data.length < lookbackPeriod) return null;
+  async calculateSidewaysMarket(tk, data) {
+    
 
-    const prices = data.map(entry => parseFloat(entry.lp));
-    const currentHigh = Math.max(...prices);
-    const currentLow = Math.min(...prices);
-
-    // **Step 1: High-Low Percentage Change**
-    const percentageThreshold1 = 0.006; // 0.6% (Immediate Sideways)
-    const percentageThreshold2 = 0.012; // 1.2% (Check BBW)
-    const percentageChange = ((currentHigh - currentLow) / currentLow) * 100;
-
-    if (percentageChange < percentageThreshold1) {
-        console.info(`✅ Step 1: High-Low % (${percentageChange.toFixed(2)}) < 0.6% → Sideways Market Confirmed`);
-        return true;
-    }
-    if (percentageChange > percentageThreshold2) {
-        console.info(`❌ Step 1: High-Low % (${percentageChange.toFixed(2)}) > 1.2% → NOT Sideways`);
-        return false;
+    //Helper Functions-------------------------------------------------------------------------------------------
+    
+    //Calculate ATR
+    function calculateATR(data, period) {
+      let trueRanges = [];
+      for (let i = 1; i < data.length; i++) {
+          let high = parseFloat(data[i].lp);
+          let low = parseFloat(data[i - 1].lp);
+          let previousClose = parseFloat(data[i - 1].lp);
+          trueRanges.push(Math.max(high - low, Math.abs(high - previousClose), Math.abs(low - previousClose)));
+      }
+      return trueRanges.slice(-period).reduce((sum, tr) => sum + tr, 0) / period;
     }
 
-    // **Step 2: Bollinger Band Width (BBW)**
-    const bbwThreshold1 = 0.02; // < 2% → Confirm sideways
-    const bbwThreshold2 = 0.035; // Between 2%-3.5% → Check RSI
-    // Calculate Bollinger Band Width (BBW)
-    function calculateBBW(prices, period) {
-      const sma = prices.slice(-period).reduce((sum, price) => sum + price, 0) / period;
-      const squaredDiffs = prices.slice(-period).map(price => Math.pow(price - sma, 2));
-      const variance = squaredDiffs.reduce((sum, squaredDiff) => sum + squaredDiff, 0) / period;
-      const stdDev = Math.sqrt(variance);
-      const upperBand = sma + 2 * stdDev;
-      const lowerBand = sma - 2 * stdDev;
-      return ((upperBand - lowerBand) / sma) * 100;
-    }
-    const bbw = calculateBBW(prices, lookbackPeriod);
-
-    if (bbw < bbwThreshold1) {
-        console.info(`✅ Step 2: BBW (${bbw.toFixed(2)}) < 2% → Sideways Market Confirmed`);
-        return true;
-    }
-    if (bbw > bbwThreshold2) {
-        console.info(`❌ Step 2: BBW (${bbw.toFixed(2)}) > 3.5% → NOT Sideways`);
-        return false;
+    //Update ATR
+    function updateRollingATR(tk, atr) {
+      // if (!strapi.rollingData[`${tk}`]) strapi.rollingData[`${tk}`] = { atrValues: [] };
+      // let atrValues = strapi.rollingData[`${tk}`].atrValues;
+      strapi.rollingData[`${tk}`].atrValues.push(atr);
+      if (strapi.rollingData[`${tk}`].atrValues > 10) strapi.rollingData[`${tk}`].atrValues.shift();
     }
 
-    // **Step 3: RSI Check**
-    // Calculate RSI
+    //Calculate ATR MA
+    function calculateATRMA(tk) {
+      // let atrValues = strapi.rollingData[`${tk}`].atrValues || [];
+      return strapi.rollingData[`${tk}`].atrValues.length >= 10 ? strapi.rollingData[`${tk}`].atrValues.reduce((sum, value) => sum + value, 0) / strapi.rollingData[`${tk}`].atrValues.length : Infinity;
+    }
+
+    // Check if ATR has been below ATR MA for 10+ ticks
+    function checkATRStability(tk) {
+      return strapi.rollingData[`${tk}`].atrValues.length === 10 && strapi.rollingData[`${tk}`].atrValues.every(value => value < calculateATRMA(tk));
+    }
+
+    //Calculate RSI
     function calculateRSI(prices, period) {
       let gains = [], losses = [];
       for (let i = 1; i < prices.length; i++) {
@@ -988,68 +977,90 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       let rs = avgGain / avgLoss;
       return 100 - (100 / (1 + rs));
     }
-    const rsi = calculateRSI(prices, lookbackPeriod);
-    const rsiThresholdLow = 42;
-    const rsiThresholdHigh = 58;
+
+    // Calculate Bollinger Band Width (BBW)
+    function calculateBBW(prices, period) {
+      const sma = prices.slice(-period).reduce((sum, price) => sum + price, 0) / period;
+      const squaredDiffs = prices.slice(-period).map(price => Math.pow(price - sma, 2));
+      const variance = squaredDiffs.reduce((sum, squaredDiff) => sum + squaredDiff, 0) / period;
+      const stdDev = Math.sqrt(variance);
+      const upperBand = sma + 2 * stdDev;
+      const lowerBand = sma - 2 * stdDev;
+      return ((upperBand - lowerBand) / sma) * 100;
+    }
+
     // Check if RSI has stayed within range for 10+ ticks
     function checkRSIStability(tk, rsi) {
       // if (!strapi.rollingData[`${tk}`]) strapi.rollingData[`${tk}`] = { rsiSeries: [] };
-      let rsiSeries = strapi.rollingData[`${tk}`].rsiSeries;
-      rsiSeries.push(rsi);
-      if (rsiSeries.length > 10) rsiSeries.shift();
-      return rsiSeries.length === 10 && rsiSeries.every(value => value >= 42 && value <= 58);
+      // let rsiSeries = strapi.rollingData[`${tk}`].rsiSeries;
+      strapi.rollingData[`${tk}`].rsiSeries.push(rsi);
+      if (strapi.rollingData[`${tk}`].rsiSeries.length > 10) strapi.rollingData[`${tk}`].rsiSeries.shift();
+      return strapi.rollingData[`${tk}`].rsiSeries.length === 10 && strapi.rollingData[`${tk}`].rsiSeries.every(value => value >= 42 && value <= 58);
+    }
+    //---------------------------------------------------------------------------------------------------------------------
+
+    //Factors & thresholds for Sideways market detection
+    const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 21), 10);
+    const percentageThreshold1 = 0.006; // 0.6% (Immediate Sideways)
+    const percentageThreshold2 = 0.012; // 1.2% (Check BBW)
+    const bbwThreshold1 = 0.02; // < 2% → Confirm sideways
+    const bbwThreshold2 = 0.035; // Between 2%-3.5% → Check RSI
+    const rsiThresholdLow = 42;
+    const rsiThresholdHigh = 58;
+
+    //Sideways detection logic starts here....
+    if (data.length < lookbackPeriod) return null; 
+
+    const prices = data.map(entry => parseFloat(entry.lp));
+    const currentHigh = Math.max(...prices);
+    const currentLow = Math.min(...prices);
+
+    //Calculate ATR, Maintain ATR Rolling Data for ATR MA calculation & Calculate ATR Moving Average (ATR MA) & RSI    
+    const atr = calculateATR(data, lookbackPeriod);       
+    updateRollingATR(tk, atr);    
+    const atrMA = calculateATRMA(tk);    
+    const rsi = calculateRSI(prices, lookbackPeriod);
+
+    // **Step 1: High-Low Percentage Change**
+    const percentageChange = ((currentHigh - currentLow) / currentLow) * 100;
+    if (percentageChange < percentageThreshold1) {
+        console.info(`✅ Step 1: High-Low % (${percentageChange.toFixed(2)}) < 0.6% → Sideways Market Confirmed`);
+        return true;
+    }
+    if (percentageChange > percentageThreshold2) {
+        console.info(`❌ Step 1: High-Low % (${percentageChange.toFixed(2)}) > 1.2% → NOT Sideways`);
+        return false;
     }
 
+    // **Step 2: Bollinger Band Width (BBW)**
+    const bbw = calculateBBW(prices, lookbackPeriod);
+
+    if (bbw < bbwThreshold1) {
+        console.info(`✅ Step 2: PC (${percentageChange.toFixed(2)}) but BBW (${bbw.toFixed(2)}) < 2% → Sideways Market Confirmed`);
+        return true;
+    }
+    if (bbw > bbwThreshold2) {
+        console.info(`❌ Step 2: PC (${percentageChange.toFixed(2)}) but BBW (${bbw.toFixed(2)}) > 3.5% → NOT Sideways`);
+        return false;
+    }
+
+    // **Step 3: RSI Check**
     if (rsi >= rsiThresholdLow && rsi <= rsiThresholdHigh && checkRSIStability(tk, rsi)) {
-        console.info(`✅ Step 3: RSI (${rsi.toFixed(2)}) in range 42-58 for 10+ ticks → Sideways Market Confirmed`);
+        console.info(`✅ Step 3: PC (${percentageChange.toFixed(2)}) BBW (${bbw.toFixed(2)}) but RSI (${rsi.toFixed(2)}) in range 42-58 for 10+ ticks → Sideways Market Confirmed`);
         return true;
     }
     if (rsi < 40 || rsi > 60) {
-        console.info(`❌ Step 3: RSI (${rsi.toFixed(2)}) outside 40-60 range → NOT Sideways`);
+        console.info(`❌ Step 3: PC (${percentageChange.toFixed(2)}) BBW (${bbw.toFixed(2)}) but RSI (${rsi.toFixed(2)}) outside 40-60 range → NOT Sideways`);
         return false;
     }
 
     // **Step 4: ATR vs ATR MA Check**
-    // Calculate ATR
-    function calculateATR(data, period) {
-      let trueRanges = [];
-      for (let i = 1; i < data.length; i++) {
-          let high = parseFloat(data[i].lp);
-          let low = parseFloat(data[i - 1].lp);
-          let previousClose = parseFloat(data[i - 1].lp);
-          trueRanges.push(Math.max(high - low, Math.abs(high - previousClose), Math.abs(low - previousClose)));
-      }
-      return trueRanges.slice(-period).reduce((sum, tr) => sum + tr, 0) / period;
-    }
-    const atr = calculateATR(data, lookbackPeriod);
-
-    // Maintain ATR Rolling Data for ATR MA calculation
-    function updateRollingATR(tk, atr) {
-      // if (!strapi.rollingData[`${tk}`]) strapi.rollingData[`${tk}`] = { atrValues: [] };
-      let atrValues = strapi.rollingData[`${tk}`].atrValues;
-      atrValues.push(atr);
-      if (atrValues.length > 10) atrValues.shift();
-    }
-    updateRollingATR(tk, atr);
-
-    // Calculate ATR Moving Average (ATR MA)
-    function calculateATRMA(tk) {
-      let atrValues = strapi.rollingData[`${tk}`].atrValues || [];
-      return atrValues.length >= 10 ? atrValues.reduce((sum, value) => sum + value, 0) / atrValues.length : Infinity;
-    }
-    const atrMA = calculateATRMA(tk);
-
-    // Check if ATR has been below ATR MA for 10+ ticks
-    function checkATRStability(tk) {
-      return strapi.rollingData[`${tk}`].atrValues.length === 10 && strapi.rollingData[`${tk}`].atrValues.every(value => value < calculateATRMA(tk));
-    }
-
     if (atr < atrMA && checkATRStability(tk)) {
-        console.info(`✅ Step 4: ATR (${atr.toFixed(4)}) < ATR MA (${atrMA.toFixed(4)}) for 10+ ticks → Sideways Market Confirmed`);
+        console.info(`✅ Step 4: PC (${percentageChange.toFixed(2)}) BBW (${bbw.toFixed(2)}) RSI (${rsi.toFixed(2)}) but ATR (${atr.toFixed(4)}) < ATR MA (${atrMA.toFixed(4)}) for 10+ ticks → Sideways Market Confirmed`);
         return true;
     }
 
-    console.info(`❌ Final Check: ATR (${atr.toFixed(4)}) > ATR MA (${atrMA.toFixed(4)}) → NOT Sideways`);
+    console.info(`❌ Final Check: PC (${percentageChange.toFixed(2)}) BBW (${bbw.toFixed(2)}) RSI (${rsi.toFixed(2)}) but ATR (${atr.toFixed(4)}) > ATR MA (${atrMA.toFixed(4)}) → NOT Sideways`);
     return false;
   },
 
