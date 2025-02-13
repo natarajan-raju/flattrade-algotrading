@@ -350,7 +350,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             } else {
               comparisonPrice = previousTradedPrice;
             }
-            strapi.log.info(`Token: ${tk} LP: ${lp} Comparison price: ${comparisonPrice.toFixed(4)} Previous LP: ${previousTradedPrice}`);
+            strapi.log.info(`Token: ${tk} LP: ${lp} Comparison price: ${parseFloat(comparisonPrice).toFixed(4)} Previous LP: ${previousTradedPrice}`);
             strapi.rollingData[`${tk}`].ticks.push(parseFloat(parseFloat(lp).toFixed(4)));
             if(strapi.rollingData[`${tk}`].ticks.length > 3){
               strapi.rollingData[`${tk}`].ticks.shift();          
