@@ -157,7 +157,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 
                 let profitThreshold = 4.10 * costPrice;            
                 let profitStage = strapi[`${index}`].get('profitStage') || 0;
-                let profitStageThreshold = Math.max(0.50 * profitStage,profitStage - 150);
+                let profitStageThreshold = Math.max(Math.floor((0.75 * profitStage) / 3.75) * 3.75, profitStage - 150);
                 if((profitStage === 0 && realizedPL >= 50) || (profitStage >=50 && realizedPL > profitStage)){
                   profitStage = Math.floor(realizedPL / 50) * 50;
                   strapi[`${index}`].set('profitStage', profitStage);
@@ -345,7 +345,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             
             
             let comparisonPrice;
-            if(strapi.rollingData[`${tk}`].ticks.length === 3){
+            if(strapi.rollingData[`${tk}`].ticks.length === 4){
               comparisonPrice = strapi.rollingData[`${tk}`].ticks.reduce((sum, tick) => sum + tick, 0) / strapi.rollingData[`${tk}`].ticks.length;
             } else {
               comparisonPrice = previousTradedPrice;
@@ -398,7 +398,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 strapi.log.info(`Reaching strategic position.Spectator mode turned off for index ${index}`);
               } else {
                 //LP in Passive zone. Do not take any action
-                strapi.log.info(`No actions taken for index ${index}. Comparison price: ${comparisonPrice} Previous Price: ${previousTradedPrice} LTP: ${lp}. Index in passive zone, InitialSpectatorMode: ${initialSpectatorMode}`);        
+                strapi.log.info(`No actions taken for index ${index}. Comparison price: ${parseFloat(comparisonPrice).toFixed(4)} Previous Price: ${previousTradedPrice} LTP: ${lp}. Index in passive zone, InitialSpectatorMode: ${initialSpectatorMode}`);        
                 previousTradedPrice = lp;
                 strapi[`${tk}`].set('previousTradedPrice', previousTradedPrice);  
                 strapi.webSocket.broadcast({ type: 'variable', message: `No actions taken for index ${index} at LTP ${lp}`, status: true});
@@ -420,7 +420,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   //Buy CALL
                   callOptionBought = true;
                   callBoughtAt = lp;
-                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${comparisonPrice}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp}. Application will attempt to buy CALL at LTP ${lp}`);
+                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp}. Application will attempt to buy CALL at LTP ${lp}`);
                   previousTradedPrice = lp;
                   awaitingOrderConfirmation = true;                  
                   strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
@@ -481,7 +481,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   //Buy PUT 
                   
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`, status: true});
-                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${comparisonPrice}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp} Application will attempt to buy PUT at LTP ${lp}`);
+                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp} Application will attempt to buy PUT at LTP ${lp}`);
                   contractType = 'PE';
                   putOptionBought = true;
                   putBoughtAt = lp;
@@ -556,7 +556,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   || ((lp >= support2 && callBoughtAt < support2) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(support2) + parseFloat(targetStep) && callBoughtAt < support1))) //Previously lp<= support2 at stop loss initial check
                 ){              
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell CALL at LTP ${lp}`, status: true});     
-                  console.log(`Reached Strategic Sell zone for ${index}. Comparison price ${comparisonPrice} Previous Traed Price ${previousTradedPrice} Application will attempt to sell CALL at LTP ${lp}`);
+                  console.log(`Reached Strategic Sell zone for ${index}. Comparison price ${parseFloat(comparisonPrice).toFixed(4)} Previous Traed Price ${previousTradedPrice} Application will attempt to sell CALL at LTP ${lp}`);
                   //call sell API
                   
                     contractType = 'CE';              
@@ -635,7 +635,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 ){                            
                   
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell PUT at LTP ${lp}`, status: true}); 
-                  console.log(`Reached Strategic Sell zone for ${index}.Comparison price ${comparisonPrice} Previous Traded Price ${previousTradedPrice} Application will attempt to sell PUT at LTP ${lp}`);
+                  console.log(`Reached Strategic Sell zone for ${index}.Comparison price ${parseFloat(comparisonPrice).toFixed(4)} Previous Traded Price ${previousTradedPrice} Application will attempt to sell PUT at LTP ${lp}`);
                   //PUT sell API 
                 
                     contractType = 'PE';             
@@ -943,18 +943,18 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       // if (!strapi.rollingData[`${tk}`]) strapi.rollingData[`${tk}`] = { atrValues: [] };
       // let atrValues = strapi.rollingData[`${tk}`].atrValues;
       strapi.rollingData[`${tk}`].atrValues.push(atr);
-      if (strapi.rollingData[`${tk}`].atrValues > 10) strapi.rollingData[`${tk}`].atrValues.shift();
+      if (strapi.rollingData[`${tk}`].atrValues > 15) strapi.rollingData[`${tk}`].atrValues.shift();
     }
 
     //Calculate ATR MA
     function calculateATRMA(tk) {
       // let atrValues = strapi.rollingData[`${tk}`].atrValues || [];
-      return strapi.rollingData[`${tk}`].atrValues.length >= 10 ? strapi.rollingData[`${tk}`].atrValues.reduce((sum, value) => sum + value, 0) / strapi.rollingData[`${tk}`].atrValues.length : Infinity;
+      return strapi.rollingData[`${tk}`].atrValues.length >= 15 ? strapi.rollingData[`${tk}`].atrValues.reduce((sum, value) => sum + value, 0) / strapi.rollingData[`${tk}`].atrValues.length : Infinity;
     }
 
     // Check if ATR has been below ATR MA for 10+ ticks
     function checkATRStability(tk) {
-      return strapi.rollingData[`${tk}`].atrValues.length === 10 && strapi.rollingData[`${tk}`].atrValues.every(value => value < calculateATRMA(tk));
+      return strapi.rollingData[`${tk}`].atrValues.length === 15 && strapi.rollingData[`${tk}`].atrValues.every(value => value < calculateATRMA(tk));
     }
 
     //Calculate RSI
@@ -995,18 +995,18 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       // let rsiSeries = strapi.rollingData[`${tk}`].rsiSeries;
       strapi.rollingData[`${tk}`].rsiSeries.push(rsi);
       if (strapi.rollingData[`${tk}`].rsiSeries.length > 10) strapi.rollingData[`${tk}`].rsiSeries.shift();
-      return strapi.rollingData[`${tk}`].rsiSeries.length === 10 && strapi.rollingData[`${tk}`].rsiSeries.every(value => value >= 42 && value <= 58);
+      return strapi.rollingData[`${tk}`].rsiSeries.length === 10 && strapi.rollingData[`${tk}`].rsiSeries.every(value => value >= 40 && value <=60);
     }
     //---------------------------------------------------------------------------------------------------------------------
 
     //Factors & thresholds for Sideways market detection
     const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 21), 10);
-    const percentageThreshold1 = 0.012; // 0.6% (Immediate Sideways)
-    const percentageThreshold2 = 0.024; // 1.2% (Check BBW)
-    const bbwThreshold1 = 0.02; // < 2% → Confirm sideways
-    const bbwThreshold2 = 0.035; // Between 2%-3.5% → Check RSI
-    const rsiThresholdLow = 42;
-    const rsiThresholdHigh = 58;
+    const percentageThreshold1 = 0.02; // 2% (Immediate Sideways)
+    const percentageThreshold2 = 0.04; // 4% (Check BBW)
+    const bbwThreshold1 = 0.025; // < 2.5% → Confirm sideways
+    const bbwThreshold2 = 0.040; // Between 2.5%-4% → Check RSI
+    const rsiThresholdLow = 40;
+    const rsiThresholdHigh = 60;
 
     //Sideways detection logic starts here....
     if (data.length < lookbackPeriod) return null; 
@@ -1024,43 +1024,43 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     // **Step 1: High-Low Percentage Change**
     const percentageChange = ((currentHigh - currentLow) / currentLow) * 100;
     if (percentageChange < percentageThreshold1) {
-        console.info(`✅ Step 1: High-Low % (${percentageChange.toFixed(4)}) < 1.2% → Sideways Market Confirmed`);
+        console.info(`✅ Stage 1: High-Low % (${percentageChange.toFixed(4)}) < ${percentageThreshold1}% → Sideways Market Confirmed`);
         return true;
     }
     if (percentageChange > percentageThreshold2) {
-        console.info(`❌ Step 1: High-Low % (${percentageChange.toFixed(4)}) > 2% → NOT Sideways`);
+        console.info(`❌ Stage 1: High-Low % (${percentageChange.toFixed(4)}) > $${percentageThreshold2}% → NOT Sideways`);
         return false;
     }
 
-    // **Step 2: Bollinger Band Width (BBW)**
+    // **Stage 2: Bollinger Band Width (BBW)**
     const bbw = calculateBBW(prices, lookbackPeriod);
 
     if (bbw < bbwThreshold1) {
-        console.info(`✅ Step 2: PC (${percentageChange.toFixed(2)}) but BBW (${bbw.toFixed(2)}) < 2% → Sideways Market Confirmed`);
+        console.info(`✅ Stage 2: PC (${percentageChange.toFixed(4)}) but BBW (${bbw.toFixed(4)}) < ${bbwThreshold1}% → Sideways Market Confirmed`);
         return true;
     }
     if (bbw > bbwThreshold2) {
-        console.info(`❌ Step 2: PC (${percentageChange.toFixed(2)}) but BBW (${bbw.toFixed(2)}) > 3.5% → NOT Sideways`);
+        console.info(`❌ Stage 2: PC (${percentageChange.toFixed(4)}) but BBW (${bbw.toFixed(4)}) > ${bbwThreshold2}% → NOT Sideways`);
         return false;
     }
 
-    // **Step 3: RSI Check**
+    // **Stage 3: RSI Check**
     if (rsi >= rsiThresholdLow && rsi <= rsiThresholdHigh && checkRSIStability(tk, rsi)) {
-        console.info(`✅ Step 3: PC (${percentageChange.toFixed(2)}) BBW (${bbw.toFixed(2)}) but RSI (${rsi.toFixed(2)}) in range 42-58 for 10+ ticks → Sideways Market Confirmed`);
+        console.info(`✅ Stage 3: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) Current RSI (${rsi.toFixed(4)}) and in range ${rsiThresholdLow}-${rsiThresholdHigh} for 10+ ticks → Sideways Market Confirmed`);
         return true;
     }
-    if (rsi < 40 || rsi > 60) {
-        console.info(`❌ Step 3: PC (${percentageChange.toFixed(2)}) BBW (${bbw.toFixed(2)}) but RSI (${rsi.toFixed(2)}) outside 40-60 range → NOT Sideways`);
+    if (rsi < rsiThresholdLow || rsi > rsiThresholdHigh) {
+        console.info(`❌ Stage 3: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) but RSI (${rsi.toFixed(2)}) outside 40-60 range → NOT Sideways`);
         return false;
     }
 
-    // **Step 4: ATR vs ATR MA Check**
+    // **Stage 4: ATR vs ATR MA Check**
     if (atr < atrMA && checkATRStability(tk)) {
-        console.info(`✅ Step 4: PC (${percentageChange.toFixed(2)}) BBW (${bbw.toFixed(2)}) RSI (${rsi.toFixed(2)}) but ATR (${atr.toFixed(4)}) < ATR MA (${atrMA.toFixed(4)}) for 10+ ticks → Sideways Market Confirmed`);
+        console.info(`✅ Stage 4: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) RSI (${rsi.toFixed(4)}) ATR (${atr.toFixed(4)}) ATR MA (${atrMA.toFixed(4)}) ATR Stability checked → Sideways Market Confirmed`);
         return true;
     }
 
-    console.info(`❌ Final Check: PC (${percentageChange.toFixed(2)}) BBW (${bbw.toFixed(2)}) RSI (${rsi.toFixed(2)}) but ATR (${atr.toFixed(4)}) > ATR MA (${atrMA.toFixed(4)}) → NOT Sideways`);
+    console.info(`❌ Final Check: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) RSI (${rsi.toFixed(4)}) ATR (${atr.toFixed(4)}) ATR MA (${atrMA.toFixed(4)}) ATR unstable → NOT Sideways`);
     return false;
   },
 
