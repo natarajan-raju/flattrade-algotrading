@@ -350,7 +350,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             } else {
               comparisonPrice = previousTradedPrice;
             }
-            strapi.log.info(`Token: ${tk} LP: ${lp} Comparison price: ${comparisonPrice} Previous LP: ${previousTradedPrice}`);
+            strapi.log.info(`Token: ${tk} LP: ${lp} Comparison price: ${comparisonPrice.toFixed(4)} Previous LP: ${previousTradedPrice}`);
             strapi.rollingData[`${tk}`].ticks.push(parseFloat(parseFloat(lp).toFixed(4)));
             if(strapi.rollingData[`${tk}`].ticks.length > 3){
               strapi.rollingData[`${tk}`].ticks.shift();          
@@ -1001,8 +1001,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
     //Factors & thresholds for Sideways market detection
     const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 21), 10);
-    const percentageThreshold1 = 0.006; // 0.6% (Immediate Sideways)
-    const percentageThreshold2 = 0.012; // 1.2% (Check BBW)
+    const percentageThreshold1 = 0.012; // 0.6% (Immediate Sideways)
+    const percentageThreshold2 = 0.024; // 1.2% (Check BBW)
     const bbwThreshold1 = 0.02; // < 2% → Confirm sideways
     const bbwThreshold2 = 0.035; // Between 2%-3.5% → Check RSI
     const rsiThresholdLow = 42;
@@ -1024,11 +1024,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     // **Step 1: High-Low Percentage Change**
     const percentageChange = ((currentHigh - currentLow) / currentLow) * 100;
     if (percentageChange < percentageThreshold1) {
-        console.info(`✅ Step 1: High-Low % (${percentageChange.toFixed(2)}) < 0.6% → Sideways Market Confirmed`);
+        console.info(`✅ Step 1: High-Low % (${percentageChange.toFixed(4)}) < 1.2% → Sideways Market Confirmed`);
         return true;
     }
     if (percentageChange > percentageThreshold2) {
-        console.info(`❌ Step 1: High-Low % (${percentageChange.toFixed(2)}) > 1.2% → NOT Sideways`);
+        console.info(`❌ Step 1: High-Low % (${percentageChange.toFixed(4)}) > 2% → NOT Sideways`);
         return false;
     }
 
