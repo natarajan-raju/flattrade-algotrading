@@ -398,6 +398,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             
             
             let comparisonPrice;
+            if(strapi.rollingData[`${tk}`].ticks.length > 4){
+              strapi.rollingData[`${tk}`].ticks.shift();          
+            }
+           
             if(strapi.rollingData[`${tk}`].ticks.length === 4){
               comparisonPrice = strapi.rollingData[`${tk}`].ticks.reduce((sum, tick) => sum + tick, 0) / strapi.rollingData[`${tk}`].ticks.length;
             } else {
@@ -405,9 +409,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             }
             strapi.log.info(`Token: ${tk} LP: ${lp} Comparison price: ${parseFloat(comparisonPrice).toFixed(4)} Previous LP: ${previousTradedPrice}`);
             strapi.rollingData[`${tk}`].ticks.push(parseFloat(parseFloat(lp).toFixed(4)));
-            if(strapi.rollingData[`${tk}`].ticks.length > 3){
-              strapi.rollingData[`${tk}`].ticks.shift();          
-            }
+           
             
             if (basePrice === 0 || resistance1 === 0 || resistance2 === 0 || support1 === 0 || support2 === 0){        
               return { message: `Investment variables not defined for ${index}`};
@@ -981,6 +983,42 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     
 
     //Helper Functions-------------------------------------------------------------------------------------------
+
+  
+    // Calculate ADX
+    function calculateADX(data, period) {
+        let dmPlus = 0, dmMinus = 0, trSum = 0;
+        let prevHigh = parseFloat(data[0].lp), prevLow = parseFloat(data[0].lp);
+
+        for (let i = 1; i < data.length; i++) {
+            let high = parseFloat(data[i].lp);
+            let low = parseFloat(data[i].lp);
+
+            let upMove = high - prevHigh;
+            let downMove = prevLow - low;
+
+            dmPlus += (upMove > downMove && upMove > 0) ? upMove : 0;
+            dmMinus += (downMove > upMove && downMove > 0) ? downMove : 0;
+            trSum += Math.max(high - low, Math.abs(high - prevLow), Math.abs(low - prevHigh));
+
+            prevHigh = high;
+            prevLow = low;
+        }
+
+        let diPlus = (dmPlus / trSum) * 100;
+        let diMinus = (dmMinus / trSum) * 100;
+        let dx = Math.abs(diPlus - diMinus) / (diPlus + diMinus) * 100;
+
+        return dx;
+    }
+
+    // Calculate Donchian Channel Width (DCW)
+    function calculateDCW(prices, period) {
+        const highestHigh = Math.max(...prices.slice(-period));
+        const lowestLow = Math.min(...prices.slice(-period));
+        return ((highestHigh - lowestLow) / lowestLow) * 100;
+    }
+
     
     //Calculate ATR
     function calculateATR(data, period) {
@@ -999,18 +1037,18 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       // if (!strapi.rollingData[`${tk}`]) strapi.rollingData[`${tk}`] = { atrValues: [] };
       // let atrValues = strapi.rollingData[`${tk}`].atrValues;
       strapi.rollingData[`${tk}`].atrValues.push(atr);
-      if (strapi.rollingData[`${tk}`].atrValues > 15) strapi.rollingData[`${tk}`].atrValues.shift();
+      if (strapi.rollingData[`${tk}`].atrValues > 14) strapi.rollingData[`${tk}`].atrValues.shift();
     }
 
     //Calculate ATR MA
     function calculateATRMA(tk) {
       // let atrValues = strapi.rollingData[`${tk}`].atrValues || [];
-      return strapi.rollingData[`${tk}`].atrValues.length >= 15 ? strapi.rollingData[`${tk}`].atrValues.reduce((sum, value) => sum + value, 0) / strapi.rollingData[`${tk}`].atrValues.length : Infinity;
+      return strapi.rollingData[`${tk}`].atrValues.length >= 14 ? strapi.rollingData[`${tk}`].atrValues.reduce((sum, value) => sum + value, 0) / strapi.rollingData[`${tk}`].atrValues.length : Infinity;
     }
 
     // Check if ATR has been below ATR MA for 10+ ticks
     function checkATRStability(tk) {
-      return strapi.rollingData[`${tk}`].atrValues.length === 15 && strapi.rollingData[`${tk}`].atrValues.every(value => value < calculateATRMA(tk));
+      return strapi.rollingData[`${tk}`].atrValues.length === 14 && strapi.rollingData[`${tk}`].atrValues.every(value => value < calculateATRMA(tk));
     }
 
     //Calculate RSI
@@ -1051,7 +1089,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       // let rsiSeries = strapi.rollingData[`${tk}`].rsiSeries;
       strapi.rollingData[`${tk}`].rsiSeries.push(rsi);
       if (strapi.rollingData[`${tk}`].rsiSeries.length > 10) strapi.rollingData[`${tk}`].rsiSeries.shift();
-      return strapi.rollingData[`${tk}`].rsiSeries.length === 10 && strapi.rollingData[`${tk}`].rsiSeries.every(value => value >= 42 && value <=58);
+      return strapi.rollingData[`${tk}`].rsiSeries.length === 10 && strapi.rollingData[`${tk}`].rsiSeries.every(value => value >= 40 && value <=60);
     }
     //---------------------------------------------------------------------------------------------------------------------
 
@@ -1061,8 +1099,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const percentageThreshold2 = 0.04; // 4% (Check BBW)
     const bbwThreshold1 = 0.025; // < 2.5% → Confirm sideways
     const bbwThreshold2 = 0.040; // Between 2.5%-4% → Check RSI
-    const rsiThresholdLow = 42;
-    const rsiThresholdHigh = 58;
+    const rsiThresholdLow = 40;
+    const rsiThresholdHigh = 60;
+    const adxThreshold = 20;            // ADX < 20 → No strong trend
+    const dcwThreshold = 0.03;          // DCW < 3% → No breakout
 
     //Sideways detection logic starts here....
     if (data.length < lookbackPeriod) return null; 
@@ -1077,48 +1117,105 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const atrMA = calculateATRMA(tk);    
     const rsi = calculateRSI(prices, lookbackPeriod);
     strapi.rollingData[`${tk}`].currentRSI = rsi;
+    const bbw = calculateBBW(prices, lookbackPeriod);
+    const adx = calculateADX(data, lookbackPeriod);
+    const dcw = calculateDCW(prices, lookbackPeriod);
+
+    // // **Step 1: High-Low Percentage Change**
+    // const percentageChange = ((currentHigh - currentLow) / currentLow) * 100;
+    // console.log(`PC: ${percentageChange.toFixed(4)}, BBW: ${bbw.toFixed(4)}, ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, ADX: ${adx.toFixed(4)}, DCW: ${dcw.toFixed(4)}`);
+
+    // let isSideways = false; // Default to false, update only if ALL checks support sideways
+
+    // if (percentageChange < percentageThreshold1) {
+    //     console.info(`✅ High-Low % (${percentageChange.toFixed(4)}) < ${percentageThreshold1}% → Sideways Market Confirmed`);
+    //     isSideways = true;
+    // } else if (percentageChange > percentageThreshold2) {
+    //     console.info(`❌ High-Low % (${percentageChange.toFixed(4)}) > ${percentageThreshold2}% → NOT Sideways`);
+    //     return false; // Strong trend
+    // }
+
+    // // **Step 2: Bollinger Band Width (BBW)**
+    // if (bbw < bbwThreshold1) {
+    //     console.info(`✅ BBW (${bbw.toFixed(4)}) < ${bbwThreshold1}% → Sideways Market Confirmed`);
+    //     isSideways = true;
+    // } else if (bbw > bbwThreshold2) {
+    //     console.info(`❌ BBW (${bbw.toFixed(4)}) > ${bbwThreshold2}% → NOT Sideways`);
+    //     return false; // Strong trend
+    // }
+
+    // // **Step 3: ADX & DCW (Trend Strength Indicators)**
+    // if (dcw < dcwThreshold && adx < adxThreshold) {
+    //     console.info(`✅ DCW (${dcw.toFixed(4)}) < ${dcwThreshold}% AND ADX (${adx.toFixed(4)}) < ${adxThreshold}% → Sideways Market Confirmed`);
+    //     isSideways = true;
+    // } else if (adx > adxThreshold) {
+    //     console.info(`❌ ADX (${adx.toFixed(4)}) > ${adxThreshold}% → NOT Sideways`);
+    //     return false; // Strong trend
+    // }
+
+    // // **Step 4: ATR & RSI Confirmation**
+    // const atrStability = checkATRStability(tk);
+    // if (atr < atrMA && atrStability) {
+    //     console.info(`✅ ATR (${atr.toFixed(4)}) < ATR MA (${atrMA.toFixed(4)}) AND stable → Sideways Market Confirmed`);
+    //     isSideways = true;
+    // }
+
+    // const rsiStable = (rsi >= rsiThresholdLow && rsi <= rsiThresholdHigh && checkRSIStability(tk, rsi));
+    // if (rsiStable) {
+    //     console.info(`✅ RSI (${rsi.toFixed(4)}) in sideways range & stable → Sideways Market Confirmed`);
+    //     isSideways = true;
+    // }
+
+    // // **Final Decision**
+    // if (isSideways) {
+    //     console.info(`✅ Final Confirmation: Sideways Market`);
+    //     return true;
+    // } else {
+    //     console.info(`❌ Final Confirmation: NOT Sideways`);
+    //     return false;
+    // }
+
 
     // **Step 1: High-Low Percentage Change**
     const percentageChange = ((currentHigh - currentLow) / currentLow) * 100;
+    console.log(`PC: ${percentageChange.toFixed(4)}, BBW: ${bbw.toFixed(4)}, ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, ADX: ${adx.toFixed(4)}, DCW: ${dcw.toFixed(4)}`);
     if (percentageChange < percentageThreshold1) {
-        console.info(`✅ Stage 1: High-Low % (${percentageChange.toFixed(4)}) < ${percentageThreshold1}% → Sideways Market Confirmed`);
+        console.info(`✅ High-Low % (${percentageChange.toFixed(4)}) < ${percentageThreshold1}% → Sideways Market Confirmed`);
         return true;
     }
     if (percentageChange > percentageThreshold2) {
-        console.info(`❌ Stage 1: High-Low % (${percentageChange.toFixed(4)}) > $${percentageThreshold2}% → NOT Sideways`);
+        console.info(`❌ High-Low % (${percentageChange.toFixed(4)}) > $${percentageThreshold2}% → NOT Sideways`);
         return false;
     }
 
     // **Stage 2: Bollinger Band Width (BBW)**
-    const bbw = calculateBBW(prices, lookbackPeriod);
+    
 
     if (bbw < bbwThreshold1) {
-        console.info(`✅ Stage 2: PC (${percentageChange.toFixed(4)}) but BBW (${bbw.toFixed(4)}) < ${bbwThreshold1}% → Sideways Market Confirmed`);
+        console.info(`✅ BBW (${bbw.toFixed(4)}) < ${bbwThreshold1}% → Sideways Market Confirmed`);
         return true;
     }
     if (bbw > bbwThreshold2) {
-        console.info(`❌ Stage 2: PC (${percentageChange.toFixed(4)}) but BBW (${bbw.toFixed(4)}) > ${bbwThreshold2}% → NOT Sideways`);
+        console.info(`❌ BBW (${bbw.toFixed(4)}) > ${bbwThreshold2}% → NOT Sideways`);
         return false;
     }
 
-    // // **Stage 3: RSI Check**
-    // if (rsi >= rsiThresholdLow && rsi <= rsiThresholdHigh && checkRSIStability(tk, rsi)) {
-    //     console.info(`✅ Stage 3: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) Current RSI (${rsi.toFixed(4)}) and in range ${rsiThresholdLow}-${rsiThresholdHigh} for 10+ ticks → Sideways Market Confirmed`);
-    //     return true;
-    // }
-    // if (rsi < rsiThresholdLow || rsi > rsiThresholdHigh) {
-    //     console.info(`❌ Stage 3: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) but RSI (${rsi.toFixed(4)}) outside 40-60 range → NOT Sideways`);
-    //     return false;
-    // }
-
-    // **Stage 4: ATR vs ATR MA Check**
-    if (atr < atrMA && checkATRStability(tk)) {
-        console.info(`✅ Stage 4: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) ATR (${atr.toFixed(4)}) ATR MA (${atrMA.toFixed(4)}) ATR Stability checked → Sideways Market Confirmed`);
-        return true;
+    // **Stage 3: ADX Check**
+    if(dcw < dcwThreshold) {
+      console.info(`✅ DCW (${dcw.toFixed(4)}) < ${dcwThreshold}% → Sideways Market confirmed`);
+      return true;
     }
-
-    console.info(`❌ Final Check: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) ATR (${atr.toFixed(4)}) ATR MA (${atrMA.toFixed(4)}) ATR unstable → NOT Sideways`);
+    if(adx < adxThreshold) {
+      console.info(`✅ ADX (${adx.toFixed(4)}) < ${adxThreshold}% → Sideways Market Confirmed`);
+      return true;
+    }
+    if(atr < atrMA && (rsi >= rsiThresholdLow && rsi <= rsiThresholdHigh && checkATRStability(tk)) ){
+      console.info(`✅ Final analysis with ATR & RSI confirms a sideways market`);
+      return true;
+    }
+    console.info(`❌ NOT Sideways`);
     return false;
+    
   },
 
   //Cron function to stop market at 3.15pm daily
