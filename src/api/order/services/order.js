@@ -45,7 +45,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         do{            
             let preferredContract = await this.getPreferredContract(index,contractType,amount,avoid);
             if(preferredContract.token){
-                console.log(`Found a suitable contract ${preferredContract.tsym} with price INR ${preferredContract.lp}`);
+                console.log(`Found a suitable contract ${preferredContract.tsym} with price INR ${preferredContract.lp} & RSI ${strapi[`${preferredContract.token}`].get('currentRSI') || -1000}`);
                 const orderQuantity = quantity * preferredContract.ls;                
                 let orderStatus;
                 const norenordno = await this.placeOrderWithFlattrade('NFO',preferredContract.tsym,orderQuantity,'0','B','Order created from rajaapp.in');
