@@ -185,116 +185,117 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             //   tsym: "DUMMYNIFTY",
 
             // }
-            let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation') || false;
-            if(!awaitingOrderConfirmation){
+            // if(!awaitingOrderConfirmation){
               try{              
                 if(contractBought && contractBought.contractToken === tk){
-                  const currentValue = parseFloat(lp) * parseFloat(contractBought.quantity);
-                  const costPrice = parseFloat(contractBought.costPrice);
-                  const realizedPL = currentValue - costPrice;
-                  strapi.webSocket.broadcast({
-                    type: 'position',
-                    data: {
-                      tk,
-                      token: tk,
-                      lp,
-                      realizedPL
-                    },
-                    status: true
-                  });
-                  
-                  let profitThreshold = 4.10 * costPrice;            
-                  let profitStage = strapi[`${index}`].get('profitStage') || 0;
-                  let profitStageThreshold = Math.max(Math.floor((0.75 * profitStage) / 3.75) * 3.75, profitStage - 150);
-                  if((profitStage === 0 && realizedPL >= 50) || (profitStage >=50 && realizedPL > profitStage)){
-                    profitStage = Math.floor(realizedPL / 50) * 50;
-                    strapi[`${index}`].set('profitStage', profitStage);
-                  } else if( profitStage > 0 && realizedPL <= profitStageThreshold) {                  
-                    strapi[`${index}`].set('downwardProfitTrigger', true);
-                  }
-                                  
-                  const stopLossThreshold = parseFloat(contractBought.costPrice) * 0.9625;
-                  strapi[`${index}`].set('currentValue', currentValue);                
-                  strapi[`${index}`].set('stopLossThreshold', stopLossThreshold);
-                  strapi[`${index}`].set('profitThreshold', profitThreshold);
-                  const contractUpdate = {
-                    index,
-                    indexRSI: strapi.rollingData[`${contractBought.indexToken}`].currentRSI,
-                    // indexToken: contractBought.indexToken,
-                    contract: contractBought.tsym,
-                    contractRSI: strapi[`${tk}`].get('rsi'),
-                    quantity: contractBought.quantity,
-                    costPrice,
-                    currentValue,
-                    realizedPL,
-                    profitStage,
-                    realizedPLTrigger:profitStageThreshold,
-                    // profitThreshold,
-                    stopLossThreshold,
-                    downwardProfitTrigger: strapi[`${index}`].get('downwardProfitTrigger'),
-                    awaitingOrderConfirmation
-                  };                           
-                  //send a Strapi web broadcast to client regarding the contract bought's token lp
-                  // strapi.log.info(`${index} contract Cost Price: ${contractBought.costPrice} Current Value: ${parseFloat(lp) * parseFloat(contractBought.quantity)} Realized PL: ${realizedPL} Stop Loss sales will be triggered on or below ${stopLossThreshold}`);
-                  console.table(contractUpdate);
-                  
-                  // let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation');
-                  if(currentValue >= profitThreshold || currentValue <= stopLossThreshold || strapi[`${index}`].get('downwardProfitTrigger')){
-                    strapi[`${contractBought.indexToken}`].set('awaitingOrderConfirmation', true);
-                    let message;
-                    if(currentValue >= profitThreshold) message = `Sell triggered as current value ${currentValue} exceeded profit threshold ${profitThreshold}`;
-                    if(currentValue <= stopLossThreshold) message = `Sell triggered as current value ${currentValue} gone below stoploss threshold ${stopLossThreshold}`;
-                    if(strapi[`${index}`].get('downwardProfitTrigger')) message = `Sell triggered as current value ${currentValue} gone below profit stage ${profitStage}`;
-                    
-                    strapi.log.info(message);
-                    let indexToken = contractBought.indexToken;
-                    let lp = strapi.rollingData[`${indexToken}`].ticks[0];
-                    let quantity = contractBought.quantity;
-                    const orderStatus = await strapi.service('api::order.order').placeSellOrder({lp,index,indexToken,quantity}) || false;
-                    if(orderStatus.status === true || orderStatus.status === 'true'){
-                      let callOptionBought = false;
-                      let callBoughtAt = 0;
-                      let previousTradedPrice = 0;
-                      let putOptionBought = false;
-                      let putBoughtAt = 0;
-                      strapi[`${index}`].set('stopLossThreshold', 0);   
-                      strapi[`${index}`].set('profitThreshold', Infinity); 
-                      strapi[`${index}`].set('downwardProfitTrigger', false);                  
-                      // console.log('sell Order status true from variable service. Resetting awaitingOrderConfirmation to false');
-                      strapi[`${contractBought.indexToken}`].set('callOptionBought', false);
-                      strapi[`${contractBought.indexToken}`].set('callBoughtAt', 0);
-                      strapi[`${contractBought.indexToken}`].set('putOptionBought', false);
-                      strapi[`${contractBought.indexToken}`].set('putBoughtAt', 0);
-                      strapi[`${contractBought.indexToken}`].set('awaitingOrderConfirmation', false);
-                      strapi.db.query('api::variable.variable').update({
-                            where: {indexToken : `${contractBought.indexToken}`},
-                            data: {
-                              callOptionBought,                  
-                              previousTradedPrice,
-                              callBoughtAt,
-                              putBoughtAt,
-                              putOptionBought,
-                              awaitingOrderConfirmation: false,
-                      }
+                  let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation') || false;
+                  if(!awaitingOrderConfirmation){                 
+                    const currentValue = parseFloat(lp) * parseFloat(contractBought.quantity);
+                    const costPrice = parseFloat(contractBought.costPrice);
+                    const realizedPL = currentValue - costPrice;
+                    strapi.webSocket.broadcast({
+                      type: 'position',
+                      data: {
+                        tk,
+                        token: tk,
+                        lp,
+                        realizedPL
+                      },
+                      status: true
                     });
-                  }
-                  if(orderStatus.status === false || orderStatus.status === 'false'){
-                      // console.log('sell Order status false from variable service. Resetting awaitingOrderConfirmation to false');
-                          strapi[`${contractBought.indexToken}`].set('awaitingOrderConfirmation', false);                      
-                          strapi.db.query('api::variable.variable').update({
-                            where: {indexToken : `${contractBought.indexToken}`},
-                            data: {
-                              awaitingOrderConfirmation: false,
-                            }
-                          });                   
-                  }        
-                  }
-                          
+                    
+                    let profitThreshold = 4.10 * costPrice;            
+                    let profitStage = strapi[`${index}`].get('profitStage') || 0;
+                    let profitStageThreshold = Math.max(Math.floor((0.75 * profitStage) / 3.75) * 3.75, profitStage - 150);
+                    if((profitStage === 0 && realizedPL >= 50) || (profitStage >=50 && realizedPL > profitStage)){
+                      profitStage = Math.floor(realizedPL / 50) * 50;
+                      strapi[`${index}`].set('profitStage', profitStage);
+                    } else if( profitStage > 0 && realizedPL <= profitStageThreshold) {                  
+                      strapi[`${index}`].set('downwardProfitTrigger', true);
+                    }
+                                    
+                    const stopLossThreshold = parseFloat(contractBought.costPrice) * 0.9625;
+                    strapi[`${index}`].set('currentValue', currentValue);                
+                    strapi[`${index}`].set('stopLossThreshold', stopLossThreshold);
+                    strapi[`${index}`].set('profitThreshold', profitThreshold);
+                    const contractUpdate = {
+                      index,
+                      indexRSI: strapi.rollingData[`${contractBought.indexToken}`].currentRSI,
+                      // indexToken: contractBought.indexToken,
+                      contract: contractBought.tsym,
+                      contractRSI: strapi[`${tk}`].get('rsi'),
+                      quantity: contractBought.quantity,
+                      costPrice,
+                      currentValue,
+                      realizedPL,
+                      profitStage,
+                      realizedPLTrigger:profitStageThreshold,
+                      // profitThreshold,
+                      stopLossThreshold,
+                      downwardProfitTrigger: strapi[`${index}`].get('downwardProfitTrigger'),
+                      awaitingOrderConfirmation
+                    };                           
+                    //send a Strapi web broadcast to client regarding the contract bought's token lp
+                    // strapi.log.info(`${index} contract Cost Price: ${contractBought.costPrice} Current Value: ${parseFloat(lp) * parseFloat(contractBought.quantity)} Realized PL: ${realizedPL} Stop Loss sales will be triggered on or below ${stopLossThreshold}`);
+                    console.table(contractUpdate);
+                    
+                    // let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation');
+                    if(currentValue >= profitThreshold || currentValue <= stopLossThreshold || strapi[`${index}`].get('downwardProfitTrigger')){
+                      strapi[`${contractBought.indexToken}`].set('awaitingOrderConfirmation', true);
+                      let message;
+                      if(currentValue >= profitThreshold) message = `Sell triggered as current value ${currentValue} exceeded profit threshold ${profitThreshold}`;
+                      if(currentValue <= stopLossThreshold) message = `Sell triggered as current value ${currentValue} gone below stoploss threshold ${stopLossThreshold}`;
+                      if(strapi[`${index}`].get('downwardProfitTrigger')) message = `Sell triggered as current value ${currentValue} gone below profit stage ${profitStage}`;
+                      
+                      strapi.log.info(message);
+                      let indexToken = contractBought.indexToken;
+                      let lp = strapi.rollingData[`${indexToken}`].ticks[0];
+                      let quantity = contractBought.quantity;
+                      const orderStatus = await strapi.service('api::order.order').placeSellOrder({lp,index,indexToken,quantity}) || false;
+                      if(orderStatus.status === true || orderStatus.status === 'true'){
+                        let callOptionBought = false;
+                        let callBoughtAt = 0;
+                        let previousTradedPrice = 0;
+                        let putOptionBought = false;
+                        let putBoughtAt = 0;
+                        strapi[`${index}`].set('stopLossThreshold', 0);   
+                        strapi[`${index}`].set('profitThreshold', Infinity); 
+                        strapi[`${index}`].set('downwardProfitTrigger', false);                  
+                        // console.log('sell Order status true from variable service. Resetting awaitingOrderConfirmation to false');
+                        strapi[`${contractBought.indexToken}`].set('callOptionBought', false);
+                        strapi[`${contractBought.indexToken}`].set('callBoughtAt', 0);
+                        strapi[`${contractBought.indexToken}`].set('putOptionBought', false);
+                        strapi[`${contractBought.indexToken}`].set('putBoughtAt', 0);
+                        strapi[`${contractBought.indexToken}`].set('awaitingOrderConfirmation', false);
+                        strapi.db.query('api::variable.variable').update({
+                              where: {indexToken : `${contractBought.indexToken}`},
+                              data: {
+                                callOptionBought,                  
+                                previousTradedPrice,
+                                callBoughtAt,
+                                putBoughtAt,
+                                putOptionBought,
+                                awaitingOrderConfirmation: false,
+                        }
+                      });
+                      }
+                      if(orderStatus.status === false || orderStatus.status === 'false'){
+                          // console.log('sell Order status false from variable service. Resetting awaitingOrderConfirmation to false');
+                              strapi[`${contractBought.indexToken}`].set('awaitingOrderConfirmation', false);                      
+                              strapi.db.query('api::variable.variable').update({
+                                where: {indexToken : `${contractBought.indexToken}`},
+                                data: {
+                                  awaitingOrderConfirmation: false,
+                                }
+                              });                   
+                      }        
+                    }
+                  }                          
                 }
               }catch(error){
                 console.log(error);
               }
-            }              
+            // }              
           }
         return { message: 'NFO Price updation received' }; 
       }           
