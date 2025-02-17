@@ -185,7 +185,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             //   tsym: "DUMMYNIFTY",
 
             // }
-            let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation');
+            let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation') || false;
             if(!awaitingOrderConfirmation){
               try{              
                 if(contractBought && contractBought.contractToken === tk){
