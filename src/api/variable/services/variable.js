@@ -1101,23 +1101,23 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         return false;
     }
 
-    // **Stage 3: RSI Check**
-    if (rsi >= rsiThresholdLow && rsi <= rsiThresholdHigh && checkRSIStability(tk, rsi)) {
-        console.info(`✅ Stage 3: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) Current RSI (${rsi.toFixed(4)}) and in range ${rsiThresholdLow}-${rsiThresholdHigh} for 10+ ticks → Sideways Market Confirmed`);
-        return true;
-    }
-    if (rsi < rsiThresholdLow || rsi > rsiThresholdHigh) {
-        console.info(`❌ Stage 3: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) but RSI (${rsi.toFixed(4)}) outside 40-60 range → NOT Sideways`);
-        return false;
-    }
+    // // **Stage 3: RSI Check**
+    // if (rsi >= rsiThresholdLow && rsi <= rsiThresholdHigh && checkRSIStability(tk, rsi)) {
+    //     console.info(`✅ Stage 3: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) Current RSI (${rsi.toFixed(4)}) and in range ${rsiThresholdLow}-${rsiThresholdHigh} for 10+ ticks → Sideways Market Confirmed`);
+    //     return true;
+    // }
+    // if (rsi < rsiThresholdLow || rsi > rsiThresholdHigh) {
+    //     console.info(`❌ Stage 3: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) but RSI (${rsi.toFixed(4)}) outside 40-60 range → NOT Sideways`);
+    //     return false;
+    // }
 
     // **Stage 4: ATR vs ATR MA Check**
     if (atr < atrMA && checkATRStability(tk)) {
-        console.info(`✅ Stage 4: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) RSI (${rsi.toFixed(4)}) ATR (${atr.toFixed(4)}) ATR MA (${atrMA.toFixed(4)}) ATR Stability checked → Sideways Market Confirmed`);
+        console.info(`✅ Stage 4: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) ATR (${atr.toFixed(4)}) ATR MA (${atrMA.toFixed(4)}) ATR Stability checked → Sideways Market Confirmed`);
         return true;
     }
 
-    console.info(`❌ Final Check: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) RSI (${rsi.toFixed(4)}) ATR (${atr.toFixed(4)}) ATR MA (${atrMA.toFixed(4)}) ATR unstable → NOT Sideways`);
+    console.info(`❌ Final Check: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) ATR (${atr.toFixed(4)}) ATR MA (${atrMA.toFixed(4)}) ATR unstable → NOT Sideways`);
     return false;
   },
 
