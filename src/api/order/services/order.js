@@ -20,19 +20,52 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         
         const contracts = contractType === 'CE' ? contractTokens.ce : contractTokens.pe;
         
-        let preferredContract = {token: null, lp: Infinity, tsym: null, lotSize: null};
-        let smallestDifference = Infinity;
+        let preferredContract = {token: null, lp: Infinity, tsym: null, lotSize: null, rsi: 0};
+        // let smallestDifference = Infinity;
+        // contracts.forEach(contract => {
+        //     //Skip the contract if it matches the avoid token
+        //     if(contract.token === avoid) return;
+        //     if(contract.lp >= amount * 0.90 && strapi[`${contract.token}`].get('rsi') >= 30 && strapi[`${contract.token}`].get('rsi') <= 50 && contract.lp <= amount * 1.15){
+        //         if(preferredContract.rsi === 0) {
+        //             preferredContract = contract;
+        //         }else if((contractType === 'CE' && preferredContract.rsi < strapi[`${contract.token}`].get('rsi')) || contractType === 'PE' && preferredContract.rsi > strapi[`${contract.token}`].get('rsi') ) {
+        //             preferredContract = contract;
+        //         }               
+        //         // const difference = Math.abs(contract.lp - amount);
+        //         // if(difference < smallestDifference){
+        //         //     smallestDifference = difference;
+        //         //     preferredContract = contract;
+        //         // }
+        //     }       
+        // });
         contracts.forEach(contract => {
-            //Skip the contract if it matches the avoid token
-            if(contract.token === avoid) return;
-            if(contract.lp >= amount * 0.90 && strapi[`${contract.token}`].get('rsi') >= 30 && strapi[`${contract.token}`].get('rsi') <= 50 && contract.lp <= amount * 1.15){
-                const difference = Math.abs(contract.lp - amount);
-                if(difference < smallestDifference){
-                    smallestDifference = difference;
+            const contractRSI = strapi[`${contract.token}`].get('rsi');
+            const contractLP = contract.lp;
+        
+            // Skip contract if it matches the avoid token
+            if (contract.token === avoid) return;
+        
+            // Check if the contract meets RSI and LP conditions
+            const isValidRSI = contractRSI >= 30 && contractRSI <= 50;
+            const isValidLP = contractLP >= amount * 0.90 && contractLP <= amount * 1.15;
+        
+            if (isValidRSI && isValidLP) {
+                // If no preferred contract is selected yet, assign the current contract
+                if (!preferredContract || preferredContract.rsi === 0) {
                     preferredContract = contract;
+                    preferredContract.rsi = contractRSI;
+                } 
+                // Choose contract with RSI closer to 50 for CALL (CE) or closer to 30 for PUT (PE)
+                else if (
+                    (contractType === 'CE' && contractRSI > preferredContract.rsi) ||
+                    (contractType === 'PE' && contractRSI < preferredContract.rsi)
+                ) {
+                    preferredContract = contract;
+                    preferredContract.rsi = contractRSI;
                 }
-            }       
+            }
         });
+        
         return preferredContract;
     },
 
