@@ -11,7 +11,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
 
     async getPreferredContract(index,contractType,amount,avoid = null) {
         let contractTokens;
-        
+        let preferredRSI;
         if(strapi[`${index}`]?.get('contractTokens')){
             contractTokens = strapi[`${index}`].get('contractTokens');
         } else {
@@ -19,18 +19,19 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         }
         
         const contracts = contractType === 'CE' ? contractTokens.ce : contractTokens.pe;
+        
         let preferredContract = {token: null, lp: Infinity, tsym: null, lotSize: null};
         let smallestDifference = Infinity;
         contracts.forEach(contract => {
             //Skip the contract if it matches the avoid token
             if(contract.token === avoid) return;
-            if(contract.lp >= amount){
+            if(contract.lp >= amount * 0.90 && strapi[`${contract.token}`].get('rsi') >= 30 && strapi[`${contract.token}`].get('rsi') <= 50 && contract.lp <= amount * 1.15){
                 const difference = Math.abs(contract.lp - amount);
                 if(difference < smallestDifference){
                     smallestDifference = difference;
                     preferredContract = contract;
                 }
-            }
+            }       
         });
         return preferredContract;
     },
@@ -45,7 +46,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         do{            
             let preferredContract = await this.getPreferredContract(index,contractType,amount,avoid);
             if(preferredContract.token){
-                console.log(`Found a suitable contract ${preferredContract.tsym} with price INR ${preferredContract.lp} & RSI ${strapi[`${preferredContract.token}`].get('currentRSI') || -1000}`);
+                console.log(`Found a suitable contract ${preferredContract.tsym} with price INR ${preferredContract.lp} & RSI ${strapi[`${preferredContract.token}`].get('rsi') || -1000}`);
                 const orderQuantity = quantity * preferredContract.ls;                
                 let orderStatus;
                 const norenordno = await this.placeOrderWithFlattrade('NFO',preferredContract.tsym,orderQuantity,'0','B','Order created from rajaapp.in');

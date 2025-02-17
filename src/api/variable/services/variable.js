@@ -220,10 +220,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     strapi[`${index}`].set('profitThreshold', profitThreshold);
                     const contractUpdate = {
                       index,
-                      indexRSI: strapi.rollingData[`${contractBought.indexToken}`].currentRSI,
+                      indexRSI: parseFloat(parseFloat(strapi.rollingData[`${contractBought.indexToken}`].currentRSI).toFixed(4)),
                       // indexToken: contractBought.indexToken,
                       contract: contractBought.tsym,
-                      contractRSI: strapi[`${tk}`].get('rsi'),
+                      contractRSI: parseFloat(parseFloat(strapi[`${tk}`].get('rsi')).toFixed(4)),
                       quantity: contractBought.quantity,
                       costPrice,
                       currentValue,
@@ -474,12 +474,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   //Buy CALL
                   callOptionBought = true;
                   callBoughtAt = lp;
-                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp}. Application will attempt to buy CALL at LTP ${lp}`);
+                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp}. Application will attempt to buy CALL at Index RSI: ${strapi.rollingData[`${tk}`].currentRSI}`);
                   previousTradedPrice = lp;
                   awaitingOrderConfirmation = true;                  
                   strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
                  
-                  strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy CALL at LTP ${lp}`, status: true});
+                  strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy CALL at LTP ${lp} `, status: true});
                   contractType = 'CE';              
                   const orderStatus = await strapi.service('api::order.order').placeBuyOrder({contractType,lp,quantity,index,indexToken,amount});              
                   if(orderStatus.status === true || orderStatus.status === 'true'){
@@ -536,7 +536,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   //Buy PUT 
                   
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`, status: true});
-                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp} Application will attempt to buy PUT at LTP ${lp}`);
+                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp} Application will attempt to buy PUT at & Index RSI: ${strapi.rollingData[`${tk}`].currentRSI}`);
                   contractType = 'PE';
                   putOptionBought = true;
                   putBoughtAt = lp;
@@ -1107,7 +1107,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         return true;
     }
     if (rsi < rsiThresholdLow || rsi > rsiThresholdHigh) {
-        console.info(`❌ Stage 3: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) but RSI (${rsi.toFixed(2)}) outside 40-60 range → NOT Sideways`);
+        console.info(`❌ Stage 3: PC (${percentageChange.toFixed(4)}) BBW (${bbw.toFixed(4)}) but RSI (${rsi.toFixed(4)}) outside 40-60 range → NOT Sideways`);
         return false;
     }
 
