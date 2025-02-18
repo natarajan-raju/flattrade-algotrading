@@ -400,11 +400,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             
             
             let comparisonPrice;
-            if(strapi.rollingData[`${tk}`].ticks.length > 4){
+            if(strapi.rollingData[`${tk}`].ticks.length > 5){
               strapi.rollingData[`${tk}`].ticks.shift();          
             }
            
-            if(strapi.rollingData[`${tk}`].ticks.length === 4){
+            if(strapi.rollingData[`${tk}`].ticks.length > 1){
               comparisonPrice = strapi.rollingData[`${tk}`].ticks.reduce((sum, tick) => sum + tick, 0) / strapi.rollingData[`${tk}`].ticks.length;
             } else {
               comparisonPrice = previousTradedPrice;
