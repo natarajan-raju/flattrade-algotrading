@@ -206,15 +206,17 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     
                     let profitThreshold = 4.10 * costPrice;            
                     let profitStage = strapi[`${index}`].get('profitStage') || 0;
-                    let profitStageThreshold = Math.max(Math.floor((0.75 * profitStage) / 3.75) * 3.75, profitStage - 150);
-                    if((profitStage === 0 && realizedPL >= 50) || (profitStage >=50 && realizedPL > profitStage)){
-                      profitStage = Math.floor(realizedPL / 50) * 50;
+                    let roundedProfitStage = Math.floor(profitStage / 50) * 50;
+                    let profitStageThreshold = Math.max(Math.floor((0.75 * roundedProfitStage) / 3.75) * 3.75, roundedProfitStage - 150);
+                    if((profitStage === 0 && realizedPL >= 56.25) || (profitStage >=56.25 && realizedPL > profitStage)){
+                      profitStage = Math.floor(realizedPL / 56.25) * 56.25;
                       strapi[`${index}`].set('profitStage', profitStage);
                     } else if( profitStage > 0 && realizedPL <= profitStageThreshold) {                  
                       strapi[`${index}`].set('downwardProfitTrigger', true);
                     }
-                                    
-                    const stopLossThreshold = parseFloat(contractBought.costPrice) * 0.9625;
+                    roundedProfitStage = Math.floor(profitStage / 50) * 50; 
+                    profitStageThreshold = Math.max(Math.floor((0.75 * roundedProfitStage) / 3.75) * 3.75, roundedProfitStage - 150);                
+                    const stopLossThreshold = Math.max(parseFloat(parseFloat(contractBought.costPrice) - (Math.floor((parseFloat(contractBought.costPrice) * 0.01875) / 37.5) * 37.5)).toFixed(4),parseFloat(contractBought.costPrice) - 37.5);
                     strapi[`${index}`].set('currentValue', currentValue);                
                     strapi[`${index}`].set('stopLossThreshold', stopLossThreshold);
                     strapi[`${index}`].set('profitThreshold', profitThreshold);
@@ -471,7 +473,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   || (lp >= parseFloat(support1) + parseFloat(targetStep) && lp < basePrice - targetStep)
                   || (lp >= parseFloat(support2) + parseFloat(targetStep) && lp < support1 - targetStep))
                   && ( Math.max(comparisonPrice,previousTradedPrice) < lp)
-                  && (strapi.rollingData[`${tk}`].currentRSI >= 30 && strapi.rollingData[`${tk}`].currentRSI <= 40)
+                  && (strapi.rollingData[`${tk}`].currentRSI >= 31 && strapi.rollingData[`${tk}`].currentRSI <= 39)
                 ){                 
                   //Buy CALL
                   callOptionBought = true;
@@ -533,7 +535,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   || (lp <= resistance1 - targetStep && lp > parseFloat(basePrice) + parseFloat(targetStep))
                   || (lp <= resistance2 - targetStep && lp > parseFloat(resistance1) + parseFloat(targetStep)))
                   && (Math.min(comparisonPrice,previousTradedPrice) > lp)
-                  && (strapi.rollingData[`${tk}`].currentRSI >= 60 && strapi.rollingData[`${tk}`].currentRSI <= 70)
+                  && (strapi.rollingData[`${tk}`].currentRSI >= 61 && strapi.rollingData[`${tk}`].currentRSI <= 69)
                 ){             
                   //Buy PUT 
                   
