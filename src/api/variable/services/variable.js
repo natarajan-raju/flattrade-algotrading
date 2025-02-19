@@ -935,7 +935,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const bbwThreshold2 = 0.04; // Between 2%-4% → Check RSI
     const rsiThresholdLow = 42;
     const rsiThresholdHigh = 58;
-    const adxThreshold = 20;            // ADX < 20 → No strong trend
+    // const adxThreshold = 20;            // ADX < 20 → No strong trend
     const dcwThreshold = 0.03;          // DCW < 3% → No breakout
 
     //Sideways detection logic starts here....
