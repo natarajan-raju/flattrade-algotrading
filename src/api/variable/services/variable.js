@@ -929,9 +929,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
     //Factors & thresholds for Sideways market detection
     const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 21), 10);
-    const percentageThreshold1 = 0.0150; // 2% (Immediate Sideways)
+    const percentageThreshold1 = 0.02; // 2% (Immediate Sideways)
     const percentageThreshold2 = 0.04; // <3% (Check BBW)
-    const bbwThreshold1 = 0.025; // < 2% → Confirm sideways
+    const bbwThreshold1 = 0.02; // < 2% → Confirm sideways
     const bbwThreshold2 = 0.04; // Between 2%-4% → Check RSI
     const rsiThresholdLow = 42;
     const rsiThresholdHigh = 58;
