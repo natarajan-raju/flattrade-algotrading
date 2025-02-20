@@ -133,7 +133,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       //NFO Price update received. Update lp for contract token
       if(strapi[`${tk}`]){
           const { optt, index, prices } = Object.fromEntries(strapi[`${tk}`]);
-          const lookbackPeriod = 14;
+          const lookbackPeriod = 28;
           prices.push(lp);
           if(prices.length > lookbackPeriod) prices.shift();
           //Calculate RSI
@@ -157,8 +157,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             return 100 - (100 / (1 + rs));
           }
           
-          if(prices.length === lookbackPeriod){
-             const rsi = calculateRSI(prices, lookbackPeriod);
+          if(prices.length <= lookbackPeriod){
+             const rsi = calculateRSI(prices, prices.length);
             //  rsiSeries.push(rsi);
              strapi[`${tk}`].set('rsi', rsi);
              strapi[`${tk}`].set('prices', prices);
@@ -297,7 +297,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     } else {      
       try {
         // Parse the lookback period once
-        const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 21), 10);
+        const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 28), 10);
                
         // Sideways market detection strategy
         if (!strapi.rollingData[`${tk}`]) {
@@ -309,6 +309,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             currentADX: 0,
             currentRSI: 0,
             pcValues: [],
+            bbwValues: [],
+            dcwValues: [],
+            adxValues: [],
             ticks: []                      
           };
         }
@@ -392,15 +395,21 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             } = indexItem;
 
 
-            
+            function calculateEMA(values, period) {
+              if (values.length < period) return null;
+              const k = 2 / (period + 1);
+              return values.reduce((prev, curr, i) => 
+                  i === 0 ? curr : (curr * k + prev * (1 - k))
+              );
+            }
             
             let comparisonPrice;
-            if(strapi.rollingData[`${tk}`].ticks.length > 5){
+            if(strapi.rollingData[`${tk}`].ticks.length > 7){
               strapi.rollingData[`${tk}`].ticks.shift();          
             }
            
             if(strapi.rollingData[`${tk}`].ticks.length > 1){
-              comparisonPrice = strapi.rollingData[`${tk}`].ticks.reduce((sum, tick) => sum + tick, 0) / strapi.rollingData[`${tk}`].ticks.length;
+              comparisonPrice = calculateEMA(strapi.rollingData[`${tk}`].ticks, strapi.rollingData[`${tk}`].ticks.length );
             } else {
               comparisonPrice = previousTradedPrice;
             }
@@ -588,22 +597,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               
               //Sell CALL
               if(callOptionBought){
-                // let stopLossTriggered;
-                // if(strapi[`${index}`].get('currentValue') <= strapi[`${index}`].get('stopLossThreshold')){
-                //   stopLossTriggered = true;
-                // } else {
-                //   stopLossTriggered = false;
-                // }
-
-                // let takeProfitTriggered;
-                // if((strapi[`${index}`].get('currentValue') >= strapi[`${index}`].get('profitThreshold')) || strapi[`${index}`].get('downwardProfitTrigger')){
-                //   takeProfitTriggered = true;
-                // } else {
-                //   takeProfitTriggered = false;
-                // }
+                
                 if(
-                  // takeProfitTriggered
-                  // ||stopLossTriggered ||
+                  
                   ((lp >= basePrice && (callBoughtAt >= parseFloat(support1) + parseFloat(targetStep) && callBoughtAt < basePrice)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(basePrice) + parseFloat(targetStep) && callBoughtAt < resistance1))) //Previously lp<= basePrice at stop loss initial check
                   || ((lp >= resistance1 && (callBoughtAt >= parseFloat(basePrice) + parseFloat(targetStep) && callBoughtAt < resistance1)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(resistance1) + parseFloat(targetStep) && callBoughtAt < resistance2))) //Previously lp<= resistance1 at stop loss initial check
                   || ((lp >= support1 && (callBoughtAt >= parseFloat(support2) + parseFloat(targetStep) && callBoughtAt < support1)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(support1) + parseFloat(targetStep) && callBoughtAt < basePrice))) //Previously lp<= support1 at stop loss initial check
@@ -761,6 +757,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         currentRSI: 0,
         currentADX: 0,
         pcValues: [],
+        bbwValues: [],
+        dcwValues: [],
+        adxValues: [],
         ticks: []                       
       };
       const defaultValues = {
@@ -875,11 +874,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     }
 
     //Update ATR
-    function updateRollingATR(tk, atr) {
+    function updateRollingATR(tk, atr, period) {
       // if (!strapi.rollingData[`${tk}`]) strapi.rollingData[`${tk}`] = { atrValues: [] };
       // let atrValues = strapi.rollingData[`${tk}`].atrValues;
       strapi.rollingData[`${tk}`].atrValues.push(atr);
-      if (strapi.rollingData[`${tk}`].atrValues > 14) strapi.rollingData[`${tk}`].atrValues.shift();
+      if (strapi.rollingData[`${tk}`].atrValues.length > period) strapi.rollingData[`${tk}`].atrValues.shift();
     }
 
     //Calculate ATR MA
@@ -889,7 +888,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     }
 
     // Check if ATR has been below ATR MA for 10+ ticks
-    function checkATRStability(tk) {
+    function checkATRStability(tk, period) {
       let atrMA = calculateATRMA(tk);
       return strapi.rollingData[`${tk}`].atrValues.length === 14 &&
              strapi.rollingData[`${tk}`].atrValues.every(value => value < atrMA * 1.05);
@@ -938,83 +937,89 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     //---------------------------------------------------------------------------------------------------------------------
 
     //Factors & thresholds for Sideways market detection
-    const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 21), 10);
+    const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 28), 10);
     const percentageThreshold1 = 0.02; // 2% (Immediate Sideways)
     const percentageThreshold2 = 0.04; // <3% (Check BBW)
-    const bbwThreshold1 = 0.02; // < 2% → Confirm sideways
+    const bbwThreshold1 = 0.025; // < 2% → Confirm sideways
     const bbwThreshold2 = 0.04; // Between 2%-4% → Check RSI
     const rsiThresholdLow = 42;
     const rsiThresholdHigh = 58;
-    // const adxThreshold = 20;            // ADX < 20 → No strong trend
+    const adxThreshold = 20;            // ADX < 20 → No strong trend
     const dcwThreshold = 0.03;          // DCW < 3% → No breakout
 
     //Sideways detection logic starts here....
-    if (data.length < lookbackPeriod) return null; 
+   
 
     const prices = data.map(entry => parseFloat(entry.lp));
     const currentHigh = Math.max(...prices);
     const currentLow = Math.min(...prices);
 
-    //Calculate ATR, Maintain ATR Rolling Data for ATR MA calculation & Calculate ATR Moving Average (ATR MA) & RSI    
-    const atr = calculateATR(data, lookbackPeriod);       
-    updateRollingATR(tk, atr);    
-    const atrMA = calculateATRMA(tk);    
-    const rsi = calculateRSI(prices, lookbackPeriod);
+    //Calculate ATR, Maintain ATR Rolling Data for ATR MA calculation & Calculate ATR Moving Average (ATR MA) & RSI 
+    // const atrPeriod = data.length >= 21? 21 : data.length ;  
+    const atr = calculateATR(data, data.length);       
+    updateRollingATR(tk, atr, data.length);    
+        
+    const rsi = calculateRSI(prices, prices.length);
     strapi.rollingData[`${tk}`].currentRSI = rsi;
-    const bbw = calculateBBW(prices, lookbackPeriod);
-    const adx = calculateADX(data, lookbackPeriod);
+    const bbw = calculateBBW(prices, prices.length);
+    const adx = calculateADX(data, data.length);
     strapi.rollingData[`${tk}`].currentADX = adx;
-    const dcw = calculateDCW(prices, lookbackPeriod);
+    const dcw = calculateDCW(prices, prices.length);   
+    const percentageChange = ((currentHigh - currentLow) / currentLow) * 100;
+    strapi.rollingData[`${tk}`].atrValues.push(atr);
+    strapi.rollingData[`${tk}`].pcValues.push(percentageChange);
+    strapi.rollingData[`${tk}`].bbwValues.push(bbw);
+    strapi.rollingData[`${tk}`].dcwValues.push(dcw);
+    strapi.rollingData[`${tk}`].adxValues.push(adx);
+    if(strapi.rollingData[`${tk}`].pcValues.length > lookbackPeriod ) strapi.rollingData[`${tk}`].pcValues.shift();
+    if(strapi.rollingData[`${tk}`].bbwValues.length > lookbackPeriod ) strapi.rollingData[`${tk}`].bbwValues.shift();
+    if(strapi.rollingData[`${tk}`].dcwValues.length > lookbackPeriod ) strapi.rollingData[`${tk}`].dcwValues.shift();
+    if(strapi.rollingData[`${tk}`].atrValues.length > lookbackPeriod - 7 ) strapi.rollingData[`tk`].atrValues.shift();
+    if(strapi.rollingData[`${tk}`].adxValues.length > lookbackPeriod - 7 ) strapi.rollingData[`tk`].adxValues.shift();
 
-
-
+    const adaptivePCThreshold = calculateEMA(strapi.rollingData[`${tk}`].pcValues, strapi.rollingData[`${tk}`].pcValues.length) * 0.8 || 2;
+    const bbwEma = calculateEMA(strapi.rollingData[`${tk}`].bbwValues, strapi.rollingData[`${tk}`].bbwValues.length );
+    const dcwEma = calculateEMA(strapi.rollingData[`${tk}`].dcwValues, strapi.rollingData[`${tk}`].dcwValues.length );
+    const atrMA = calculateEMA(strapi.rollingData[`${tk}`].atrValues, strapi.rollingData[`${tk}`].atrValues.length); 
+    const adxEma = calculateEMA(strapi.rollingData[`${tk}`].adxValues, strapi.rollingData[`${tk}`].adxValues.length);
+    
+    console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${adaptivePCThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)} BBW EMA: ${bbwEma.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, DCW: ${dcw.toFixed(4)} DCW EMA: ${dcwEma.toFixed(4)}`);
+    if (data.length < lookbackPeriod) return null; 
 
     // **Step 1: High-Low Percentage Change**
-    
-    
-    const percentageChange = ((currentHigh - currentLow) / currentLow) * 100;
-    strapi.rollingData[`${tk}`].pcValues.push(percentageChange);
-    if(strapi.rollingData[`${tk}`].pcValues.length > lookbackPeriod) strapi.rollingData[`${tk}`].pcValues.shift();
-    const adaptivePCThreshold = calculateEMA(strapi.rollingData[`${tk}`].pcValues, lookbackPeriod) * 0.8 || 2;
-    console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${adaptivePCThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)}, ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, ADX: ${adx.toFixed(4)}, DCW: ${dcw.toFixed(4)}`);
-    // if (percentageChange < percentageThreshold1) {
-    //     console.info(`✅ High-Low % (${percentageChange.toFixed(4)}) < ${percentageThreshold1}% → Sideways Market Confirmed`);
-    //     return true;
-    // }
-    // if (percentageChange > percentageThreshold2) {
-    //     console.info(`❌ High-Low % (${percentageChange.toFixed(4)}) > $${percentageThreshold2}% → NOT Sideways`);
-    //     return false;
-    // }
     if (percentageChange < adaptivePCThreshold) {
       console.info(`✅ PC (${percentageChange.toFixed(4)}) < Adaptive Threshold (${adaptivePCThreshold.toFixed(4)}) → Sideways Market Confirmed`);
       return true;
     }
 
-    // **Stage 2: Bollinger Band Width (BBW)**
-    
-
-    if (bbw < bbwThreshold1) {
-        console.info(`✅ BBW (${bbw.toFixed(4)}) < ${bbwThreshold1}% → Sideways Market Confirmed`);
-        return true;
-    }
-    if (bbw > bbwThreshold2) {
-        console.info(`❌ BBW (${bbw.toFixed(4)}) > ${bbwThreshold2}% → NOT Sideways`);
-        return false;
-    }
-
-    // **Stage 3: ADX Check**
-    if(dcw < dcwThreshold) {
-      console.info(`✅ DCW (${dcw.toFixed(4)}) < ${dcwThreshold}% → Sideways Market confirmed`);
+    // **Step 2: Donchian Channel Width (DCW)**
+    if (dcwEma < dcwThreshold) {
+      console.info(`✅ DCW EMA (${dcwEma.toFixed(4)}) < ${dcwThreshold}% → Sideways Market Confirmed`);
       return true;
     }
-    // if(adx < adxThreshold) {
-    //   console.info(`✅ ADX (${adx.toFixed(4)}) < ${adxThreshold}% → Sideways Market Confirmed`);
-    //   return true;
-    // }
-    if(atr < atrMA && (rsi >= rsiThresholdLow && rsi <= rsiThresholdHigh && checkATRStability(tk)) ){
+
+    // **Step 3: Bollinger Band Width (BBW)**
+    if (bbwEma < bbwThreshold1) {
+      console.info(`✅ BBW EMA (${bbwEma.toFixed(4)}) < ${bbwThreshold1}% → Sideways Market Confirmed`);
+      return true;
+    } 
+    if (bbwEma > bbwThreshold2) {
+      console.info(`❌ BBW EMA (${bbwEma.toFixed(4)}) > ${bbwThreshold2}% → NOT Sideways`);
+      return false;
+    }
+
+    // **Step 4: ADX Check**
+    if (adxEma < adxThreshold) {
+      console.info(`✅ ADX EMA (${adxEma.toFixed(4)}) < ${adxThreshold} → Sideways Market Confirmed`);
+      return true;
+    }
+
+    // **Step 5: ATR & RSI Final Confirmation**
+    if (atr < atrMA * 1.05 && (rsi >= rsiThresholdLow && rsi <= rsiThresholdHigh)) {
       console.info(`✅ Final analysis with ATR & RSI confirms a sideways market`);
       return true;
     }
+
     console.info(`❌ NOT Sideways`);
     return false;
     
@@ -1077,6 +1082,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             currentRSI: 0,
             currentADX: 0,
             pcValues: [],
+            bbwValues: [],
+            dcwValues: [],
+            adxValues: [],
             ticks: []                       
           };
         } 
@@ -1103,6 +1111,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         currentRSI: 0,
         currentADX: 0,
         pcValues: [],
+        bbwValues: [],
+        dcwValues: [],
+        adxValues: [],
         ticks: []                       
       };
       try{
@@ -1159,6 +1170,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       currentRSI: 0,
       currentADX: 0,
       pcValues: [],
+      bbwValues: [],
+      dcwValues: [],
+      adxValues: [],
       ticks: []                       
     };
     await strapi.service('api::authentication.authentication').fetchRequestToken();
