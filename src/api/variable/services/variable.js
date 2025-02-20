@@ -924,6 +924,14 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       return ((upperBand - lowerBand) / sma) * 100;
     }
 
+    //Calculate EMA
+    function calculateEMA(values, period) {
+      if (values.length < period) return null;
+      const k = 2 / (period + 1);
+      return values.reduce((prev, curr, i) => 
+          i === 0 ? curr : (curr * k + prev * (1 - k))
+      );
+    }
   
     //---------------------------------------------------------------------------------------------------------------------
 
@@ -960,15 +968,22 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
 
     // **Step 1: High-Low Percentage Change**
+    const adaptivePCThreshold = calculateEMA(prices, lookbackPeriod) * 0.8;
+
+
     const percentageChange = ((currentHigh - currentLow) / currentLow) * 100;
-    console.log(`PC: ${percentageChange.toFixed(4)}, BBW: ${bbw.toFixed(4)}, ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, ADX: ${adx.toFixed(4)}, DCW: ${dcw.toFixed(4)}`);
-    if (percentageChange < percentageThreshold1) {
-        console.info(`✅ High-Low % (${percentageChange.toFixed(4)}) < ${percentageThreshold1}% → Sideways Market Confirmed`);
-        return true;
-    }
-    if (percentageChange > percentageThreshold2) {
-        console.info(`❌ High-Low % (${percentageChange.toFixed(4)}) > $${percentageThreshold2}% → NOT Sideways`);
-        return false;
+    console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${adaptivePCThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)}, ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, ADX: ${adx.toFixed(4)}, DCW: ${dcw.toFixed(4)}`);
+    // if (percentageChange < percentageThreshold1) {
+    //     console.info(`✅ High-Low % (${percentageChange.toFixed(4)}) < ${percentageThreshold1}% → Sideways Market Confirmed`);
+    //     return true;
+    // }
+    // if (percentageChange > percentageThreshold2) {
+    //     console.info(`❌ High-Low % (${percentageChange.toFixed(4)}) > $${percentageThreshold2}% → NOT Sideways`);
+    //     return false;
+    // }
+    if (percentageChange < adaptivePCThreshold) {
+      console.info(`✅ PC (${percentageChange.toFixed(4)}) < Adaptive Threshold (${adaptivePCThreshold.toFixed(4)}) → Sideways Market Confirmed`);
+      return true;
     }
 
     // **Stage 2: Bollinger Band Width (BBW)**
