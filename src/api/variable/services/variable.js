@@ -308,6 +308,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             // rsiSeries: [],
             currentADX: 0,
             currentRSI: 0,
+            pcValues: [],
             ticks: []                      
           };
         }
@@ -759,6 +760,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         // rsiSeries: [],
         currentRSI: 0,
         currentADX: 0,
+        pcValues: [],
         ticks: []                       
       };
       const defaultValues = {
@@ -968,10 +970,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
 
     // **Step 1: High-Low Percentage Change**
-    const adaptivePCThreshold = calculateEMA(prices, lookbackPeriod) * 0.8;
-
-
+    
+    
     const percentageChange = ((currentHigh - currentLow) / currentLow) * 100;
+    strapi.rollingData[`${tk}`].pcValues.push(percentageChange);
+    if(strapi.rollingData[`${tk}`].pcValues.length > lookbackPeriod) strapi.rollingData[`${tk}`].pcValues.shift();
+    const adaptivePCThreshold = calculateEMA(strapi.rollingData[`${tk}`].pcValues, lookbackPeriod) * 0.8 || 2;
     console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${adaptivePCThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)}, ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, ADX: ${adx.toFixed(4)}, DCW: ${dcw.toFixed(4)}`);
     // if (percentageChange < percentageThreshold1) {
     //     console.info(`✅ High-Low % (${percentageChange.toFixed(4)}) < ${percentageThreshold1}% → Sideways Market Confirmed`);
@@ -1072,6 +1076,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             // rsiSeries: [],
             currentRSI: 0,
             currentADX: 0,
+            pcValues: [],
             ticks: []                       
           };
         } 
@@ -1097,6 +1102,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         // rsiSeries: [],
         currentRSI: 0,
         currentADX: 0,
+        pcValues: [],
         ticks: []                       
       };
       try{
@@ -1152,6 +1158,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       // rsiSeries: [],
       currentRSI: 0,
       currentADX: 0,
+      pcValues: [],
       ticks: []                       
     };
     await strapi.service('api::authentication.authentication').fetchRequestToken();
