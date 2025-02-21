@@ -873,27 +873,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       return trueRanges.slice(-period).reduce((sum, tr) => sum + tr, 0) / period;
     }
 
-    //Update ATR
-    function updateRollingATR(tk, atr, period) {
-      // if (!strapi.rollingData[`${tk}`]) strapi.rollingData[`${tk}`] = { atrValues: [] };
-      // let atrValues = strapi.rollingData[`${tk}`].atrValues;
-      strapi.rollingData[`${tk}`].atrValues.push(atr);
-      if (strapi.rollingData[`${tk}`].atrValues.length > period) strapi.rollingData[`${tk}`].atrValues.shift();
-    }
+    
 
-    //Calculate ATR MA
-    function calculateATRMA(tk) {
-      // let atrValues = strapi.rollingData[`${tk}`].atrValues || [];
-      return strapi.rollingData[`${tk}`].atrValues.length >= 14 ? strapi.rollingData[`${tk}`].atrValues.reduce((sum, value) => sum + value, 0) / strapi.rollingData[`${tk}`].atrValues.length : Infinity;
-    }
-
-    // Check if ATR has been below ATR MA for 10+ ticks
-    function checkATRStability(tk, period) {
-      let atrMA = calculateATRMA(tk);
-      return strapi.rollingData[`${tk}`].atrValues.length === 14 &&
-             strapi.rollingData[`${tk}`].atrValues.every(value => value < atrMA * 1.05);
-    }
-    //Calculate RSI
+   
     function calculateRSI(prices, period) {
       let gains = [], losses = [];
       for (let i = 1; i < prices.length; i++) {
@@ -956,13 +938,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
     //Calculate ATR, Maintain ATR Rolling Data for ATR MA calculation & Calculate ATR Moving Average (ATR MA) & RSI 
     // const atrPeriod = data.length >= 21? 21 : data.length ;  
-    const atr = calculateATR(data, data.length);       
-    updateRollingATR(tk, atr, data.length);    
-        
-    const rsi = calculateRSI(prices, prices.length);
+    const atr = calculateATR(data, data.length);      
+    const rsi = calculateRSI(prices, prices.length) || 0;
     strapi.rollingData[`${tk}`].currentRSI = rsi;
     const bbw = calculateBBW(prices, prices.length);
-    const adx = calculateADX(data, data.length);
+    const adx = calculateADX(data, data.length) || 0;
     strapi.rollingData[`${tk}`].currentADX = adx;
     const dcw = calculateDCW(prices, prices.length);   
     const percentageChange = ((currentHigh - currentLow) / currentLow) * 100;
@@ -971,17 +951,18 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     strapi.rollingData[`${tk}`].bbwValues.push(bbw);
     strapi.rollingData[`${tk}`].dcwValues.push(dcw);
     strapi.rollingData[`${tk}`].adxValues.push(adx);
+    // console.table(strapi.rollingData[`${tk}`]);
     if(strapi.rollingData[`${tk}`].pcValues.length > lookbackPeriod ) strapi.rollingData[`${tk}`].pcValues.shift();
     if(strapi.rollingData[`${tk}`].bbwValues.length > lookbackPeriod ) strapi.rollingData[`${tk}`].bbwValues.shift();
     if(strapi.rollingData[`${tk}`].dcwValues.length > lookbackPeriod ) strapi.rollingData[`${tk}`].dcwValues.shift();
-    if(strapi.rollingData[`${tk}`].atrValues.length > lookbackPeriod - 7 ) strapi.rollingData[`tk`].atrValues.shift();
-    if(strapi.rollingData[`${tk}`].adxValues.length > lookbackPeriod - 7 ) strapi.rollingData[`tk`].adxValues.shift();
+    if(strapi.rollingData[`${tk}`].atrValues.length > lookbackPeriod - 7 ) strapi.rollingData[`${tk}`].atrValues.shift();
+    if(strapi.rollingData[`${tk}`].adxValues.length > lookbackPeriod - 7 ) strapi.rollingData[`${tk}`].adxValues.shift();
 
     const adaptivePCThreshold = calculateEMA(strapi.rollingData[`${tk}`].pcValues, strapi.rollingData[`${tk}`].pcValues.length) * 0.8 || 2;
     const bbwEma = calculateEMA(strapi.rollingData[`${tk}`].bbwValues, strapi.rollingData[`${tk}`].bbwValues.length );
     const dcwEma = calculateEMA(strapi.rollingData[`${tk}`].dcwValues, strapi.rollingData[`${tk}`].dcwValues.length );
     const atrMA = calculateEMA(strapi.rollingData[`${tk}`].atrValues, strapi.rollingData[`${tk}`].atrValues.length); 
-    const adxEma = calculateEMA(strapi.rollingData[`${tk}`].adxValues, strapi.rollingData[`${tk}`].adxValues.length);
+    const adxEma = calculateEMA(strapi.rollingData[`${tk}`].adxValues, strapi.rollingData[`${tk}`].adxValues.length) || 0;
     
     console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${adaptivePCThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)} BBW EMA: ${bbwEma.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, DCW: ${dcw.toFixed(4)} DCW EMA: ${dcwEma.toFixed(4)}`);
     if (data.length < lookbackPeriod) return null; 
