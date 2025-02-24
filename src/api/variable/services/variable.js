@@ -88,7 +88,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         strapi[`${option.token}`].set('ls', option.ls);
         strapi[`${option.token}`].set('index', index);
         strapi[`${option.token}`].set('rsi', 0);
-        // strapi[`${option.token}`].set('rsiSeries', []);
+        strapi[`${option.token}`].set('rsiSeries', []);
         strapi[`${option.token}`].set('prices', []);
         // contractTokens[`${option.token}`] = tokenData;
         
@@ -132,7 +132,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     if (!buySellTokens.has(tk)) {     
       //NFO Price update received. Update lp for contract token
       if(strapi[`${tk}`]){
-          const { optt, index, prices } = Object.fromEntries(strapi[`${tk}`]);
+          const { optt, index, prices, rsiSeries } = Object.fromEntries(strapi[`${tk}`]);
           const lookbackPeriod = 28;
           prices.push(lp);
           if(prices.length > lookbackPeriod) prices.shift();
@@ -156,17 +156,26 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             let rs = avgGain / avgLoss;
             return 100 - (100 / (1 + rs));
           }
+
+          //Calculate EMA
+          function calculateEMA(values, period) {
+            if (values.length < period) return null;
+            const k = 2 / (period + 1);
+            return values.reduce((prev, curr, i) => 
+                i === 0 ? curr : (curr * k + prev * (1 - k))
+            );
+          }
           
           if(prices.length <= lookbackPeriod){
-             const rsi = calculateRSI(prices, prices.length);
-            //  rsiSeries.push(rsi);
-             strapi[`${tk}`].set('rsi', rsi);
+             const rsi = calculateRSI(prices, prices.length) || 0;
+             rsiSeries.push(rsi);
+             const rsiEma = calculateEMA(rsiSeries, rsiSeries.length) || rsi;
+             strapi[`${tk}`].set('rsi', rsiEma);
              strapi[`${tk}`].set('prices', prices);
-            //  strapi[`${tk}`].set('rsiSeries', rsiSeries);
+             strapi[`${tk}`].set('rsiSeries', rsiSeries);
           }
           // if(prices.length > lookbackPeriod) prices.shift();
-
-          
+          if(strapi[`${tk}`].get('rsiSeries').length > lookbackPeriod) strapi[`${tk}`].get('rsiSeries').shift(); 
           
           if(strapi[`${index}`]){
             const contractTokens = strapi[`${index}`].get('contractTokens');
@@ -959,26 +968,32 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     if(strapi.rollingData[`${tk}`].atrValues.length > lookbackPeriod - 7 ) strapi.rollingData[`${tk}`].atrValues.shift();
     if(strapi.rollingData[`${tk}`].adxValues.length > lookbackPeriod - 7 ) strapi.rollingData[`${tk}`].adxValues.shift();
 
-    const adaptivePCThreshold = calculateEMA(strapi.rollingData[`${tk}`].pcValues, strapi.rollingData[`${tk}`].pcValues.length) || 2;
+    const adaptivePCThreshold = calculateEMA(strapi.rollingData[`${tk}`].pcValues, strapi.rollingData[`${tk}`].pcValues.length) * 0.80 || 2;
     const bbwEma = calculateEMA(strapi.rollingData[`${tk}`].bbwValues, strapi.rollingData[`${tk}`].bbwValues.length ) || bbw;
     const dcwEma = calculateEMA(strapi.rollingData[`${tk}`].dcwValues, strapi.rollingData[`${tk}`].dcwValues.length ) || dcw;
     const atrMA = calculateEMA(strapi.rollingData[`${tk}`].atrValues, strapi.rollingData[`${tk}`].atrValues.length) || atr; 
     const adxEma = calculateEMA(strapi.rollingData[`${tk}`].adxValues, strapi.rollingData[`${tk}`].adxValues.length) || adx;
     strapi.rollingData[`${tk}`].currentADX = adxEma > 0 ? adxEma : adx;
-    
-    console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${adaptivePCThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)} BBW EMA: ${bbwEma.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, DCW: ${dcw.toFixed(4)} DCW EMA: ${dcwEma.toFixed(4)}`);
+    let dynamicRsiHigh = rsiThresholdHigh - (atr / atrMA) * 5;
+    let dynamicRsiLow = rsiThresholdLow + (atr / atrMA) * 5;   
+    console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${adaptivePCThreshold.toFixed(4)}, DCW: ${dcw.toFixed(4)} DCW EMA: ${dcwEma.toFixed(4)} BBW: ${bbw.toFixed(4)} BBW EMA: ${bbwEma.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, Dynamic Low RSI: ${dynamicRsiLow.toFixed(4)}, Dynamic Low RSI: ${dynamicRsiLow.toFixed(4)} Dynamic High RSI: ${dynamicRsiHigh.toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, `);
     if (data.length < lookbackPeriod) return null; 
 
     // **Step 1: High-Low Percentage Change**
-    if (percentageChange < adaptivePCThreshold * 0.85) {
-      console.info(`✅ PC (${percentageChange.toFixed(4)}) is within adaptive range  ${adaptivePCThreshold.toFixed(4) * 0.90} ) → Sideways Market Confirmed`);
+    if (percentageChange < adaptivePCThreshold) {
+      console.info(`✅ PC (${percentageChange.toFixed(4)}) is within adaptive range  ${adaptivePCThreshold.toFixed(4)} ) → Sideways Market Confirmed`);
       return true;
     }
 
     // **Step 2: Donchian Channel Width (DCW) with BBW Cross-Check**
-    if (dcw < dcwEma * 0.90 && bbw < bbwEma * 0.95) {
-      console.info(`✅ DCW (${dcw.toFixed(4)}) < DCW EMA (${dcwEma.toFixed(4)}) & BBW (${bbw.toFixed(4)}) < BBW EMA (${bbwEma.toFixed(4)}) → Sideways Market Confirmed`);
+    if (dcwEma < dcwThreshold) {
+      console.info(`✅ DCW EMA (${dcwEma.toFixed(4)}) < DCW Threshold ${dcwThreshold.toFixed(4)} → Sideways Market Confirmed`);
       return true;
+    }
+
+    if(dcwEma > dcwThreshold * 1.65){
+      console.info(`❌ DCW EMA (${dcwEma.toFixed(4)}) > DCW Threshold ${dcwEma * 2} → NOT Sideways`);
+      return false;
     }
 
     // **Step 3: Bollinger Band Width (BBW) with Upper Bound Buffer**
@@ -998,10 +1013,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     }
 
     // **Step 5: ATR & RSI with Dynamic RSI Adjustment**
-    let dynamicRsiHigh = rsiThresholdHigh - (atr / atrMA) * 5;
-    let dynamicRsiLow = rsiThresholdLow + (atr / atrMA) * 5;
+    // let dynamicRsiHigh = rsiThresholdHigh - (atr / atrMA) * 5;
+    // let dynamicRsiLow = rsiThresholdLow + (atr / atrMA) * 5;
     if (atr < atrMA * 1.05 && (rsi >= dynamicRsiLow && rsi <= dynamicRsiHigh)) {
-      console.info(`✅ Final analysis with ATR & dynamic RSI confirms a sideways market`);
+      console.info(`✅ Final analysis with ATR (${atr.toFixed(4)}) < ATR MA x 1.05 times (${atrMA.toFixed(4)* 1.05}) & RSI (${rsi.toFixed(4)}) within dynamic RSI threshold (${dynamicRsiLow.toFixed(4)} - ${dynamicRsiHigh.toFixed(4)}) confirms a sideways market`);
       return true;
     }
 
@@ -1190,7 +1205,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           strapi[`${token}`].set('ls', ls);
           strapi[`${token}`].set('index', index);
           strapi[`${token}`].set('rsi', 0);
-          // strapi[`${token}`].set('rsiSeries', []);
+          strapi[`${token}`].set('rsiSeries', []);
           strapi[`${token}`].set('prices', []);
         });
         contractTokens.pe.forEach(contract => {
@@ -1201,7 +1216,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           strapi[`${token}`].set('ls', ls);
           strapi[`${token}`].set('index', index);
           strapi[`${token}`].set('rsi', 0);
-          // strapi[`${token}`].set('rsiSeries', []);
+          strapi[`${token}`].set('rsiSeries', []);
           strapi[`${token}`].set('prices', []);
         });
         

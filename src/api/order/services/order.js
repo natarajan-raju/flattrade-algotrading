@@ -39,7 +39,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         //     }       
         // });
         contracts.forEach(contract => {
-            const contractRSI = strapi[`${contract.token}`].get('rsi');
+            const contractRSI = strapi[`${contract.token}`].get('rsi') || 0;
             const contractLP = contract.lp;
         
             // Skip contract if it matches the avoid token
@@ -47,7 +47,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         
             // Check if the contract meets RSI and LP conditions
             const isValidRSI = contractRSI >= 30 && contractRSI <= 50;
-            const isValidLP = contractLP >= amount * 0.90 && contractLP <= amount * 1.15;
+            const isValidLP = contractLP >= amount * 0.85 && contractLP <= amount * 1.15;
         
             if (isValidRSI && isValidLP) {
                 // If no preferred contract is selected yet, assign the current contract
