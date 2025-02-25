@@ -2,6 +2,7 @@
 'use strict';
 
 const { env } = require('@strapi/utils');
+const { ExecutionContext } = require('styled-components');
 // @ts-ignore
 const { createCoreService } = require('@strapi/strapi').factories;
 
@@ -26,6 +27,21 @@ module.exports = createCoreService('api::authentication.authentication', ({ stra
         id: existingTokens[0]?.id || "",
       };    
   },
+
+  async clearAuthentications(){
+    const existingTokens = awaitstrapi.service('api::authentication.authentication').findMany();
+    const documentId = existingTokens[0].documentId;
+    strapi.db.query('api::authentication.authentication').update(
+      {
+        where: {documentId},
+        data: {
+          requestToken: '',
+        }
+      }
+    );
+    strapi.sessionToken = null;
+    console.log('Authentications cleared for the day....');
+  }
 
   // Other authentication-related service functions can go here
 
