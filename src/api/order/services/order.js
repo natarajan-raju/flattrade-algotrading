@@ -318,7 +318,8 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     if(orderStatus){
                         console.table(orderStatus);                        
                         const price = orderStatus.qty * orderStatus.avgprc;
-                        const realizedPL = price - contractBought.costPrice;  
+                        let realizedPL = price - contractBought.costPrice; 
+                        const costPrice = contractBought.costPrice; 
                         
                         if(orderStatus.status.toLowerCase() === 'complete'){
                             const contractBought = {                                    
@@ -342,8 +343,10 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             strapi[`${indexToken}`].set('callOptionBought', false);
                             strapi[`${indexToken}`].set('callBoughtAt', 0);
                             strapi[`${indexToken}`].set('putOptionBought', false);
-                            strapi[`${indexToken}`].set('putBoughtAt', 0); 
-                            let initialSpectatorMode = true; 
+                            strapi[`${indexToken}`].set('putBoughtAt', 0);
+                            let initialSpectatorMode;
+                            realizedPL > 0?  initialSpectatorMode = false : initialSpectatorMode = true;
+                            console.info(`Realized P/L is ${realizedPL}, hence setting initialSpectatorMode to ${initialSpectatorMode}`);
                             strapi[`${indexToken}`].set('initialSpectatorMode', initialSpectatorMode);        
                             strapi.db.query('api::variable.variable').update(
                                 { where: { indexToken },
@@ -356,8 +359,11 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                         initialSpectatorMode
                                     } 
                                 });
+                            
+                            
+                            
                             try{
-                                const createdOrder = await strapi.db.query('api::order.order').create({
+                                await strapi.db.query('api::order.order').create({
                                     data: {
                                         index,
                                         orderType: 'SELL',
@@ -376,6 +382,26 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                         realizedPL: `${realizedPL}`,                        
                                     }               
                                 });
+                                try{
+                                    const profitItem = strapi.db.query('api::profit.profit').findOne({ where: { indexToken } });
+                                    if(profitItem){
+                                        realizedPL = profitItem.realizedPL || 0 + realizedPL;
+                                        let invested = profitItem.invested || 0 + costPrice;
+                                        let sold = profitItem.sold || 0 + price;
+                                        let returnPercentage = (realizedPL / invested) * 100;
+                                        strapi.service('api::profit.profit').update({
+                                            where: { indexToken },
+                                            data: { 
+                                                realizedPL,
+                                                invested,
+                                                sold,
+                                                returnPercentage
+                                            }
+                                        });                               
+                                    }
+                                }catch(error){
+                                    console.log(`Some error in calculating profits: ${error}`);
+                                }
                                 // console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);                               
                             }catch(error){
                                 console.log(`Error in storing the order in database: ${error}`);

@@ -1,0 +1,46 @@
+{
+  "kind": "collectionType",
+  "collectionName": "profits",
+  "info": {
+    "singularName": "profit",
+    "pluralName": "profits",
+    "displayName": "profit",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "realizedPL": {
+      "type": "decimal"
+    },
+    "index": {
+      "type": "string"
+    },
+    "indexToken": {
+      "type": "string"
+    },
+    "totalPL": {
+      "type": "decimal"
+    },
+    "invested": {
+      "type": "decimal"
+    },
+    "sold": {
+      "type": "decimal"
+    },
+    "returnPercentage": {
+      "type": "decimal"
+    },
+    "totalInvested": {
+      "type": "decimal"
+    },
+    "totalSold": {
+      "type": "decimal"
+    },
+    "totalReturnPercentage": {
+      "type": "decimal"
+    }
+  }
+}

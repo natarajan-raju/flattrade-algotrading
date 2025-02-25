@@ -507,6 +507,44 @@ export interface ApiPositionPosition extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiProfitProfit extends Struct.CollectionTypeSchema {
+  collectionName: 'profits';
+  info: {
+    description: '';
+    displayName: 'profit';
+    pluralName: 'profits';
+    singularName: 'profit';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    index: Schema.Attribute.String;
+    indexToken: Schema.Attribute.String;
+    invested: Schema.Attribute.Decimal;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::profit.profit'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    realizedPL: Schema.Attribute.Decimal;
+    returnPercentage: Schema.Attribute.Decimal;
+    sold: Schema.Attribute.Decimal;
+    totalInvested: Schema.Attribute.Decimal;
+    totalPL: Schema.Attribute.Decimal;
+    totalReturnPercentage: Schema.Attribute.Decimal;
+    totalSold: Schema.Attribute.Decimal;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiPurgePurge extends Struct.CollectionTypeSchema {
   collectionName: 'purges';
   info: {
@@ -1141,6 +1179,7 @@ declare module '@strapi/strapi' {
       'api::contract.contract': ApiContractContract;
       'api::order.order': ApiOrderOrder;
       'api::position.position': ApiPositionPosition;
+      'api::profit.profit': ApiProfitProfit;
       'api::purge.purge': ApiPurgePurge;
       'api::variable.variable': ApiVariableVariable;
       'api::web-socket.web-socket': ApiWebSocketWebSocket;
