@@ -9,7 +9,7 @@ const { createCoreService } = require('@strapi/strapi').factories;
 
 module.exports = createCoreService('api::profit.profit',({ strapi }) => ({
     async calculateProfits(){
-        const profits = await strapi.service('api::profit.profit').findMany();
+        const profits = await strapi.db.query('api::profit.profit').findMany();
         for (const profit of profits){
             // const realizedPL = profit.realizedPL            
             profit.totalPL = profit.totalPL || 0 + profit.realizedPL || 0;

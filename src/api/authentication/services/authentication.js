@@ -29,7 +29,7 @@ module.exports = createCoreService('api::authentication.authentication', ({ stra
   },
 
   async clearAuthentications(){
-    const existingTokens = awaitstrapi.service('api::authentication.authentication').findMany();
+    const existingTokens = await strapi.db.query('api::authentication.authentication').findMany();
     const documentId = existingTokens[0].documentId;
     strapi.db.query('api::authentication.authentication').update(
       {

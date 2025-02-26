@@ -490,7 +490,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   // && (lp > comparisonPrice && (comparisonPrice > (resistance2 + parseFloat(targetStep)) || comparisonPrice > (resistance1 + parseFloat(targetStep)) || comparisonPrice > (basePrice + parseFloat(targetStep)) || comparisonPrice > (support1 + parseFloat(targetStep)) || comparisonPrice > (support2 + parseFloat(targetStep))))
                   && ((strapi.rollingData[`${tk}`].currentRSI >= 30 && strapi.rollingData[`${tk}`].currentRSI <= 70) || (strapi.rollingData[`${tk}`].currentRSI > 70 && strapi.rollingData[`${tk}`].currentADX > 30))
                 ){
-                  console.table(strapi.rollingData[`${tk}`]);                 
+                  // console.table(strapi.rollingData[`${tk}`]);                 
                   //Buy CALL
                   callOptionBought = true;
                   callBoughtAt = lp;
@@ -554,7 +554,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   && lp < comparisonPrice
                   && ((strapi.rollingData[`${tk}`].currentRSI >= 30 && strapi.rollingData[`${tk}`].currentRSI <= 70) || (strapi.rollingData[`${tk}`].currentRSI < 30 && strapi.rollingData[`${tk}`].currentADX > 30))
                 ){
-                  console.table(strapi.rollingData[`${tk}`]);              
+                  // console.table(strapi.rollingData[`${tk}`]);              
                   //Buy PUT                  
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`, status: true});
                   console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp} Application will attempt to buy PUT at & Index RSI: ${strapi.rollingData[`${tk}`].currentRSI}`);
