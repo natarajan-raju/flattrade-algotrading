@@ -986,8 +986,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     }
 
     // **Step 2: Donchian Channel Width (DCW) with BBW Cross-Check**
-    if (dcwEma < dcwThreshold) {
-      console.info(`✅ DCW EMA (${dcwEma.toFixed(4)}) < DCW Threshold ${dcwThreshold.toFixed(4)} → Sideways Market Confirmed`);
+    if (dcwEma < 3) {
+      console.info(`✅ DCW EMA (${dcwEma.toFixed(4)}) < DCW Threshold 0.03 → Sideways Market Confirmed`);
       return true;
     }
 
