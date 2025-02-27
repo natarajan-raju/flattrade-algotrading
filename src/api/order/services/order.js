@@ -345,7 +345,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             strapi[`${indexToken}`].set('putOptionBought', false);
                             strapi[`${indexToken}`].set('putBoughtAt', 0);
                             let initialSpectatorMode;
-                            realizedPL > 0?  initialSpectatorMode = false : initialSpectatorMode = true;
+                            realizedPL > costPrice * 1.04 ?  initialSpectatorMode = false : initialSpectatorMode = true;
                             console.info(`Realized P/L is ${realizedPL}, hence setting initialSpectatorMode to ${initialSpectatorMode}`);
                             strapi[`${indexToken}`].set('initialSpectatorMode', initialSpectatorMode);        
                             strapi.db.query('api::variable.variable').update(
