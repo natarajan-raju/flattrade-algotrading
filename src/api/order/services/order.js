@@ -39,6 +39,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         //     }       
         // });
         contracts.forEach(contract => {
+            console.table(contract);
             const contractRSI = strapi[`${contract.token}`].get('rsi') || 0;
             const contractLP = contract.lp;
         
@@ -47,7 +48,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         
             // Check if the contract meets RSI and LP conditions
             const isValidRSI = contractRSI >= 30 && contractRSI <= 50;
-            const isValidLP = contractLP >= amount * 0.85 && contractLP <= amount * 1.15;
+            const isValidLP = contractLP >= amount * 0.95 && contractLP <= amount * 1.15;
         
             if (isValidRSI && isValidLP) {
                 // If no preferred contract is selected yet, assign the current contract

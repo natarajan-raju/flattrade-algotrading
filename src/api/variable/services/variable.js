@@ -851,12 +851,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         return dx;
     }
 
-    // Calculate Donchian Channel Width (DCW)
-    function calculateDCW(prices, period) {
-        const highestHigh = Math.max(...prices.slice(-period));
-        const lowestLow = Math.min(...prices.slice(-period));
-        return ((highestHigh - lowestLow) / lowestLow) * 100;
-    }
+    // // Calculate Donchian Channel Width (DCW)
+    // function calculateDCW(prices, period) {
+    //     const highestHigh = Math.max(...prices.slice(-period));
+    //     const lowestLow = Math.min(...prices.slice(-period));
+    //     return ((highestHigh - lowestLow) / lowestLow) * 100;
+    // }
 
     
     //Calculate ATR
@@ -923,7 +923,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const rsiThresholdLow = 40;
     const rsiThresholdHigh = 60;
     const adxThreshold = 20;            // ADX < 20 → No strong trend
-    const dcwThreshold = 0.03;          // DCW < 3% → No breakout
+    // const dcwThreshold = 0.03;          // DCW < 3% → No breakout
 
     //Sideways detection logic starts here....
    
@@ -940,29 +940,29 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const bbw = calculateBBW(prices, prices.length);
     const adx = calculateADX(data, data.length) || 0;
     
-    const dcw = calculateDCW(prices, prices.length);   
+    // const dcw = calculateDCW(prices, prices.length);   
     const percentageChange = ((currentHigh - currentLow) / currentLow) * 100;
     strapi.rollingData[`${tk}`].atrValues.push(atr);
     strapi.rollingData[`${tk}`].pcValues.push(percentageChange);
     strapi.rollingData[`${tk}`].bbwValues.push(bbw);
-    strapi.rollingData[`${tk}`].dcwValues.push(dcw);
+    // strapi.rollingData[`${tk}`].dcwValues.push(dcw);
     strapi.rollingData[`${tk}`].adxValues.push(adx);
     // console.table(strapi.rollingData[`${tk}`]);
     if(strapi.rollingData[`${tk}`].pcValues.length > lookbackPeriod ) strapi.rollingData[`${tk}`].pcValues.shift();
     if(strapi.rollingData[`${tk}`].bbwValues.length > lookbackPeriod ) strapi.rollingData[`${tk}`].bbwValues.shift();
-    if(strapi.rollingData[`${tk}`].dcwValues.length > lookbackPeriod ) strapi.rollingData[`${tk}`].dcwValues.shift();
+    // if(strapi.rollingData[`${tk}`].dcwValues.length > lookbackPeriod ) strapi.rollingData[`${tk}`].dcwValues.shift();
     if(strapi.rollingData[`${tk}`].atrValues.length > lookbackPeriod - 7 ) strapi.rollingData[`${tk}`].atrValues.shift();
     if(strapi.rollingData[`${tk}`].adxValues.length > lookbackPeriod - 7 ) strapi.rollingData[`${tk}`].adxValues.shift();
 
     const adaptivePCThreshold = calculateEMA(strapi.rollingData[`${tk}`].pcValues, strapi.rollingData[`${tk}`].pcValues.length) * 0.80 || 2;
     const bbwEma = calculateEMA(strapi.rollingData[`${tk}`].bbwValues, strapi.rollingData[`${tk}`].bbwValues.length ) || bbw;
-    const dcwEma = calculateEMA(strapi.rollingData[`${tk}`].dcwValues, strapi.rollingData[`${tk}`].dcwValues.length ) || dcw;
+    // const dcwEma = calculateEMA(strapi.rollingData[`${tk}`].dcwValues, strapi.rollingData[`${tk}`].dcwValues.length ) || dcw;
     const atrMA = calculateEMA(strapi.rollingData[`${tk}`].atrValues, strapi.rollingData[`${tk}`].atrValues.length) || atr; 
     const adxEma = calculateEMA(strapi.rollingData[`${tk}`].adxValues, strapi.rollingData[`${tk}`].adxValues.length) || adx;
     strapi.rollingData[`${tk}`].currentADX = adxEma > 0 ? adxEma : adx;
     let dynamicRsiHigh = rsiThresholdHigh - (atr / atrMA) * 5;
     let dynamicRsiLow = rsiThresholdLow + (atr / atrMA) * 5;   
-    console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${adaptivePCThreshold.toFixed(4)}, DCW: ${dcw.toFixed(4)} DCW EMA: ${dcwEma.toFixed(4)} BBW: ${bbw.toFixed(4)} BBW EMA: ${bbwEma.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, Dynamic Low RSI: ${dynamicRsiLow.toFixed(4)}, Dynamic Low RSI: ${dynamicRsiLow.toFixed(4)} Dynamic High RSI: ${dynamicRsiHigh.toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, `);
+    console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${adaptivePCThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)} BBW EMA: ${bbwEma.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, Dynamic Low RSI: ${dynamicRsiLow.toFixed(4)}, Dynamic Low RSI: ${dynamicRsiLow.toFixed(4)} Dynamic High RSI: ${dynamicRsiHigh.toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, `);
     if (data.length < lookbackPeriod) return null; 
 
     // **Step 1: High-Low Percentage Change**
@@ -971,16 +971,16 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       return true;
     }
 
-    // **Step 2: Donchian Channel Width (DCW) with BBW Cross-Check**
-    if (parseFloat(dcwEma) < 3) {
-      console.info(`✅ DCW EMA (${dcwEma.toFixed(4)}) < DCW Threshold 0.03 → Sideways Market Confirmed`);
-      return true;
-    }
+    // // **Step 2: Donchian Channel Width (DCW) with BBW Cross-Check**
+    // if (parseFloat(dcwEma) < 3) {
+    //   console.info(`✅ DCW EMA (${dcwEma.toFixed(4)}) < DCW Threshold 0.03 → Sideways Market Confirmed`);
+    //   return true;
+    // }
 
-    if(parseFloat(dcwEma) > dcwThreshold * 1.65){
-      console.info(`❌ DCW EMA (${dcwEma.toFixed(4)}) > DCW Threshold ${dcwEma * 2} → NOT Sideways`);
-      return false;
-    }
+    // if(perce > dcwThreshold * 1.65){
+    //   console.info(`❌ DCW EMA (${dcwEma.toFixed(4)}) > DCW Threshold ${dcwEma * 2} → NOT Sideways`);
+    //   return false;
+    // }
 
     // **Step 3: Bollinger Band Width (BBW) with Upper Bound Buffer**
     if (parseFloat(bbwEma) < bbwThreshold1) {
