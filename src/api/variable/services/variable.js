@@ -954,7 +954,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     if(strapi.rollingData[`${tk}`].atrValues.length > lookbackPeriod - 7 ) strapi.rollingData[`${tk}`].atrValues.shift();
     if(strapi.rollingData[`${tk}`].adxValues.length > lookbackPeriod - 7 ) strapi.rollingData[`${tk}`].adxValues.shift();
 
-    const adaptivePCThreshold = calculateEMA(strapi.rollingData[`${tk}`].pcValues, strapi.rollingData[`${tk}`].pcValues.length) * 0.80 || 2;
+    const adaptivePCThreshold = calculateEMA(strapi.rollingData[`${tk}`].pcValues, strapi.rollingData[`${tk}`].pcValues.length) || 2;
     const bbwEma = calculateEMA(strapi.rollingData[`${tk}`].bbwValues, strapi.rollingData[`${tk}`].bbwValues.length ) || bbw;
     // const dcwEma = calculateEMA(strapi.rollingData[`${tk}`].dcwValues, strapi.rollingData[`${tk}`].dcwValues.length ) || dcw;
     const atrMA = calculateEMA(strapi.rollingData[`${tk}`].atrValues, strapi.rollingData[`${tk}`].atrValues.length) || atr; 
@@ -966,9 +966,13 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     if (data.length < lookbackPeriod) return null; 
 
     // **Step 1: High-Low Percentage Change**
-    if (percentageChange < adaptivePCThreshold) {
+    if (percentageChange < parseFloat(adaptivePCThreshold) * 0.80) {
       console.info(`✅ PC (${percentageChange.toFixed(4)}) is within adaptive range  ${adaptivePCThreshold.toFixed(4)} ) → Sideways Market Confirmed`);
       return true;
+    }
+
+    if(percentageChange > parseFloat(adaptivePCThreshold) * 1.65) {
+      console.info(`❌ Sudden spike in PC ${percentageChange.toFixed(4)} whereas moving average is ${adaptivePCThreshold.toFixed(4)} → Not a sideways`);  
     }
 
     // // **Step 2: Donchian Channel Width (DCW) with BBW Cross-Check**
