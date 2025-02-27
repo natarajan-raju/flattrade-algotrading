@@ -344,8 +344,9 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             strapi[`${indexToken}`].set('callBoughtAt', 0);
                             strapi[`${indexToken}`].set('putOptionBought', false);
                             strapi[`${indexToken}`].set('putBoughtAt', 0);
-                            let initialSpectatorMode;
-                            realizedPL > costPrice * 1.04 ?  initialSpectatorMode = false : initialSpectatorMode = true;
+                            let initialSpectatorMode = true;
+                            // realizedPL > costPrice * 1.04 ?  initialSpectatorMode = false : initialSpectatorMode = true;
+                            if(realizedPL > costPrice * 0.04) initialSpectatorMode = false;
                             console.info(`Realized P/L is ${realizedPL}, hence setting initialSpectatorMode to ${initialSpectatorMode}`);
                             strapi[`${indexToken}`].set('initialSpectatorMode', initialSpectatorMode);        
                             strapi.db.query('api::variable.variable').update(
@@ -382,26 +383,26 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                         realizedPL: `${realizedPL}`,                        
                                     }               
                                 });
-                                try{
-                                    const profitItem = strapi.db.query('api::profit.profit').findOne({ where: { indexToken } });
-                                    if(profitItem){
-                                        realizedPL = profitItem.realizedPL || 0 + realizedPL;
-                                        let invested = profitItem.invested || 0 + costPrice;
-                                        let sold = profitItem.sold || 0 + price;
-                                        let returnPercentage = (realizedPL / invested) * 100;
-                                        strapi.service('api::profit.profit').update({
-                                            where: { indexToken },
-                                            data: { 
-                                                realizedPL,
-                                                invested,
-                                                sold,
-                                                returnPercentage
-                                            }
-                                        });                               
-                                    }
-                                }catch(error){
-                                    console.log(`Some error in calculating profits: ${error}`);
-                                }
+                                // try{
+                                //     const profitItem = strapi.db.query('api::profit.profit').findOne({ where: { indexToken } });
+                                //     if(profitItem){
+                                //         realizedPL = profitItem.realizedPL || 0 + realizedPL;
+                                //         let invested = profitItem.invested || 0 + costPrice;
+                                //         let sold = profitItem.sold || 0 + price;
+                                //         let returnPercentage = (realizedPL / invested) * 100;
+                                //         strapi.service('api::profit.profit').update({
+                                //             where: { indexToken },
+                                //             data: { 
+                                //                 realizedPL,
+                                //                 invested,
+                                //                 sold,
+                                //                 returnPercentage
+                                //             }
+                                //         });                               
+                                //     }
+                                // }catch(error){
+                                //     console.log(`Some error in calculating profits: ${error}`);
+                                // }
                                 // console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);                               
                             }catch(error){
                                 console.log(`Error in storing the order in database: ${error}`);
