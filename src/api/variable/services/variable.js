@@ -986,28 +986,28 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     }
 
     // **Step 2: Donchian Channel Width (DCW) with BBW Cross-Check**
-    if (dcwEma < 3) {
+    if (parseFloat(dcwEma) < 3) {
       console.info(`✅ DCW EMA (${dcwEma.toFixed(4)}) < DCW Threshold 0.03 → Sideways Market Confirmed`);
       return true;
     }
 
-    if(dcwEma > dcwThreshold * 1.65){
+    if(parseFloat(dcwEma) > dcwThreshold * 1.65){
       console.info(`❌ DCW EMA (${dcwEma.toFixed(4)}) > DCW Threshold ${dcwEma * 2} → NOT Sideways`);
       return false;
     }
 
     // **Step 3: Bollinger Band Width (BBW) with Upper Bound Buffer**
-    if (bbwEma < bbwThreshold1) {
+    if (parseFloat(bbwEma) < bbwThreshold1) {
       console.info(`✅ BBW EMA (${bbwEma.toFixed(4)}) < ${bbwThreshold1}% → Sideways Market Confirmed`);
       return true;
     } 
-    if (bbwEma > bbwThreshold2 * 1.05) { // Added buffer
+    if (parseFloat(bbwEma) > bbwThreshold2 * 1.05) { // Added buffer
       console.info(`❌ BBW EMA (${bbwEma.toFixed(4)}) > ${bbwThreshold2 * 1.05}% → NOT Sideways`);
       return false;
     }
 
     // **Step 4: ADX Check**
-    if (adxEma < adxThreshold) {
+    if (parseFloat(adxEma) < adxThreshold) {
       console.info(`✅ ADX EMA (${adxEma.toFixed(4)}) < ${adxThreshold} → Sideways Market Confirmed`);
       return true;
     }
@@ -1015,7 +1015,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     // **Step 5: ATR & RSI with Dynamic RSI Adjustment**
     // let dynamicRsiHigh = rsiThresholdHigh - (atr / atrMA) * 5;
     // let dynamicRsiLow = rsiThresholdLow + (atr / atrMA) * 5;
-    if (atr < atrMA * 1.05 && (rsi >= dynamicRsiLow && rsi <= dynamicRsiHigh)) {
+    if (atr < parseFloat(atrMA) * 1.05 && (rsi >= dynamicRsiLow && rsi <= dynamicRsiHigh)) {
       console.info(`✅ Final analysis with ATR (${atr.toFixed(4)}) < ATR MA x 1.05 times (${atrMA.toFixed(4)* 1.05}) & RSI (${rsi.toFixed(4)}) within dynamic RSI threshold (${dynamicRsiLow.toFixed(4)} - ${dynamicRsiHigh.toFixed(4)}) confirms a sideways market`);
       return true;
     }
