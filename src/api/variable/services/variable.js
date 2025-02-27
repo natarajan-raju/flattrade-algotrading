@@ -378,7 +378,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           data: feedData,          
           status: true
       })
-      
+      console.log(feedData);
         
           const headers = {
               Authorization: `Bearer ${env('SPECIAL_TOKEN')}`, // Including the special token in the Authorization header
@@ -422,7 +422,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             } else {
               comparisonPrice = lp;
             }
-            strapi.log.info(`Token: ${tk} LP: ${lp} Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}`);
+            // strapi.log.info(`Token: ${tk} LP: ${lp} Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}`);
             strapi.rollingData[`${tk}`].ticks.push(parseFloat(parseFloat(lp).toFixed(4)));
            
             
@@ -451,11 +451,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           
             //Check if initialSpectatorMode is active
             if(initialSpectatorMode){
-              if((lp <= parseFloat(basePrice) + parseFloat(targetStep) && lp >= basePrice - targetStep)
-                || (lp <= parseFloat(resistance1) + parseFloat(targetStep) && lp >= resistance1 - targetStep)
-                || (lp <= parseFloat(resistance2) + parseFloat(targetStep) && lp >= resistance2 - targetStep)
-                || (lp <= parseFloat(support1) + parseFloat(targetStep) && lp >= support1 - targetStep)
-                || (lp <= parseFloat(support2) + parseFloat(targetStep) && lp >= support2 - targetStep)
+              if((parseFloat(comparisonPrice) <= parseFloat(basePrice) + parseFloat(targetStep) && parseFloat(comparisonPrice) >= parseFloat(basePrice) - parseFloat(targetStep))
+                || (parseFloat(comparisonPrice) <= parseFloat(resistance1) + parseFloat(targetStep) && parseFloat(comparisonPrice) >= parseFloat(resistance1) - parseFloat(targetStep))
+                || (parseFloat(comparisonPrice) <= parseFloat(resistance2) + parseFloat(targetStep) && parseFloat(comparisonPrice) >= parseFloat(resistance2) - parseFloat(targetStep))
+                || (parseFloat(comparisonPrice) <= parseFloat(support1) + parseFloat(targetStep) && parseFloat(comparisonPrice) >= parseFloat(support1) - parseFloat(targetStep))
+                || (parseFloat(comparisonPrice) <= parseFloat(support2) + parseFloat(targetStep) && parseFloat(comparisonPrice) >= parseFloat(support2) - parseFloat(targetStep))
               ){
                 //LP in investment hot zone. Turn off Spectator mode
                 initialSpectatorMode = false;
@@ -480,12 +480,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               let contractType;           
               //Buy CALL
               if(!callOptionBought && !putOptionBought && !initialSpectatorMode && !strapi.rollingData[`${tk}`].isSidewaysMarket){                
-                if(((comparisonPrice >= parseFloat(basePrice) + parseFloat(targetStep) && comparisonPrice < resistance1 - targetStep) 
-                  || (comparisonPrice >= parseFloat(resistance1) + parseFloat(targetStep) && comparisonPrice < resistance2 - targetStep)
-                  || (comparisonPrice>= parseFloat(resistance2) + parseFloat(targetStep))
-                  || (comparisonPrice >= parseFloat(support1) + parseFloat(targetStep) && comparisonPrice < basePrice - targetStep)
-                  || (comparisonPrice >= parseFloat(support2) + parseFloat(targetStep) && comparisonPrice < support1 - targetStep))
-                  && lp > comparisonPrice
+                if(((parseFloat(comparisonPrice) >= parseFloat(basePrice) + parseFloat(targetStep) && parseFloat(comparisonPrice) < parseFloat(resistance1) - parseFloat(targetStep)) 
+                  || (parseFloat(comparisonPrice) >= parseFloat(resistance1) + parseFloat(targetStep) && parseFloat(comparisonPrice) < parseFloat(resistance2) - parseFloat(targetStep))
+                  || (parseFloat(comparisonPrice)>= parseFloat(resistance2) + parseFloat(targetStep))
+                  || (parseFloat(comparisonPrice) >= parseFloat(support1) + parseFloat(targetStep) && parseFloat(comparisonPrice) < parseFloat(basePrice) - parseFloat(targetStep))
+                  || (parseFloat(comparisonPrice) >= parseFloat(support2) + parseFloat(targetStep) && parseFloat(comparisonPrice) < parseFloat(support1) - parseFloat(targetStep)))
+                  && parseFloat(lp) > parseFloat(comparisonPrice)
                   // && ( Math.max(comparisonPrice,previousTradedPrice) < lp)
                   // && (lp > comparisonPrice && (comparisonPrice > (resistance2 + parseFloat(targetStep)) || comparisonPrice > (resistance1 + parseFloat(targetStep)) || comparisonPrice > (basePrice + parseFloat(targetStep)) || comparisonPrice > (support1 + parseFloat(targetStep)) || comparisonPrice > (support2 + parseFloat(targetStep))))
                   && ((strapi.rollingData[`${tk}`].currentRSI >= 30 && strapi.rollingData[`${tk}`].currentRSI <= 70) || (strapi.rollingData[`${tk}`].currentRSI > 70 && strapi.rollingData[`${tk}`].currentADX > 30))
@@ -493,7 +493,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   // console.table(strapi.rollingData[`${tk}`]);                 
                   //Buy CALL
                   callOptionBought = true;
-                  callBoughtAt = lp;
+                  callBoughtAt = comparisonPrice;
                   console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp}. Application will attempt to buy CALL at Index RSI: ${strapi.rollingData[`${tk}`].currentRSI}`);
                   previousTradedPrice = lp;
                   awaitingOrderConfirmation = true;                  
@@ -545,13 +545,13 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   }                  
                   
                                      
-                } else if(((comparisonPrice <= basePrice - targetStep && comparisonPrice > parseFloat(support1) + parseFloat(targetStep)) 
-                  || (comparisonPrice <= support1 - targetStep && comparisonPrice > parseFloat(support2) + parseFloat(targetStep))
-                  || (comparisonPrice <= support2 - targetStep)
-                  || (comparisonPrice <= resistance1 - targetStep && comparisonPrice > parseFloat(basePrice) + parseFloat(targetStep))
-                  || (comparisonPrice <= resistance2 - targetStep && comparisonPrice > parseFloat(resistance1) + parseFloat(targetStep)))
+                } else if(((parseFloat(comparisonPrice) <= parseFloat(basePrice) - parseFloat(targetStep) && parseFloat(comparisonPrice) > parseFloat(support1) + parseFloat(targetStep)) 
+                  || (parseFloat(comparisonPrice) <= parseFloat(support1) - parseFloat(targetStep) && parseFloat(comparisonPrice) > parseFloat(support2) + parseFloat(targetStep))
+                  || (parseFloat(comparisonPrice) <= parseFloat(support2) - parseFloat(targetStep))
+                  || (parseFloat(comparisonPrice) <= parseFloat(resistance1) - parseFloat(targetStep) && parseFloat(comparisonPrice) > parseFloat(basePrice) + parseFloat(targetStep))
+                  || (parseFloat(comparisonPrice) <= parseFloat(resistance2) - parseFloat(targetStep) && parseFloat(comparisonPrice) > parseFloat(resistance1) + parseFloat(targetStep)))
                   // && (Math.min(comparisonPrice,previousTradedPrice) > lp)
-                  && lp < comparisonPrice
+                  && parseFloat(lp) < parseFloat(comparisonPrice)
                   && ((strapi.rollingData[`${tk}`].currentRSI >= 30 && strapi.rollingData[`${tk}`].currentRSI <= 70) || (strapi.rollingData[`${tk}`].currentRSI < 30 && strapi.rollingData[`${tk}`].currentADX > 30))
                 ){
                   // console.table(strapi.rollingData[`${tk}`]);              
@@ -560,7 +560,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp} Application will attempt to buy PUT at & Index RSI: ${strapi.rollingData[`${tk}`].currentRSI}`);
                   contractType = 'PE';
                   putOptionBought = true;
-                  putBoughtAt = lp;
+                  putBoughtAt = comparisonPrice;
                   previousTradedPrice = lp;
                   awaitingOrderConfirmation = true;
                   strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
@@ -612,11 +612,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 
                 if(
                   
-                  ((lp >= basePrice && (callBoughtAt >= parseFloat(support1) + parseFloat(targetStep) && callBoughtAt < basePrice)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(basePrice) + parseFloat(targetStep) && callBoughtAt < resistance1))) //Previously lp<= basePrice at stop loss initial check
-                  || ((lp >= resistance1 && (callBoughtAt >= parseFloat(basePrice) + parseFloat(targetStep) && callBoughtAt < resistance1)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(resistance1) + parseFloat(targetStep) && callBoughtAt < resistance2))) //Previously lp<= resistance1 at stop loss initial check
-                  || ((lp >= support1 && (callBoughtAt >= parseFloat(support2) + parseFloat(targetStep) && callBoughtAt < support1)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(support1) + parseFloat(targetStep) && callBoughtAt < basePrice))) //Previously lp<= support1 at stop loss initial check
-                  || ((lp >=resistance2 && (callBoughtAt >= parseFloat(resistance1) + parseFloat(targetStep) && callBoughtAt < resistance2)) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && callBoughtAt  >= parseFloat(resistance2) + parseFloat(targetStep))) //Previously lp<= resistance2 at stop loss initial check
-                  || ((lp >= support2 && callBoughtAt < support2) || ((lp <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (callBoughtAt >= parseFloat(support2) + parseFloat(targetStep) && callBoughtAt < support1))) //Previously lp<= support2 at stop loss initial check
+                  (   (parseFloat(comparisonPrice) >= parseFloat(basePrice)   && (parseFloat(callBoughtAt) >= parseFloat(support1)    + parseFloat(targetStep) && parseFloat(callBoughtAt) < parseFloat(basePrice)))   || ((parseFloat(comparisonPrice) <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (parseFloat(callBoughtAt) >= parseFloat(basePrice)   + parseFloat(targetStep) && parseFloat(callBoughtAt) < parseFloat(resistance1)))) //Previously comparisonPrice<= basePrice at stop loss initial check
+                  || ((parseFloat(comparisonPrice) >= parseFloat(resistance1) && (parseFloat(callBoughtAt) >= parseFloat(basePrice)   + parseFloat(targetStep) && parseFloat(callBoughtAt) < parseFloat(resistance1))) || ((parseFloat(comparisonPrice) <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (parseFloat(callBoughtAt) >= parseFloat(resistance1) + parseFloat(targetStep) && parseFloat(callBoughtAt) < parseFloat(resistance2)))) //Previously comparisonPrice<= resistance1 at stop loss initial check
+                  || ((parseFloat(comparisonPrice) >= parseFloat(support1)    && (parseFloat(callBoughtAt) >= parseFloat(support2)    + parseFloat(targetStep) && parseFloat(callBoughtAt) < parseFloat(support1)))    || ((parseFloat(comparisonPrice) <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (parseFloat(callBoughtAt) >= parseFloat(support1)    + parseFloat(targetStep) && parseFloat(callBoughtAt) < parseFloat(basePrice)))) //Previously comparisonPrice<= support1 at stop loss initial check
+                  || ((parseFloat(comparisonPrice) >= parseFloat(resistance2) && (parseFloat(callBoughtAt) >= parseFloat(resistance1) + parseFloat(targetStep) && parseFloat(callBoughtAt) < parseFloat(resistance2))) || ((parseFloat(comparisonPrice) <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (parseFloat(callBoughtAt) >= parseFloat(resistance2) + parseFloat(targetStep)))) //Previously comparisonPrice<= resistance2 at stop loss initial check
+                  || ((parseFloat(comparisonPrice) >= parseFloat(support2)    && parseFloat(callBoughtAt)   < parseFloat(support2))                                                                                    || ((parseFloat(comparisonPrice) <= parseFloat(callBoughtAt)-parseFloat(lossStep)) && (parseFloat(callBoughtAt) >= parseFloat(support2)    + parseFloat(targetStep) && parseFloat(callBoughtAt) < parseFloat(support1)))) //Previously comparisonPrice<= support2 at stop loss initial check
                 ){              
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell CALL at LTP ${lp}`, status: true});     
                   console.log(`Reached Strategic Sell zone for ${index}. Comparison price ${parseFloat(comparisonPrice).toFixed(4)} Previous Traed Price ${previousTradedPrice} Application will attempt to sell CALL at LTP ${lp}`);
@@ -672,29 +672,15 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           
               //Sell PUT
               if(putOptionBought){
-                // let stopLossTriggered;
-                // if(strapi[`${index}`].get('currentValue') <= strapi[`${index}`].get('stopLossThreshold')){
-                //   stopLossTriggered = true;
-                //   console.info(`Reached stop loss threshold for ${index}. Application will attempt to sell PUT at LTP ${lp}`);
-                // } else {
-                //   stopLossTriggered = false;
-                // }
-
-                // let takeProfitTriggered;
-                // if((strapi[`${index}`].get('currentValue') >= strapi[`${index}`].get('profitThreshold')) || strapi[`${index}`].get('downwardProfitTrigger')){
-                //   takeProfitTriggered = true;
-                //   console.info(`Reached take profit threshold for ${index}. Application will attempt to sell PUT at LTP ${lp}`);
-                // } else {
-                //   takeProfitTriggered = false;
-                // }
+                
                 if(
                   // takeProfitTriggered
                   // || stopLossTriggered ||
-                  ((lp <= basePrice && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)) || ((lp >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)))
-                  || ((lp <= support1 && (putBoughtAt <= basePrice - targetStep && putBoughtAt > support1)) || ((lp >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)))
-                  || ((lp <= resistance1 && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1)) || ((lp >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && (putBoughtAt <= resistance1 - targetStep && putBoughtAt > basePrice)))
-                  || ((lp <= support2 && (putBoughtAt <= support1 - targetStep && putBoughtAt > support2)) || ((lp >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && putBoughtAt <= support2 - targetStep))
-                  || ((lp <= resistance2 && putBoughtAt > resistance2) || ((lp >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && (putBoughtAt <= resistance2 - targetStep && putBoughtAt > resistance1))) //Stop loss at Resistance 2
+                  (   (parseFloat(comparisonPrice) <= parseFloat(basePrice)   && (parseFloat(putBoughtAt) <= parseFloat(resistance1) - parseFloat(targetStep) && parseFloat(putBoughtAt) > parseFloat(basePrice)))   || ((parseFloat(comparisonPrice) >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && (parseFloat(putBoughtAt) <= parseFloat(basePrice)   - parseFloat(targetStep) && parseFloat(putBoughtAt) > parseFloat(support1))))
+                  || ((parseFloat(comparisonPrice) <= parseFloat(support1)    && (parseFloat(putBoughtAt) <= parseFloat(basePrice)   - parseFloat(targetStep) && parseFloat(putBoughtAt) > parseFloat(support1)))    || ((parseFloat(comparisonPrice) >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && (parseFloat(putBoughtAt) <= parseFloat(support1)    - parseFloat(targetStep) && parseFloat(putBoughtAt) > parseFloat(support2))))
+                  || ((parseFloat(comparisonPrice) <= parseFloat(resistance1) && (parseFloat(putBoughtAt) <= parseFloat(resistance2) - parseFloat(targetStep) && parseFloat(putBoughtAt) > parseFloat(resistance1))) || ((parseFloat(comparisonPrice) >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && (parseFloat(putBoughtAt) <= parseFloat(resistance1) - parseFloat(targetStep) && parseFloat(putBoughtAt) > parseFloat(basePrice))))
+                  || ((parseFloat(comparisonPrice) <= parseFloat(support2)    && (parseFloat(putBoughtAt) <= parseFloat(support1)    - parseFloat(targetStep) && parseFloat(putBoughtAt) > parseFloat(support2)))    || ((parseFloat(comparisonPrice) >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && (parseFloat(putBoughtAt) <= parseFloat(support2)    - parseFloat(targetStep))))
+                  || ((parseFloat(comparisonPrice) <= parseFloat(resistance2) && (parseFloat(putBoughtAt)  > parseFloat(resistance2)))                                                                               || ((parseFloat(comparisonPrice) >= parseFloat(putBoughtAt) + parseFloat(lossStep)) && (parseFloat(putBoughtAt) <= parseFloat(resistance2) - parseFloat(targetStep) && parseFloat(putBoughtAt) > parseFloat(resistance1)))) //Stop loss at Resistance 2
                 ){                            
                   
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Sell zone for ${index}. Application will attempt to sell PUT at LTP ${lp}`, status: true}); 
