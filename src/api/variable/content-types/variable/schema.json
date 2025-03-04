@@ -86,6 +86,9 @@
     "lossStep": {
       "type": "integer",
       "default": 2
+    },
+    "eod": {
+      "type": "json"
     }
   }
 }

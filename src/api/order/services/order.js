@@ -11,7 +11,6 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
 
     async getPreferredContract(index,contractType,amount,avoid = null) {
         let contractTokens;
-        let preferredRSI;
         if(strapi[`${index}`]?.get('contractTokens')){
             contractTokens = strapi[`${index}`].get('contractTokens');
         } else {
@@ -21,6 +20,20 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         const contracts = contractType === 'CE' ? contractTokens.ce : contractTokens.pe;
         
         let preferredContract = {token: null, lp: Infinity, tsym: null, lotSize: null, rsi: 0};
+        let closestLP = Infinity;
+
+        contracts.forEach(contract => {
+            const contractLP = contract.lp;
+
+            // Skip contract if it matches the avoid token
+            if (contract.token === avoid) return;
+
+            // Ensure LP is equal to or greater than the amount and find the closest
+            if (contractLP >= amount && contractLP < closestLP) {
+                preferredContract = contract;
+                closestLP = contractLP;
+            }
+        });
         // let smallestDifference = Infinity;
         // contracts.forEach(contract => {
         //     //Skip the contract if it matches the avoid token
@@ -38,34 +51,35 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         //         // }
         //     }       
         // });
-        contracts.forEach(contract => {
-            console.table(contract);
-            const contractRSI = strapi[`${contract.token}`].get('rsi') || 0;
-            const contractLP = contract.lp;
+        // contracts.forEach(contract => {
+        //     // console.table(contract);
+        //     const contractRSI = strapi[`${contract.token}`].get('rsi') || 0;
+        //     const contractLP = contract.lp;
         
-            // Skip contract if it matches the avoid token
-            if (contract.token === avoid) return;
+        //     // Skip contract if it matches the avoid token
+        //     if (contract.token === avoid) return;
         
-            // Check if the contract meets RSI and LP conditions
-            const isValidRSI = contractRSI >= 30 && contractRSI <= 50;
-            const isValidLP = contractLP >= amount * 0.95 && contractLP <= amount * 1.15;
+        //     // Check if the contract meets RSI and LP conditions
+        //     const isValidRSI = contractRSI >= 30 && contractRSI <= 50;
+        //     const isValidLP = contractLP >= amount * 0.95 && contractLP <= amount * 1.15;
         
-            if (isValidRSI && isValidLP) {
-                // If no preferred contract is selected yet, assign the current contract
-                if (!preferredContract || preferredContract.rsi === 0) {
-                    preferredContract = contract;
-                    preferredContract.rsi = contractRSI;
-                } 
-                // Choose contract with RSI closer to 50 for CALL (CE) or closer to 30 for PUT (PE)
-                else if (
-                    (contractType === 'CE' && contractRSI > preferredContract.rsi) ||
-                    (contractType === 'PE' && contractRSI < preferredContract.rsi)
-                ) {
-                    preferredContract = contract;
-                    preferredContract.rsi = contractRSI;
-                }
-            }
-        });
+        //     if (isValidRSI && isValidLP) {
+        //         // If no preferred contract is selected yet, assign the current contract
+        //         if (!preferredContract || preferredContract.rsi === 0) {
+        //             preferredContract = contract;
+        //             preferredContract.rsi = contractRSI;
+        //         } 
+        //         // Choose contract with RSI closer to 50 for CALL (CE) or closer to 30 for PUT (PE)
+        //         else if (
+        //             (contractType === 'CE' && contractRSI > preferredContract.rsi) ||
+        //             (contractType === 'PE' && contractRSI < preferredContract.rsi)
+        //         ) {
+        //             preferredContract = contract;
+        //             preferredContract.rsi = contractRSI;
+        //             console.table(preferredContract);
+        //         }
+        //     }
+        // });
         
         return preferredContract;
     },
@@ -103,8 +117,8 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             }
                             strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType, contractToken: preferredContract.token,tsym: preferredContract.tsym,lotSize: preferredContract.ls, quantity: orderStatus.qty, price } });
                             strapi[`${index}`].set('contractBought', contractBought);
-                            strapi[`${index}`].set('profitStage', 0); 
-                            strapi[`${index}`].set('downwardProfitTrigger', false);                              
+                            // strapi[`${index}`].set('profitStage', 0); 
+                            // strapi[`${index}`].set('downwardProfitTrigger', false);                              
                             strapi.webSocket.broadcast({
                                 type: 'order',
                                 data: orderStatus,
@@ -326,8 +340,8 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             const contractBought = {                                    
                             }
                             strapi[`${index}`].set('stopLossThreshold', 0);   
-                            strapi[`${index}`].set('profitThreshold', Infinity); 
-                            strapi[`${index}`].set('downwardProfitTrigger', false); 
+                            // strapi[`${index}`].set('profitThreshold', Infinity); 
+                            // strapi[`${index}`].set('downwardProfitTrigger', false); 
                             strapi.db.query('api::position.position').update({ where: { indexToken }, data: { contractType: '', contractToken: '',tsym: '',lotSize: '', quantity: 0, price: 0 } });
                             strapi[`${index}`].set('contractBought', contractBought);
                             // console.log(`Order complete, Contract bought reset: ${strapi[`index`].get('contractBought')}`);                      

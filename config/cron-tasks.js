@@ -10,7 +10,7 @@ module.exports = {
         await strapi.service('api::web-socket.web-socket').resetScripList();
         await strapi.service('api::purge.purge').purgeOrders();    
         await strapi.service('api::profit.profit').calculateProfits();
-        await strapi.service('api::authentication.authentication').clearAuthentications();    
+        await strapi.service('api::authentication.authentication').clearAuthentications();   
         strapi.isTradingEnabled = false;
       },
       options: {
@@ -32,14 +32,30 @@ module.exports = {
         await strapi.service('api::variable.variable').resetInvestmentVariables();
         await strapi.service('api::contract.contract').clearContractVariables();
         await strapi.service('api::variable.variable').stopTrading('1');
-        await strapi.service('api::web-socket.web-socket').resetScripList();        
+        await strapi.service('api::web-socket.web-socket').resetScripList();
+        for (const indexToken of strapi.INDICES) {
+          await strapi.service('api::variable.variable').getQuote(indexToken);
+        }
         strapi.isTradingEnabled = false;
       },
       options: {
-        rule: "30 15 * * *", // Every day at 3:15 pm
+        rule: "45 15 * * *", // Every day at 3:45 pm
         tz: "Asia/Kolkata",  // Set to your desired timezone
       },
     },
+    dailyNightJob: {
+      task: async ({ strapi }) => {
+        for (const indexToken of strapi.INDICES) {
+          await strapi.service('api::variable.variable').getQuote(indexToken);
+        }
+        strapi.isTradingEnabled = false;
+      },
+      options: {
+        rule: "00 23 * * *", // Every day at 11:00 PM
+        tz: "Asia/Kolkata",  // Set to your desired timezone
+      },
+    },
+    
     dailyMidnightJob: {
       task: async ({ strapi }) => {
         await strapi.service('api::variable.variable').resetInvestmentVariables();
@@ -54,26 +70,6 @@ module.exports = {
         tz: "Asia/Kolkata",  // Set to your desired timezone
       },
     },
-    // monthlyFirstJob: {
-    //   task: async ({ strapi }) => {
-    //     await strapi.service('api::purge.purge').deletePurgeTableMonthly();
-    //     console.log('Purged data deleted');
-    //   },
-    //   options: {
-    //     rule: "0 0 1 * *", // Monthly once on first day
-    //     tz: "Asia/Kolkata",  // Set to your desired timezone
-    //   },
-    // },
-    // monthlyFortnightJob: {
-    //   task: async ({ strapi }) => {
-    //     await strapi.service('api::purge.purge').deletePurgeTableMonthly();
-    //     console.log('Purged data deleted');
-    //   },
-    //   options: {
-    //     rule: "0 0 15 * *", // Monthly once on first day
-    //     tz: "Asia/Kolkata",  // Set to your desired timezone
-    //   },
-    // },
     monthlyEndJob: {
       task: async ({ strapi }) => {
         await strapi.service('api::purge.purge').deletePurgeTableMonthly();

@@ -605,6 +605,7 @@ export interface ApiVariableVariable extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    eod: Schema.Attribute.JSON;
     expiry: Schema.Attribute.Date;
     index: Schema.Attribute.String & Schema.Attribute.Unique;
     indexToken: Schema.Attribute.String & Schema.Attribute.Unique;

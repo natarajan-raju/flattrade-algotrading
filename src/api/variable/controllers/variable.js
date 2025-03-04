@@ -52,7 +52,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         if(!strapi.sessionToken){
             return ctx.send({ message: 'Request token not found', status: false });
         }
-        console.log(strapi.sessionToken);
+        // console.log(strapi.sessionToken);
         //Check expiry data by submitting a random contract detail fetch with the given expiry date to Flattrade
         try{            
             const date = await strapi.service('api::variable.variable').convertDateFormat(expiry);
@@ -73,23 +73,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             return ctx.send({ message: 'Either expiry data provided is wrong or Session token expired',error: error, status: false });
         }        
        
-        // //Fetch and create previousTradedPrice which is beneficial for initialSpectatorMode decisions
-        // let previousTradedPrice;
-        // try{
-        //     const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","exch":"NSE","token":"${strapi.sessionToken}"}&jKey=${strapi.sessionToken}`;
-        //     const quoteReponse = await fetch(`${env('FLATTRADE_GET_QUOTES_URL')}`,{
-        //         method: 'POST',
-        //         headers: {
-        //             'Content-Type': 'application/json'
-        //         },
-        //         body: payload, 
-        //     });
-        //     const quote = await quoteReponse.json();                        
-        //     previousTradedPrice = quote.lp || 0;
-            
-        // }catch(error){
-        //     return ctx.send({ message: `Error in fetching LTP of the index from Flattrade with error:  ${error}`, status: false });            
-        // }
+   
 
               
         // Step 2: Update values for the found index
@@ -115,6 +99,10 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         });
         strapi[`${indexToken}`] = new Map(Object.entries(updatedIndexItem));
         strapi[`${indexToken}`].set('index', indexItem.index);
+        strapi[`${indexToken}`].set('buyCall',true);
+        strapi[`${indexToken}`].set('buyPut',true);
+        // strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);    
+
         strapi[`${indexItem.index}`] = new Map();
         
 
@@ -202,22 +190,22 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                 default:
                     calculatedInterval = interval || 1; // Default to 1 if no match
             }
-        } else {
-            // If days are not provided, default to today's date
-            calculatedStartDate = new Date(currentDate);
-            calculatedStartDate.setHours(0, 0, 0, 0);
-            calculatedInterval = interval || 1; // Default interval is 1
+        }else {
+                // If days are not provided, default to today's date
+                calculatedStartDate = new Date(currentDate);
+                calculatedStartDate.setHours(0, 0, 0, 0);
+                calculatedInterval = interval || 1; // Default interval is 1
         }
-    
-        // Pass the calculated startDate and interval to the service
-        return ctx.send(await strapi.service('api::variable.variable').getTimePriceData(
-            indexToken,
-            calculatedInterval,
-            calculatedStartDate.toISOString()
-        ));
-    }catch(error){
-        return ctx.send({ message: `Error in getting time price data with error:  ${error}`, status: false });
-    }
+        
+            // Pass the calculated startDate and interval to the service
+            return ctx.send(await strapi.service('api::variable.variable').getTimePriceData(
+                indexToken,
+                calculatedInterval,
+                calculatedStartDate.toISOString()
+            ));
+        }catch(error){
+            return ctx.send({ message: `Error in getting time price data with error:  ${error}`, status: false });
+        }
     }
     
 }));

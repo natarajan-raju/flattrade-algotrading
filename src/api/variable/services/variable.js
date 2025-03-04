@@ -136,46 +136,46 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           const lookbackPeriod = 28;
           prices.push(lp);
           if(prices.length > lookbackPeriod) prices.shift();
-          //Calculate RSI
-          function calculateRSI(prices, period) {
-            let gains = [], losses = [];
-            for (let i = 1; i < prices.length; i++) {
-                let change = prices[i] - prices[i - 1];
-                gains.push(change > 0 ? change : 0);
-                losses.push(change < 0 ? Math.abs(change) : 0);
-            }
+          // //Calculate RSI
+          // function calculateRSI(prices, period) {
+          //   let gains = [], losses = [];
+          //   for (let i = 1; i < prices.length; i++) {
+          //       let change = prices[i] - prices[i - 1];
+          //       gains.push(change > 0 ? change : 0);
+          //       losses.push(change < 0 ? Math.abs(change) : 0);
+          //   }
 
-            let avgGain = gains.slice(0, period).reduce((sum, g) => sum + g, 0) / period;
-            let avgLoss = losses.slice(0, period).reduce((sum, l) => sum + l, 0) / period;
+          //   let avgGain = gains.slice(0, period).reduce((sum, g) => sum + g, 0) / period;
+          //   let avgLoss = losses.slice(0, period).reduce((sum, l) => sum + l, 0) / period;
 
-            for (let i = period; i < gains.length; i++) {
-                avgGain = (avgGain * (period - 1) + gains[i]) / period;
-                avgLoss = (avgLoss * (period - 1) + losses[i]) / period;
-            }
+          //   for (let i = period; i < gains.length; i++) {
+          //       avgGain = (avgGain * (period - 1) + gains[i]) / period;
+          //       avgLoss = (avgLoss * (period - 1) + losses[i]) / period;
+          //   }
 
-            let rs = avgGain / avgLoss;
-            return 100 - (100 / (1 + rs));
-          }
+          //   let rs = avgGain / avgLoss;
+          //   return 100 - (100 / (1 + rs));
+          // }
 
-          //Calculate EMA
-          function calculateEMA(values, period) {
-            if (values.length < period) return null;
-            const k = 2 / (period + 1);
-            return values.reduce((prev, curr, i) => 
-                i === 0 ? curr : (curr * k + prev * (1 - k))
-            );
-          }
+          // //Calculate EMA
+          // function calculateEMA(values, period) {
+          //   if (values.length < period) return null;
+          //   const k = 2 / (period + 1);
+          //   return values.reduce((prev, curr, i) => 
+          //       i === 0 ? curr : (curr * k + prev * (1 - k))
+          //   );
+          // }
           
-          if(prices.length <= lookbackPeriod){
-             const rsi = calculateRSI(prices, prices.length) || 0;
-             rsiSeries.push(rsi);
-             const rsiEma = calculateEMA(rsiSeries, rsiSeries.length) || rsi;
-             strapi[`${tk}`].set('rsi', rsiEma);
-             strapi[`${tk}`].set('prices', prices);
-             strapi[`${tk}`].set('rsiSeries', rsiSeries);
-          }
-          // if(prices.length > lookbackPeriod) prices.shift();
-          if(strapi[`${tk}`].get('rsiSeries').length > lookbackPeriod) strapi[`${tk}`].get('rsiSeries').shift(); 
+          // if(prices.length <= lookbackPeriod){
+          //    const rsi = calculateRSI(prices, prices.length) || 0;
+          //    rsiSeries.push(rsi);
+          //    const rsiEma = calculateEMA(rsiSeries, rsiSeries.length) || rsi;
+          //    strapi[`${tk}`].set('rsi', rsiEma);
+          //    strapi[`${tk}`].set('prices', prices);
+          //    strapi[`${tk}`].set('rsiSeries', rsiSeries);
+          // }
+          // // if(prices.length > lookbackPeriod) prices.shift();
+          // if(strapi[`${tk}`].get('rsiSeries').length > lookbackPeriod) strapi[`${tk}`].get('rsiSeries').shift(); 
           
           if(strapi[`${index}`]){
             const contractTokens = strapi[`${index}`].get('contractTokens');
@@ -206,37 +206,37 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                       status: true
                     });
                     
-                    let profitThreshold = 4.10 * costPrice;            
-                    let profitStage = strapi[`${index}`].get('profitStage') || 0;
-                    // let roundedProfitStage = Math.floor(profitStage / 50) * 50;
-                    let profitStageThreshold = Math.max(Math.floor((0.60 * profitStage) / 3.75) * 3.75, profitStage - 150);
-                    if((profitStage === 0 && realizedPL >= 50) || (profitStage >=50 && realizedPL > profitStage)){
-                      profitStage = Math.floor(realizedPL / 50) * 50;
-                      strapi[`${index}`].set('profitStage', profitStage);
-                    } else if( profitStage > 0 && realizedPL <= profitStageThreshold) {                  
-                      strapi[`${index}`].set('downwardProfitTrigger', true);
-                    }
+                    // let profitThreshold = 4.10 * costPrice;            
+                    // let profitStage = strapi[`${index}`].get('profitStage') || 0;
+                    // // let roundedProfitStage = Math.floor(profitStage / 50) * 50;
+                    // let profitStageThreshold = Math.max(0.50 * profitStage, profitStage - 187.5);
+                    // if((profitStage === 0 && realizedPL >= 75) || (profitStage >=75 && realizedPL > profitStage)){
+                    //   profitStage = Math.floor(realizedPL / 75) * 75;
+                    //   strapi[`${index}`].set('profitStage', profitStage);
+                    // } else if( profitStage > 0 && realizedPL <= profitStageThreshold) {                  
+                    //   strapi[`${index}`].set('downwardProfitTrigger', true);
+                    // }
                     // roundedProfitStage = Math.floor(profitStage / 50) * 50; 
-                    profitStageThreshold = Math.max(Math.floor((0.60 * profitStage) / 3.75) * 3.75, profitStage - 150);                
-                    const stopLossThreshold = Math.min(parseFloat(contractBought.costPrice) - (Math.floor((parseFloat(contractBought.costPrice) * 0.01875) / 37.5) * 37.5),parseFloat(contractBought.costPrice) - 37.5);
+                    // profitStageThreshold = Math.max(0.50 * profitStage, profitStage - 187.5);;                
+                    const stopLossThreshold = 0.95 * costPrice;
                     strapi[`${index}`].set('currentValue', currentValue);                
                     strapi[`${index}`].set('stopLossThreshold', stopLossThreshold);
-                    strapi[`${index}`].set('profitThreshold', profitThreshold);
+                    // strapi[`${index}`].set('profitThreshold', profitThreshold);
                     const contractUpdate = {
                       index,
-                      indexRSI: parseFloat(parseFloat(strapi.rollingData[`${contractBought.indexToken}`].currentRSI).toFixed(4)),
+                      // indexRSI: parseFloat(parseFloat(strapi.rollingData[`${contractBought.indexToken}`].currentRSI).toFixed(4)),
                       // indexToken: contractBought.indexToken,
                       contract: contractBought.tsym,
-                      contractRSI: parseFloat(parseFloat(strapi[`${tk}`].get('rsi')).toFixed(4)),
+                      // contractRSI: parseFloat(parseFloat(strapi[`${tk}`].get('rsi')).toFixed(4)),
                       quantity: contractBought.quantity,
                       costPrice,
                       currentValue,
                       realizedPL,
-                      profitStage,
-                      profitTrigger: profitStageThreshold,
+                      // profitStage,
+                      // profitTrigger: profitStageThreshold,
                       // profitThreshold,
-                      lossTrigger: costPrice - stopLossThreshold,
-                      downwardProfitTrigger: strapi[`${index}`].get('downwardProfitTrigger'),
+                      stopLossTrigger: stopLossThreshold - costPrice,
+                      // downwardProfitTrigger: strapi[`${index}`].get('downwardProfitTrigger'),
                       // awaitingOrderConfirmation
                     };                           
                     //send a Strapi web broadcast to client regarding the contract bought's token lp
@@ -244,12 +244,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     console.table(contractUpdate);
                     
                     // let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation');
-                    if(currentValue >= profitThreshold || currentValue <= stopLossThreshold || strapi[`${index}`].get('downwardProfitTrigger')){
+                    if(currentValue <= stopLossThreshold){
                       strapi[`${contractBought.indexToken}`].set('awaitingOrderConfirmation', true);
-                      let message;
-                      if(currentValue >= profitThreshold) message = `Sell triggered as current value ${currentValue} exceeded profit threshold ${profitThreshold}`;
-                      if(currentValue <= stopLossThreshold) message = `Sell triggered as current value ${currentValue} gone below stoploss threshold ${stopLossThreshold}`;
-                      if(strapi[`${index}`].get('downwardProfitTrigger')) message = `Sell triggered as current value ${currentValue} gone below profit stage ${profitStage}`;
+                      let message = `Sell triggered as current value ${currentValue} gone below stoploss threshold ${stopLossThreshold}`;
+                      // if(strapi[`${index}`].get('downwardProfitTrigger')) message = `Sell triggered as current value ${currentValue} gone below profit stage ${profitStage}`;
                       
                       strapi.log.info(message);
                       let indexToken = contractBought.indexToken;
@@ -263,8 +261,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                         let putOptionBought = false;
                         let putBoughtAt = 0;
                         strapi[`${index}`].set('stopLossThreshold', 0);   
-                        strapi[`${index}`].set('profitThreshold', Infinity); 
-                        strapi[`${index}`].set('downwardProfitTrigger', false);                  
+                        // strapi[`${index}`].set('profitThreshold', Infinity); 
+                        // strapi[`${index}`].set('downwardProfitTrigger', false);                  
                         // console.log('sell Order status true from variable service. Resetting awaitingOrderConfirmation to false');
                         strapi[`${contractBought.indexToken}`].set('callOptionBought', false);
                         strapi[`${contractBought.indexToken}`].set('callBoughtAt', 0);
@@ -303,10 +301,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           }
         return { message: 'NFO Price updation received' }; 
       }           
-    } else {      
+    } else { 
+      // Parse the lookback period once
+      const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 28), 10);     
       try {
-        // Parse the lookback period once
-        const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 28), 10);
+        
                
         // Sideways market detection strategy
         if (!strapi.rollingData[`${tk}`]) {
@@ -378,15 +377,19 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           data: feedData,          
           status: true
       })
-      console.log(feedData);
+      
         
           const headers = {
               Authorization: `Bearer ${env('SPECIAL_TOKEN')}`, // Including the special token in the Authorization header
           };  
           //Try to fetch indexItem from local Map
           let indexItem;
+          let buyCall = true;
+          let buyPut = true;
           if(strapi[`${tk}`]){
             indexItem = Object.fromEntries(strapi[`${tk}`]);
+            buyCall = indexItem.buyCall;
+            buyPut = indexItem.buyPut;
           } else {
             strapi.log.info('Fetching from database.. Please check map allocation');
             indexItem = await strapi.db.query('api::variable.variable').findOne({
@@ -413,7 +416,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             }
             
             let comparisonPrice;
-            if(strapi.rollingData[`${tk}`].ticks.length > 14){
+            if(strapi.rollingData[`${tk}`].ticks.length > lookbackPeriod || 28){
               strapi.rollingData[`${tk}`].ticks.shift();          
             }
            
@@ -429,9 +432,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             if (basePrice === 0 || resistance1 === 0 || resistance2 === 0 || support1 === 0 || support2 === 0){        
               return { message: `Investment variables not defined for ${index}`};
             } 
+            feedData.cp = comparisonPrice;
+            console.log(feedData);
 
             if(previousTradedPrice === 0){
               console.log(`First feed after submitting variables: Setting ${lp} as Last Traded Price for ${tk}`);
+              strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
               strapi[`${tk}`].set('previousTradedPrice', lp);
               return { message: 'First feed' };
             }
@@ -486,9 +492,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   || (parseFloat(comparisonPrice) >= parseFloat(support1) + parseFloat(targetStep) && parseFloat(comparisonPrice) < parseFloat(basePrice) - parseFloat(targetStep))
                   || (parseFloat(comparisonPrice) >= parseFloat(support2) + parseFloat(targetStep) && parseFloat(comparisonPrice) < parseFloat(support1) - parseFloat(targetStep)))
                   && parseFloat(lp) > parseFloat(comparisonPrice)
+                  && buyCall
                   // && ( Math.max(comparisonPrice,previousTradedPrice) < lp)
                   // && (lp > comparisonPrice && (comparisonPrice > (resistance2 + parseFloat(targetStep)) || comparisonPrice > (resistance1 + parseFloat(targetStep)) || comparisonPrice > (basePrice + parseFloat(targetStep)) || comparisonPrice > (support1 + parseFloat(targetStep)) || comparisonPrice > (support2 + parseFloat(targetStep))))
-                  && ((strapi.rollingData[`${tk}`].currentRSI >= 30 && strapi.rollingData[`${tk}`].currentRSI <= 70) || (strapi.rollingData[`${tk}`].currentRSI > 70 && strapi.rollingData[`${tk}`].currentADX > 30))
+                  // && ((strapi.rollingData[`${tk}`].currentRSI >= 30 && strapi.rollingData[`${tk}`].currentRSI <= 70) || (strapi.rollingData[`${tk}`].currentRSI > 70 && strapi.rollingData[`${tk}`].currentADX > 30))
                 ){
                   // console.table(strapi.rollingData[`${tk}`]);                 
                   //Buy CALL
@@ -552,7 +559,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   || (parseFloat(comparisonPrice) <= parseFloat(resistance2) - parseFloat(targetStep) && parseFloat(comparisonPrice) > parseFloat(resistance1) + parseFloat(targetStep)))
                   // && (Math.min(comparisonPrice,previousTradedPrice) > lp)
                   && parseFloat(lp) < parseFloat(comparisonPrice)
-                  && ((strapi.rollingData[`${tk}`].currentRSI >= 30 && strapi.rollingData[`${tk}`].currentRSI <= 70) || (strapi.rollingData[`${tk}`].currentRSI < 30 && strapi.rollingData[`${tk}`].currentADX > 30))
+                  && buyPut
+                  // && ((strapi.rollingData[`${tk}`].currentRSI >= 30 && strapi.rollingData[`${tk}`].currentRSI <= 70) || (strapi.rollingData[`${tk}`].currentRSI < 30 && strapi.rollingData[`${tk}`].currentADX > 30))
                 ){
                   // console.table(strapi.rollingData[`${tk}`]);              
                   //Buy PUT                  
@@ -631,8 +639,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     const orderStatus = await strapi.service('api::order.order').placeSellOrder({contractType,lp,index,indexToken,quantity});
                     if(orderStatus.status === true || orderStatus.status === 'true'){
                       strapi[`${index}`].set('stopLossThreshold', 0);   
-                      strapi[`${index}`].set('profitThreshold', Infinity); 
-                      strapi[`${index}`].set('downwardProfitTrigger', false);                  
+                      // strapi[`${index}`].set('profitThreshold', Infinity); 
+                      // strapi[`${index}`].set('downwardProfitTrigger', false);                  
                       // console.log('CALL sell Order status true from variable service. Resetting awaitingOrderConfirmation to false');
                       strapi[`${tk}`].set('callOptionBought', callOptionBought);
                       strapi[`${tk}`].set('callBoughtAt', callBoughtAt);
@@ -696,8 +704,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     let orderStatus = await strapi.service('api::order.order').placeSellOrder({contractType,lp,index,indexToken,quantity});
                     if(orderStatus.status === true || orderStatus.status === 'true'){
                       strapi[`${index}`].set('stopLossThreshold', 0);
-                      strapi[`${index}`].set('profitThreshold', Infinity);
-                      strapi[`${index}`].set('downwardProfitTrigger', false);
+                      // strapi[`${index}`].set('profitThreshold', Infinity);
+                      // strapi[`${index}`].set('downwardProfitTrigger', false);
                       // console.log('PUT sell Order status true from variable service. Resetting awaitingOrderConfirmation to false');
                       strapi[`${tk}`].set('putOptionBought', putOptionBought);
                       strapi[`${tk}`].set('putBoughtAt', putBoughtAt);
@@ -905,6 +913,17 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       return ((upperBand - lowerBand) / sma) * 100;
     }
 
+    //Calculate SD
+    function calculateStandardDeviation(data) {
+      if (!data.length) return 0; // Handle empty array case
+  
+      const mean = data.reduce((sum, value) => sum + value, 0) / data.length;
+      const squaredDiffs = data.map(value => Math.pow(value - mean, 2));
+      const variance = squaredDiffs.reduce((sum, value) => sum + value, 0) / data.length;
+  
+      return Math.sqrt(variance);
+  }
+
     //Calculate EMA
     function calculateEMA(values, period) {
       if (values.length < period) return null;
@@ -917,9 +936,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     //---------------------------------------------------------------------------------------------------------------------
 
     //Factors & thresholds for Sideways market detection
-    const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 28), 10);
-    const bbwThreshold1 = 0.025; // < 2% → Confirm sideways
-    const bbwThreshold2 = 0.04; // Between 2%-4% → Check RSI
+    const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 28), 10);   
     const rsiThresholdLow = 40;
     const rsiThresholdHigh = 60;
     const adxThreshold = 20;            // ADX < 20 → No strong trend
@@ -938,6 +955,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const rsi = calculateRSI(prices, prices.length) || 0;
     strapi.rollingData[`${tk}`].currentRSI = rsi;
     const bbw = calculateBBW(prices, prices.length);
+
     const adx = calculateADX(data, data.length) || 0;
     
     // const dcw = calculateDCW(prices, prices.length);   
@@ -956,14 +974,17 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
     const adaptivePCThreshold = calculateEMA(strapi.rollingData[`${tk}`].pcValues, strapi.rollingData[`${tk}`].pcValues.length) || 2;
     const bbwEma = calculateEMA(strapi.rollingData[`${tk}`].bbwValues, strapi.rollingData[`${tk}`].bbwValues.length ) || bbw;
+    const bbwSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].bbwValues) || 0;
+    const bbwLowerThreshold = bbwEma - bbwSD || 0;
+    const bbwHigherThreshold = bbwEma + (bbwSD * 2) || 0;
     // const dcwEma = calculateEMA(strapi.rollingData[`${tk}`].dcwValues, strapi.rollingData[`${tk}`].dcwValues.length ) || dcw;
     const atrMA = calculateEMA(strapi.rollingData[`${tk}`].atrValues, strapi.rollingData[`${tk}`].atrValues.length) || atr; 
     const adxEma = calculateEMA(strapi.rollingData[`${tk}`].adxValues, strapi.rollingData[`${tk}`].adxValues.length) || adx;
     strapi.rollingData[`${tk}`].currentADX = adxEma > 0 ? adxEma : adx;
-    let dynamicRsiHigh = rsiThresholdHigh - (atr / atrMA) * 5;
-    let dynamicRsiLow = rsiThresholdLow + (atr / atrMA) * 5;   
+    let dynamicRsiHigh = rsiThresholdHigh - (atr / atrMA) * 5 || rsiThresholdHigh;
+    let dynamicRsiLow = rsiThresholdLow + (atr / atrMA) * 5 || rsiThresholdLow;   
     console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${adaptivePCThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)} BBW EMA: ${bbwEma.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, Dynamic Low RSI: ${dynamicRsiLow.toFixed(4)}, Dynamic Low RSI: ${dynamicRsiLow.toFixed(4)} Dynamic High RSI: ${dynamicRsiHigh.toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, `);
-    if (data.length < lookbackPeriod) return null; 
+    if (data.length < 1) return null; 
 
     // **Step 1: High-Low Percentage Change**
     if (percentageChange < parseFloat(adaptivePCThreshold) * 0.80) {
@@ -971,28 +992,20 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       return true;
     }
 
-    if(percentageChange > parseFloat(adaptivePCThreshold) * 1.65) {
+    if(percentageChange > parseFloat(adaptivePCThreshold) * 2) {
       console.info(`❌ Sudden spike in PC ${percentageChange.toFixed(4)} whereas moving average is ${adaptivePCThreshold.toFixed(4)} → Not a sideways`);  
+      return false;
     }
 
-    // // **Step 2: Donchian Channel Width (DCW) with BBW Cross-Check**
-    // if (parseFloat(dcwEma) < 3) {
-    //   console.info(`✅ DCW EMA (${dcwEma.toFixed(4)}) < DCW Threshold 0.03 → Sideways Market Confirmed`);
-    //   return true;
-    // }
-
-    // if(perce > dcwThreshold * 1.65){
-    //   console.info(`❌ DCW EMA (${dcwEma.toFixed(4)}) > DCW Threshold ${dcwEma * 2} → NOT Sideways`);
-    //   return false;
-    // }
+   
 
     // **Step 3: Bollinger Band Width (BBW) with Upper Bound Buffer**
-    if (parseFloat(bbwEma) < bbwThreshold1) {
-      console.info(`✅ BBW EMA (${bbwEma.toFixed(4)}) < ${bbwThreshold1}% → Sideways Market Confirmed`);
+    if (bbw < bbwLowerThreshold) {
+      console.info(`✅ BBW (${bbw.toFixed(4)}) < ${bbwLowerThreshold}% → Sideways Market Confirmed`);
       return true;
     } 
-    if (parseFloat(bbwEma) > bbwThreshold2 * 1.05) { // Added buffer
-      console.info(`❌ BBW EMA (${bbwEma.toFixed(4)}) > ${bbwThreshold2 * 1.05}% → NOT Sideways`);
+    if (bbw > bbwHigherThreshold) { // Added buffer
+      console.info(`❌ BBW (${bbw.toFixed(4)}) > ${bbwHigherThreshold}% → NOT Sideways`);
       return false;
     }
 
@@ -1236,8 +1249,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         }
         strapi[`${position.index}`].set('contractBought', contractBought);
         strapi[`${position.index}`].set('stopLossThreshold', 0);   
-        strapi[`${position.index}`].set('profitThreshold', Infinity); 
-        strapi[`${position.index}`].set('downwardProfitTrigger', false);
+        // strapi[`${position.index}`].set('profitThreshold', Infinity); 
+        // strapi[`${position.index}`].set('downwardProfitTrigger', false);
       }
     }
     strapi.log.info('Positions fetched...');
@@ -1262,6 +1275,40 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     } 
     
     strapi.log.info('Variables fetched...');  
+  },
+
+  //Get Quote
+  async getQuote(indexToken) {    
+    try{      
+        const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","exch":"NSE","token":"${indexToken}"}&jKey=${strapi.sessionToken}`;
+        const quoteResponse = await fetch(`${env('FLATTRADE_GET_QUOTES_URL')}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: payload,
+        });
+        const quote = await quoteResponse.json();
+        // console.log(quote);
+        if(quote.h && quote.l){
+          // console.log(indexToken, quote.h, quote.l);
+          strapi.db.query('api::variable.variable').update({
+            where: {
+              indexToken: indexToken
+            },
+            data: {
+              eod: {
+                high: quote.h,
+                low: quote.l,
+                requestTime: quote.request_time
+              }              
+            }
+          });
+        }        
+      
+    }catch(error){
+      console.warn(error);
+    }
   },
 
   //Fetch time price data from flattrade
@@ -1329,8 +1376,75 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             data: [],
         };
     }
-}
+  },
 
+  //Determine Market direction
+  async analyzeMarketDirection(indexToken) {
+    // console.log('test');
+    try {
+        const interval = 1; // 1-minute candles
+        const currentDate = new Date();
+        let calculatedStartDate = new Date(currentDate);
+        calculatedStartDate.setHours(0, 0, 0, 0);
+        
+        // Fetch today's candle data
+        const response = await this.getTimePriceData(indexToken, interval, calculatedStartDate.toISOString());
+        // Get the latest and previous candle
+        const candles = response.data;
+        // console.log(response);
+        if (!response.status ) {
+            throw new Error("Insufficient candle data for analysis.");
+        }
+        let currentOpen, prevHigh, prevLow;
+        if(response.data.length < 2){
+          currentOpen = await this.getQuote(indexToken);
+          prevHigh = strapi[`${indexToken}`].get('eod').high;
+          prevLow = strapi[`${indexToken}`].get('eod').low;
+        } else if(response.data.length > 2){
+          const currentCandle = candles[0];
+          const previousCandle = candles[1];
+          currentOpen = currentCandle.open;
+          prevHigh = previousCandle.high;
+          prevLow = previousCandle.low;
+        }         
+        if (currentOpen >= prevHigh) {
+            strapi[`${indexToken}`].set('buyCall', false) // Market may go down
+            strapi[`${indexToken}`].set('buyPut', true) // Market may go down
+        } else if (currentOpen <= prevLow) {
+            strapi[`${indexToken}`].set('buyCall', true); // Market may go up;
+            strapi[`${indexToken}`].set('buyPut', false); // Market may go up;
+        } else {
+            strapi[`${indexToken}`].set('buyCall', true); // Market may move in any direction
+            strapi[`${indexToken}`].set('buyPut', true); // Market may move in any direction
+        }
+        console.table({
+          "Current Open": currentOpen,
+          "Previous High": prevHigh,
+          "Previous Low": prevLow,
+          "Buy Call": strapi[`${indexToken}`].get('buyCall'),
+          "Buy Put": strapi[`${indexToken}`].get('buyPut'),
+        });
+        
+        setTimeout(() => {
+         strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
+        },20000);
+        // return {
+        //     status: true,
+        //     indexToken,
+        //     decision,
+        //     currentCandle,
+        //     previousCandle,
+        //     message: `Decision made based on the last two 1-minute candles.`,
+        // };
+    } catch (error) {
+        console.error(`Error in market analysis: ${error}`);
+        strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
+        return {
+            status: false,
+            message: `${error.message}`,
+        };
+    }
+  }
   
 }));
 
