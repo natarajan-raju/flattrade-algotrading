@@ -993,8 +993,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const adaptivePCThreshold = calculateEMA(strapi.rollingData[`${tk}`].pcValues, strapi.rollingData[`${tk}`].pcValues.length) || 2;
     const bbwEma = calculateEMA(strapi.rollingData[`${tk}`].bbwValues, strapi.rollingData[`${tk}`].bbwValues.length ) || bbw;
     const bbwSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].bbwValues) || 0;
-    const bbwLowerThreshold = bbwEma - (bbwSD * 2) || 0;
-    const bbwHigherThreshold = bbwEma + (bbwSD * 2) || 0;
+    const bbwLowerThreshold = bbwEma - bbwSD || 0;
+    const bbwHigherThreshold = bbwEma + bbwSD || 0;
     // const dcwEma = calculateEMA(strapi.rollingData[`${tk}`].dcwValues, strapi.rollingData[`${tk}`].dcwValues.length ) || dcw;
     const atrMA = calculateEMA(strapi.rollingData[`${tk}`].atrValues, strapi.rollingData[`${tk}`].atrValues.length) || atr; 
     const adxEma = calculateEMA(strapi.rollingData[`${tk}`].adxValues, strapi.rollingData[`${tk}`].adxValues.length) || adx;
@@ -1017,13 +1017,21 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
    
 
-    // **Step 3: Bollinger Band Width (BBW) with Upper Bound Buffer**
-    if (bbw < bbwLowerThreshold) {
-      console.info(`✅ BBW (${bbw.toFixed(4)}) < ${bbwLowerThreshold}% → Sideways Market Confirmed`);
+    // // **Step 3: Bollinger Band Width (BBW) with Upper Bound Buffer**
+    // if (bbw < bbwLowerThreshold) {
+    //   console.info(`✅ BBW (${bbw.toFixed(4)}) < ${bbwLowerThreshold}% → Sideways Market Confirmed`);
+    //   return true;
+    // } 
+    // if (bbw > bbwHigherThreshold) { // Added buffer
+    //   console.info(`❌ BBW (${bbw.toFixed(4)}) > ${bbwHigherThreshold}% → NOT Sideways`);
+    //   return false;
+    // }
+
+    if (bbw >= bbwLowerThreshold && bbw <= bbwHigherThreshold) {
+      console.info(`✅ BBW (${bbw.toFixed(4)}) is between ${bbwLowerThreshold}% and ${bbwHigherThreshold}% → Sideways Market Confirmed`);
       return true;
-    } 
-    if (bbw > bbwHigherThreshold) { // Added buffer
-      console.info(`❌ BBW (${bbw.toFixed(4)}) > ${bbwHigherThreshold}% → NOT Sideways`);
+    } else {
+      console.info(`❌ BBW (${bbw.toFixed(4)}) is outside range → NOT Sideways`);
       return false;
     }
 
