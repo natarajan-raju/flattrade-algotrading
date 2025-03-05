@@ -145,7 +145,12 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
         console.log(`Base Price: ${basePrice}, Resistance 1: ${resistance1}, Resistance 2: ${resistance2}, Support 1: ${support1}, Support 2: ${support2}`);
         
-   
+        try {
+            strapi.service('api::variable.variable').startMarketAnalysis(indexToken);
+            // await strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
+          } catch (error) {
+            console.log(error);
+          }
                 
         return {
             message: `Investment variables updated successfully. Market watching started for index ${indexItem.index}.`,

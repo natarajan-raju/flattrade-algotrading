@@ -449,13 +449,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
             if(previousTradedPrice === 0){
               console.log(`First feed after submitting variables: Setting ${lp} as Last Traded Price for ${tk}`);
-              strapi[`${tk}`].set('currentOpen', lp);
-              try {
-                strapi.service('api::variable.variable').startMarketAnalysis(indexToken);
-                // await strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
-              } catch (error) {
-                console.log(error);
-              }
+              // strapi[`${tk}`].set('currentOpen', lp);
+              
               strapi[`${tk}`].set('previousTradedPrice', lp);
               return { message: 'First feed' };
             }
@@ -1416,6 +1411,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   //Determine Market direction
   async analyzeMarketDirection(indexToken) {
     // console.log('test');
+    if(strapi.isTradingEnabled === false) return;
     try {
         const interval = 1; // 1-minute candles
         const currentDate = new Date();
