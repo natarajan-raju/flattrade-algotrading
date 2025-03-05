@@ -54,7 +54,7 @@ module.exports = createCoreController('api::authentication.authentication',({str
 
           // Check if any tokens exist
           const existingRequestToken = requestTokenResponse.requestToken;
-          if (!existingRequestToken) {
+          if (!requestTokenResponse) {
             // No tokens found, create a new one
             await strapi.db.query('api::authentication.authentication').create({
               data: { requestToken: data.token },

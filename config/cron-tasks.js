@@ -34,7 +34,8 @@ module.exports = {
         await strapi.service('api::variable.variable').stopTrading('1');
         await strapi.service('api::web-socket.web-socket').resetScripList();
         for (const indexToken of strapi.INDICES) {
-          await strapi.service('api::variable.variable').getQuote(indexToken);
+          await strapi.service('api::variable.variable').getQuote(indexToken, true);
+          strapi[`${indexToken}`].get('intervalId') && clearInterval(strapi[`${indexToken}`].get('intervalId'));
         }
         strapi.isTradingEnabled = false;
       },
@@ -46,7 +47,7 @@ module.exports = {
     dailyNightJob: {
       task: async ({ strapi }) => {
         for (const indexToken of strapi.INDICES) {
-          await strapi.service('api::variable.variable').getQuote(indexToken);
+          await strapi.service('api::variable.variable').getQuote(indexToken, true);
         }
         strapi.isTradingEnabled = false;
       },

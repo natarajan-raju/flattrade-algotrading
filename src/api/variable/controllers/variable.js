@@ -101,6 +101,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         strapi[`${indexToken}`].set('index', indexItem.index);
         strapi[`${indexToken}`].set('buyCall',true);
         strapi[`${indexToken}`].set('buyPut',true);
+        strapi[`${indexToken}`].set('eod',indexItem.eod);
         // strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);    
 
         strapi[`${indexItem.index}`] = new Map();

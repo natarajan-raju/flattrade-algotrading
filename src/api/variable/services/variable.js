@@ -118,6 +118,18 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                                 
   },
 
+  //Trigger function to start market function analysis
+  async startMarketAnalysis(indexToken) {
+    const intervalId = setInterval(async () => {
+      try{
+        await strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
+      }catch(error){
+        throw new Error(error);
+      }
+    },30000);
+    strapi[`${indexToken}`].set('intervalId', intervalId);
+  },
+
   //Custom service function to handle trade logic basis Flattrade touchline feed
   async handleFeed(feedData) {
 
@@ -132,10 +144,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     if (!buySellTokens.has(tk)) {     
       //NFO Price update received. Update lp for contract token
       if(strapi[`${tk}`]){
-          const { optt, index, prices, rsiSeries } = Object.fromEntries(strapi[`${tk}`]);
-          const lookbackPeriod = 28;
-          prices.push(lp);
-          if(prices.length > lookbackPeriod) prices.shift();
+          const { optt, index } = Object.fromEntries(strapi[`${tk}`]);
+          // const lookbackPeriod = 28;
+          // prices.push(lp);
+          // if(prices.length > lookbackPeriod) prices.shift();
           // //Calculate RSI
           // function calculateRSI(prices, period) {
           //   let gains = [], losses = [];
@@ -433,11 +445,17 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               return { message: `Investment variables not defined for ${index}`};
             } 
             feedData.cp = comparisonPrice;
-            console.log(feedData);
+            console.log(feedData,`Ready to buy CALL: ${buyCall}, Ready to buy PUT: ${buyPut}`);
 
             if(previousTradedPrice === 0){
               console.log(`First feed after submitting variables: Setting ${lp} as Last Traded Price for ${tk}`);
-              strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
+              strapi[`${tk}`].set('currentOpen', lp);
+              try {
+                strapi.service('api::variable.variable').startMarketAnalysis(indexToken);
+                // await strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
+              } catch (error) {
+                console.log(error);
+              }
               strapi[`${tk}`].set('previousTradedPrice', lp);
               return { message: 'First feed' };
             }
@@ -975,7 +993,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const adaptivePCThreshold = calculateEMA(strapi.rollingData[`${tk}`].pcValues, strapi.rollingData[`${tk}`].pcValues.length) || 2;
     const bbwEma = calculateEMA(strapi.rollingData[`${tk}`].bbwValues, strapi.rollingData[`${tk}`].bbwValues.length ) || bbw;
     const bbwSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].bbwValues) || 0;
-    const bbwLowerThreshold = bbwEma - bbwSD || 0;
+    const bbwLowerThreshold = bbwEma - (bbwSD * 2) || 0;
     const bbwHigherThreshold = bbwEma + (bbwSD * 2) || 0;
     // const dcwEma = calculateEMA(strapi.rollingData[`${tk}`].dcwValues, strapi.rollingData[`${tk}`].dcwValues.length ) || dcw;
     const atrMA = calculateEMA(strapi.rollingData[`${tk}`].atrValues, strapi.rollingData[`${tk}`].atrValues.length) || atr; 
@@ -1010,8 +1028,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     }
 
     // **Step 4: ADX Check**
-    if (parseFloat(adxEma) < adxThreshold) {
-      console.info(`✅ ADX EMA (${adxEma.toFixed(4)}) < ${adxThreshold} → Sideways Market Confirmed`);
+    if (parseFloat(adxEma) < adxThreshold && adx < adxThreshold) {
+      console.info(`✅ ADX (${adx.toFixed(4)}) < ${adxThreshold} & ADX EMA (${adxEma.toFixed(4)}) < ${adxThreshold} → Sideways Market Confirmed`);
       return true;
     }
 
@@ -1278,7 +1296,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   },
 
   //Get Quote
-  async getQuote(indexToken) {    
+  async getQuote(indexToken, updateDB) {    
     try{      
         const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","exch":"NSE","token":"${indexToken}"}&jKey=${strapi.sessionToken}`;
         const quoteResponse = await fetch(`${env('FLATTRADE_GET_QUOTES_URL')}`, {
@@ -1290,7 +1308,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         });
         const quote = await quoteResponse.json();
         // console.log(quote);
-        if(quote.h && quote.l){
+        if(quote.h && quote.l && quote.c && updateDB){
           // console.log(indexToken, quote.h, quote.l);
           strapi.db.query('api::variable.variable').update({
             where: {
@@ -1300,14 +1318,16 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               eod: {
                 high: quote.h,
                 low: quote.l,
-                requestTime: quote.request_time
+                requestTime: quote.request_time,
+                close: quote.c
               }              
             }
           });
         }        
-      
+      return quote;
     }catch(error){
       console.warn(error);
+      return null;
     }
   },
 
@@ -1369,7 +1389,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             message: 'Time price data fetched successfully for the given index token and interval',
         };
     } catch (error) {
-        console.log(`Error in getting time price data: ${error}`);
+        console.log(error);
         return {
             status: false,
             message: `${error}`,
@@ -1388,46 +1408,54 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         calculatedStartDate.setHours(0, 0, 0, 0);
         
         // Fetch today's candle data
-        const response = await this.getTimePriceData(indexToken, interval, calculatedStartDate.toISOString());
+        const response = await strapi.service('api::variable.variable').getTimePriceData(indexToken, interval, calculatedStartDate.toISOString());
         // Get the latest and previous candle
         const candles = response.data;
         // console.log(response);
         if (!response.status ) {
-            throw new Error("Insufficient candle data for analysis.");
+          strapi[`${indexToken}`].set('buyCall', true); // Market may move in any direction
+          strapi[`${indexToken}`].set('buyPut', true); // Market may move in any direction
+          return;
         }
-        let currentOpen, prevHigh, prevLow;
-        if(response.data.length < 2){
-          currentOpen = await this.getQuote(indexToken);
-          prevHigh = strapi[`${indexToken}`].get('eod').high;
-          prevLow = strapi[`${indexToken}`].get('eod').low;
+        let currentOpen, prevHigh, prevLow, prevClose;
+        prevHigh = strapi[`${indexToken}`].get('eod').high || strapi.db.query('api::variable.variable').findOne({where: {indexToken}}).eod.high;
+        prevLow = strapi[`${indexToken}`].get('eod').low || strapi.db.query('api::variable.variable').findOne({where: {indexToken}}).eod.low;
+        prevClose = strapi[`${indexToken}`].get('eod').close || strapi.db.query('api::variable.variable').findOne({where: {indexToken}}).eod.close;
+        if(response.data.length < 2){          
+          const quoteResponse = await strapi.service('api::variable.variable').getQuote(indexToken, false);
+          if(quoteResponse){
+            currentOpen = quoteResponse.o;
+          }
+          console.log(`Previous high: ${prevHigh} Previous low: ${prevLow} Current open: ${currentOpen}`);
         } else if(response.data.length > 2){
-          const currentCandle = candles[0];
-          const previousCandle = candles[1];
-          currentOpen = currentCandle.open;
-          prevHigh = previousCandle.high;
-          prevLow = previousCandle.low;
+          const currentCandle = candles[0];         
+          currentOpen = currentCandle.open;          
         }         
-        if (currentOpen >= prevHigh) {
+        if (currentOpen && parseFloat(currentOpen) >= parseFloat(prevHigh) - 10) {
             strapi[`${indexToken}`].set('buyCall', false) // Market may go down
             strapi[`${indexToken}`].set('buyPut', true) // Market may go down
-        } else if (currentOpen <= prevLow) {
+        } else if (currentOpen && parseFloat(currentOpen) <= parseFloat(prevLow) + 10) {
             strapi[`${indexToken}`].set('buyCall', true); // Market may go up;
             strapi[`${indexToken}`].set('buyPut', false); // Market may go up;
-        } else {
+        } else if (currentOpen && (parseFloat(currentOpen) <= parseFloat(prevClose) + 10) && parseFloat(currentOpen) >= parseFloat(prevClose) - 10) {
             strapi[`${indexToken}`].set('buyCall', true); // Market may move in any direction
             strapi[`${indexToken}`].set('buyPut', true); // Market may move in any direction
+        } else {
+            strapi[`${indexToken}`].set('buyCall', false); // Market may move in any direction
+            strapi[`${indexToken}`].set('buyPut', false); // Market may move in any direction
         }
         console.table({
           "Current Open": currentOpen,
           "Previous High": prevHigh,
           "Previous Low": prevLow,
+          "Previous Close": prevClose,
           "Buy Call": strapi[`${indexToken}`].get('buyCall'),
           "Buy Put": strapi[`${indexToken}`].get('buyPut'),
         });
         
-        setTimeout(() => {
-         strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
-        },20000);
+        // setTimeout(() => {
+        //  strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
+        // },20000);
         // return {
         //     status: true,
         //     indexToken,
@@ -1438,11 +1466,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         // };
     } catch (error) {
         console.error(`Error in market analysis: ${error}`);
-        strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
-        return {
-            status: false,
-            message: `${error.message}`,
-        };
+        // strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
+        throw new Error(error);
     }
   }
   
