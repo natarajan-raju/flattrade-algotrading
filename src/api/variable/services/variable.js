@@ -1033,6 +1033,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       return true;
     }
 
+    if(parseFloat(adxEma) > 40 && adx > 40){
+      console.info(`❌ ADX (${adx.toFixed(4)}) > 40 & ADX EMA (${adxEma.toFixed(4)}) > 40 → NOT Sideways`);
+      return false;
+    }
+
     // **Step 5: ATR & RSI with Dynamic RSI Adjustment**
     // let dynamicRsiHigh = rsiThresholdHigh - (atr / atrMA) * 5;
     // let dynamicRsiLow = rsiThresholdLow + (atr / atrMA) * 5;
