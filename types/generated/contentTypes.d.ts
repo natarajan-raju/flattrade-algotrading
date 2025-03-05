@@ -618,6 +618,7 @@ export interface ApiVariableVariable extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     lossStep: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<2>;
+    open: Schema.Attribute.Decimal;
     previousTradedPrice: Schema.Attribute.Decimal &
       Schema.Attribute.DefaultTo<0>;
     publishedAt: Schema.Attribute.DateTime;

@@ -787,6 +787,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         ticks: []                       
       };
       const defaultValues = {
+        open: 0,
         basePrice: 0,
         resistance1: 0,
         resistance2: 0,
@@ -1068,6 +1069,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     
     
     const defaultValues = {
+      open: 0,
       basePrice: 0,
       resistance1: 0,
       resistance2: 0,
@@ -1434,23 +1436,20 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         prevHigh = strapi[`${indexToken}`].get('eod').high || strapi.db.query('api::variable.variable').findOne({where: {indexToken}}).eod.high;
         prevLow = strapi[`${indexToken}`].get('eod').low || strapi.db.query('api::variable.variable').findOne({where: {indexToken}}).eod.low;
         prevClose = strapi[`${indexToken}`].get('eod').close || strapi.db.query('api::variable.variable').findOne({where: {indexToken}}).eod.close;
-        if(response.data.length < 2){          
-          const quoteResponse = await strapi.service('api::variable.variable').getQuote(indexToken, false);
-          if(quoteResponse){
-            currentOpen = quoteResponse.o;
-          }
+        if(response.data.length < 2){      
+          currentOpen = strapi[`${indexToken}`].get('open') || await strapi.db.query('api::variable.variable').findOne({where: {indexToken}}).open || await strapi.service('api::variable.variable').getQuote(indexToken, false).o;          
           console.log(`Previous high: ${prevHigh} Previous low: ${prevLow} Current open: ${currentOpen}`);
-        } else if(response.data.length > 2){
+        } else {
           const currentCandle = candles[0];         
           currentOpen = currentCandle.open;          
         }         
-        if (currentOpen && parseFloat(currentOpen) >= parseFloat(prevHigh) - 10) {
+        if (parseFloat(currentOpen) >= parseFloat(prevHigh) - 10) {
             strapi[`${indexToken}`].set('buyCall', false) // Market may go down
             strapi[`${indexToken}`].set('buyPut', true) // Market may go down
-        } else if (currentOpen && parseFloat(currentOpen) <= parseFloat(prevLow) + 10) {
+        } else if (parseFloat(currentOpen) <= parseFloat(prevLow) + 10) {
             strapi[`${indexToken}`].set('buyCall', true); // Market may go up;
             strapi[`${indexToken}`].set('buyPut', false); // Market may go up;
-        } else if (currentOpen && (parseFloat(currentOpen) <= parseFloat(prevClose) + 10) && parseFloat(currentOpen) >= parseFloat(prevClose) - 10) {
+        } else if ((parseFloat(currentOpen) <= parseFloat(prevClose) + 10) && parseFloat(currentOpen) >= parseFloat(prevClose) - 10) {
             strapi[`${indexToken}`].set('buyCall', true); // Market may move in any direction
             strapi[`${indexToken}`].set('buyPut', true); // Market may move in any direction
         } else {

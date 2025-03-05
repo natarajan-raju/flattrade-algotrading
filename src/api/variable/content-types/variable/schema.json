@@ -89,6 +89,9 @@
     },
     "eod": {
       "type": "json"
+    },
+    "open": {
+      "type": "decimal"
     }
   }
 }

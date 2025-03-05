@@ -26,11 +26,12 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
           indexToken,
           amount,
           expiry,
-          quantity
+          quantity,
+          open
         } = ctx.request.body;        
-        if (!quantity || !expiry || !amount || !indexToken || indexToken.length === 0 || !basePrice || !resistance1 || !resistance2 || !support1 || !support2) {
+        if (!open ||!quantity || !expiry || !amount || !indexToken || indexToken.length === 0 || !basePrice || !resistance1 || !resistance2 || !support1 || !support2) {
             return ctx.send({ message: 'Invalid Payload provided. Please fill all the fields...', status: false, });
-        } else if(quantity <= 0 || amount <= 0 || basePrice <=0 || resistance1 <=0 || resistance2 <=0 || support1 <=0 || support2 <=0){
+        } else if(open <= 0 || quantity <= 0 || amount <= 0 || basePrice <=0 || resistance1 <=0 || resistance2 <=0 || support1 <=0 || support2 <=0){
             return ctx.send({ message: 'Cannot provide zero or negative values for mandatory fields...', status: false });
         }
 
@@ -80,6 +81,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         const updatedIndexItem = await strapi.db.query('api::variable.variable').update({
             where: { indexToken },  
             data: {
+            open,    
             basePrice,
             resistance1,
             resistance2,
@@ -98,6 +100,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             },
         });
         strapi[`${indexToken}`] = new Map(Object.entries(updatedIndexItem));
+        console.log(updatedIndexItem);
         strapi[`${indexToken}`].set('index', indexItem.index);
         strapi[`${indexToken}`].set('buyCall',true);
         strapi[`${indexToken}`].set('buyPut',true);
