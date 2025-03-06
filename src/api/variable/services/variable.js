@@ -1282,7 +1282,21 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         // if(strapi[`${indexItem.index}`]){
         //   strapi[`${indexItem.index}`].set('amount', indexItem.amount);
         // }
-               
+      try{
+        strapi[`${indexItem.indexToken}`].set('buyCall',true);
+        strapi[`${indexItem.indexToken}`].set('buyPut',true);
+        strapi[`${indexItem.indexToken}`].set('eod',indexItem.eod);      
+        strapi[`${indexItem.indexToken}`].get('intervalId') && clearInterval(strapi[`${indexItem.indexToken}`].get('intervalId'));
+      }catch(error){
+        console.log(error);
+      }  
+      try {
+        strapi.service('api::variable.variable').startMarketAnalysis(indexItem.indexToken);
+        // await strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
+      } catch (error) {
+        console.log(error);
+      }
+                
         
       }      
     } 
@@ -1397,6 +1411,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   async analyzeMarketDirection(indexToken) {
     // console.log('test');
     if(strapi.isTradingEnabled === false) return;
+    let openValueChanged = false;
 
     let currentOpen, prevHigh, prevLow, prevClose;
     currentOpen = strapi[`${indexToken}`].get('open') || await strapi.db.query('api::variable.variable').findOne({where: {indexToken}}).open || await strapi.service('api::variable.variable').getQuote(indexToken, false).o;          
@@ -1418,26 +1433,29 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         
        if(response.status && response.data.length > 1) {
           const currentCandle = candles[0];         
-          currentOpen = currentCandle.open;          
+          currentOpen = currentCandle.open;
+          openValueChanged = true;
+                
         }    
     } catch (error) {
         console.error(`Error in market analysis: ${error}`);
         // strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
         throw new Error(error);
-    }     
-        if (parseFloat(currentOpen) >= parseFloat(prevHigh) - 10) {
+    }    
+    openValueChanged && strapi.db.query('api::variable.variable').update({where: {indexToken}, data: {open: currentOpen}});     
+    if (parseFloat(currentOpen) >= parseFloat(prevHigh) - 10) {
             strapi[`${indexToken}`].set('buyCall', false) // Market may go down
             strapi[`${indexToken}`].set('buyPut', true) // Market may go down
-        } else if (parseFloat(currentOpen) <= parseFloat(prevLow) + 10) {
+    } else if (parseFloat(currentOpen) <= parseFloat(prevLow) + 10) {
             strapi[`${indexToken}`].set('buyCall', true); // Market may go up;
             strapi[`${indexToken}`].set('buyPut', false); // Market may go up;
-        } else if ((parseFloat(currentOpen) <= parseFloat(prevClose) + 10) && parseFloat(currentOpen) >= parseFloat(prevClose) - 10) {
+    } else if ((parseFloat(currentOpen) <= parseFloat(prevClose) + 10) && parseFloat(currentOpen) >= parseFloat(prevClose) - 10) {
             strapi[`${indexToken}`].set('buyCall', true); // Market may move in any direction
             strapi[`${indexToken}`].set('buyPut', true); // Market may move in any direction
-        } else {
+    } else {
             strapi[`${indexToken}`].set('buyCall', false); // Market may move in any direction
             strapi[`${indexToken}`].set('buyPut', false); // Market may move in any direction
-        }
+    }
         strapi.log.info('Market analysis completed');
         console.table({
           "Current Open": currentOpen,
