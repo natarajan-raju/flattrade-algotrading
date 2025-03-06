@@ -29,14 +29,18 @@ module.exports = {
     },
     dailyEveningJob: {
       task: async ({ strapi }) => {
+        for (const indexToken of strapi.INDICES) {
+          await strapi.service('api::variable.variable').getQuote(indexToken, true);
+          try{
+          strapi[`${indexToken}`].get('intervalId') && clearInterval(strapi[`${indexToken}`].get('intervalId'));
+          }catch(e){
+            continue;
+          }
+        }
         await strapi.service('api::variable.variable').resetInvestmentVariables();
         await strapi.service('api::contract.contract').clearContractVariables();
         await strapi.service('api::variable.variable').stopTrading('1');
         await strapi.service('api::web-socket.web-socket').resetScripList();
-        for (const indexToken of strapi.INDICES) {
-          await strapi.service('api::variable.variable').getQuote(indexToken, true);
-          strapi[`${indexToken}`].get('intervalId') && clearInterval(strapi[`${indexToken}`].get('intervalId'));
-        }
         strapi.isTradingEnabled = false;
       },
       options: {

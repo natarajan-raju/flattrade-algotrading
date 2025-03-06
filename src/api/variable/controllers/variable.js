@@ -100,7 +100,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             },
         });
         strapi[`${indexToken}`] = new Map(Object.entries(updatedIndexItem));
-        console.log(updatedIndexItem);
+        console.table(updatedIndexItem);
         strapi[`${indexToken}`].set('index', indexItem.index);
         strapi[`${indexToken}`].set('buyCall',true);
         strapi[`${indexToken}`].set('buyPut',true);
@@ -143,7 +143,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         }
         
         await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
-        console.log(`Base Price: ${basePrice}, Resistance 1: ${resistance1}, Resistance 2: ${resistance2}, Support 1: ${support1}, Support 2: ${support2}`);
+        console.table(`Base Price: ${basePrice}, Resistance 1: ${resistance1}, Resistance 2: ${resistance2}, Support 1: ${support1}, Support 2: ${support2}`);
         
         try {
             strapi.service('api::variable.variable').startMarketAnalysis(indexToken);
