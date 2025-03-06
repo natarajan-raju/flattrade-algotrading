@@ -428,17 +428,18 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             }
             
             let comparisonPrice;
-            if(strapi.rollingData[`${tk}`].ticks.length > lookbackPeriod || 28){
+            if(strapi.rollingData[`${tk}`].ticks.length >  28){
               strapi.rollingData[`${tk}`].ticks.shift();          
             }
-           
+            // console.log(strapi.rollingData[`${tk}`].ticks);
             if(strapi.rollingData[`${tk}`].ticks.length > 1){
-              comparisonPrice = calculateEMA(strapi.rollingData[`${tk}`].ticks, strapi.rollingData[`${tk}`].ticks.length );
+              comparisonPrice = parseFloat(calculateEMA(strapi.rollingData[`${tk}`].ticks, strapi.rollingData[`${tk}`].ticks.length )).toFixed(4);
+              // console.log(comparisonPrice);
             } else {
               comparisonPrice = lp;
             }
             // strapi.log.info(`Token: ${tk} LP: ${lp} Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}`);
-            strapi.rollingData[`${tk}`].ticks.push(parseFloat(parseFloat(lp).toFixed(4)));
+            strapi.rollingData[`${tk}`].ticks.push(lp);
            
             
             if (basePrice === 0 || resistance1 === 0 || resistance2 === 0 || support1 === 0 || support2 === 0){        
