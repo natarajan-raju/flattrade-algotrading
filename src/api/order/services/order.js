@@ -20,22 +20,25 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         const contracts = contractType === 'CE' ? contractTokens.ce : contractTokens.pe;
         
         let preferredContract = {token: null, lp: Infinity, tsym: null, lotSize: null, rsi: 0};
-        let closestLP = Infinity;
+        let smallestDifference = Infinity;
 
         contracts.forEach(contract => {
             const contractLP = contract.lp;
 
             // Skip contract if it matches the avoid token
             if (contract.token === avoid) return;
-
+            const difference = Math.abs(contractLP - amount);
             // Ensure LP is equal to or greater than the amount and find the closest
-            if (contractLP >= amount && contractLP < closestLP) {
+            if(difference < smallestDifference){
+                smallestDifference = difference;
                 preferredContract = contract;
-                closestLP = contractLP;
             }
         });
-        // let smallestDifference = Infinity;
-        // contracts.forEach(contract => {
+        
+
+       if(preferredContract.lp > amount * 1.20){
+        return {token: null, lp: Infinity, tsym: null, lotSize: null, rsi: 0};
+       }
         //     //Skip the contract if it matches the avoid token
         //     if(contract.token === avoid) return;
         //     if(contract.lp >= amount * 0.90 && strapi[`${contract.token}`].get('rsi') >= 30 && strapi[`${contract.token}`].get('rsi') <= 50 && contract.lp <= amount * 1.15){
