@@ -327,8 +327,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             isSidewaysMarket: false,
             atrValues: [],
             // rsiSeries: [],
-            currentADX: 0,
-            currentRSI: 0,
+            // currentADX: 0,
+            // currentRSI: 0,
             pcValues: [],
             bbwValues: [],
             dcwValues: [],
@@ -516,7 +516,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   //Buy CALL
                   callOptionBought = true;
                   callBoughtAt = comparisonPrice;
-                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp}. Application will attempt to buy CALL at Index RSI: ${strapi.rollingData[`${tk}`].currentRSI}`);
+                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp}. Application will attempt to buy CALL `);
                   previousTradedPrice = lp;
                   awaitingOrderConfirmation = true;                  
                   strapi[`${tk}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
@@ -580,7 +580,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   // console.table(strapi.rollingData[`${tk}`]);              
                   //Buy PUT                  
                   strapi.webSocket.broadcast({ type: 'variable', message: `Reached Strategic Buy zone for ${index}. Application will attempt to buy PUT at LTP ${lp}`, status: true});
-                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp} Application will attempt to buy PUT at & Index RSI: ${strapi.rollingData[`${tk}`].currentRSI}`);
+                  console.log(`Reached Strategic Buy zone for ${index}.Comparison price: ${parseFloat(comparisonPrice).toFixed(4)}. Previous Traded Price: ${previousTradedPrice}. Current Price: ${lp} Application will attempt to buy PUT`);
                   contractType = 'PE';
                   putOptionBought = true;
                   putBoughtAt = comparisonPrice;
@@ -775,8 +775,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         isSidewaysMarket: false,
         atrValues: [],
         // rsiSeries: [],
-        currentRSI: 0,
-        currentADX: 0,
+        // currentRSI: 0,
+        // currentADX: 0,
         pcValues: [],
         bbwValues: [],
         dcwValues: [],
@@ -956,7 +956,6 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const rsiThresholdLow = 40;
     const rsiThresholdHigh = 60;
     const adxThreshold = 20;            // ADX < 20 → No strong trend
-    // const dcwThreshold = 0.03;          // DCW < 3% → No breakout
 
     //Sideways detection logic starts here....
    
@@ -969,7 +968,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     // const atrPeriod = data.length >= 21? 21 : data.length ;  
     const atr = calculateATR(data, data.length);      
     const rsi = calculateRSI(prices, prices.length) || 0;
-    strapi.rollingData[`${tk}`].currentRSI = rsi;
+    // strapi.rollingData[`${tk}`].currentRSI = rsi;
     const bbw = calculateBBW(prices, prices.length);
 
     const adx = calculateADX(data, data.length) || 0;
@@ -994,20 +993,20 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const bbwLowerThreshold = bbwEma - bbwSD || 0;
     const bbwHigherThreshold = parseFloat(bbwEma) + bbwSD || 0;
     const pcSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].pcValues) || 0;
-    const pcLowerThreshold = adaptivePCThreshold - pcSD || 0;
-    const pcHigherThreshold = parseFloat(adaptivePCThreshold) + pcSD || 0;
+    const pcLowerThreshold = adaptivePCThreshold - (2 * pcSD) || 0;
+    const pcHigherThreshold = parseFloat(adaptivePCThreshold) + (2 * pcSD) || 0;
     // const dcwEma = calculateEMA(strapi.rollingData[`${tk}`].dcwValues, strapi.rollingData[`${tk}`].dcwValues.length ) || dcw;
     const atrMA = calculateEMA(strapi.rollingData[`${tk}`].atrValues, strapi.rollingData[`${tk}`].atrValues.length) || atr; 
     const adxEma = calculateEMA(strapi.rollingData[`${tk}`].adxValues, strapi.rollingData[`${tk}`].adxValues.length) || adx;
-    strapi.rollingData[`${tk}`].currentADX = adxEma > 0 ? adxEma : adx;
+    // strapi.rollingData[`${tk}`].currentADX = adxEma > 0 ? adxEma : adx;
     let dynamicRsiHigh = rsiThresholdHigh - (atr / atrMA) * 5 || rsiThresholdHigh;
     let dynamicRsiLow = rsiThresholdLow + (atr / atrMA) * 5 || rsiThresholdLow;   
-    console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${adaptivePCThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)} BBW EMA: ${bbwEma.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, Dynamic Low RSI: ${dynamicRsiLow.toFixed(4)}, Dynamic Low RSI: ${dynamicRsiLow.toFixed(4)} Dynamic High RSI: ${dynamicRsiHigh.toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, `);
+    console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${adaptivePCThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)} BBW EMA: ${bbwEma.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, Dynamic Low RSI: ${dynamicRsiLow.toFixed(4)} Dynamic High RSI: ${dynamicRsiHigh.toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, `);
     if (data.length < 1) return null; 
 
     // **Step 1: High-Low Percentage Change**
-    if (percentageChange >= pcLowerThreshold && percentageChange <= pcHigherThreshold) {
-      console.info(`✅ PC (${percentageChange.toFixed(4)}) is within adaptive range  ${pcLowerThreshold.toFixed(4)} - ${pcHigherThreshold.toFixed(4)} ) → Sideways Market Confirmed`);
+    if (percentageChange < pcLowerThreshold) {
+      console.info(`✅ PC (${percentageChange.toFixed(4)}) is within adaptive range  ${pcLowerThreshold.toFixed(4)} → Sideways Market Confirmed`);
       return true;
     }
 
@@ -1038,8 +1037,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       return false;
     }
     // **Step 4: ATR & RSI with Dynamic RSI Adjustment**
-    if (atr < parseFloat(atrMA) * 1.05 && (rsi >= dynamicRsiLow && rsi <= dynamicRsiHigh)) {
-      console.info(`✅ Final analysis with ATR (${atr.toFixed(4)}) < ATR MA x 1.05 times (${atrMA.toFixed(4)* 1.05}) & RSI (${rsi.toFixed(4)}) within dynamic RSI threshold (${dynamicRsiLow.toFixed(4)} - ${dynamicRsiHigh.toFixed(4)}) confirms a sideways market`);
+    if (atr < parseFloat(atrMA) * 1.05 || (rsi >= dynamicRsiLow && rsi <= dynamicRsiHigh)) {
+      console.info(`✅ Final analysis with ATR (${atr.toFixed(4)}) < ATR MA x 1.05 times (${atrMA.toFixed(4)* 1.05}) or RSI (${rsi.toFixed(4)}) within dynamic RSI threshold (${dynamicRsiLow.toFixed(4)} - ${dynamicRsiHigh.toFixed(4)}) confirms a sideways market`);
       return true;
     }
 
@@ -1103,8 +1102,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             isSidewaysMarket: false,
             atrValues: [],
             // rsiSeries: [],
-            currentRSI: 0,
-            currentADX: 0,
+            // currentRSI: 0,
+            // currentADX: 0,
             pcValues: [],
             bbwValues: [],
             dcwValues: [],
@@ -1132,8 +1131,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         isSidewaysMarket: false,
         atrValues: [],
         // rsiSeries: [],
-        currentRSI: 0,
-        currentADX: 0,
+        // currentRSI: 0,
+        // currentADX: 0,
         pcValues: [],
         bbwValues: [],
         dcwValues: [],
@@ -1183,8 +1182,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       isSidewaysMarket: false,
       atrValues: [],
       // rsiSeries: [],
-      currentRSI: 0,
-      currentADX: 0,
+      // currentRSI: 0,
+      // currentADX: 0,
       pcValues: [],
       bbwValues: [],
       dcwValues: [],

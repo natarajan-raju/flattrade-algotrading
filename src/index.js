@@ -24,52 +24,9 @@ module.exports = {
     const setFoundation = async () => {          
       
       await strapi.service('api::web-socket.web-socket').initializeWebSocketServer();      
-      await strapi.service('api::variable.variable').fetchIndexVariables();      
-      // // strapi.rollingData = {};
-      // // Simulate market
-      // // Simulate market with gradual price changes
-      // // Simulate market with gradual price changes and 1-second delay
-      // strapi['2000'] = new Map();
-      // strapi['2000'].set('optt','CE');
-
-      // let lastPrice = 25; // Initial price
-
-      // const generateFeedObject = () => {
-      //   // Generate a small random step change (-0.5 to +0.5)
-      //   const priceChange = (Math.random() - 0.5) * 1; 
-      //   lastPrice = Math.max(10, lastPrice + priceChange); // Ensure price doesn't drop below 10
-
-      //   return {
-      //     t: 'tf',
-      //     e: 'NFO', 
-      //     tk: '2000', // Random token
-      //     lp: lastPrice.toFixed(2), // Updated last price
-      //   };
-      // };
-
-      // const variableService = strapi.service('api::variable.variable');
-
-      // const sendFeeds = async () => {
-      //   for (let i = 0; i < 30; i++) {
-      //     const feed = generateFeedObject();
-
-      //     try {
-      //       variableService.handleFeed(feed);
-      //       console.log(`Sent feed ${i + 1}:`, feed);
-      //     } catch (error) {
-      //       console.error(`Error processing feed: ${error.message}`);
-      //     }
-
-      //     await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second delay
-      //   }
-      // };
-
-      // sendFeeds();
-
+      await strapi.service('api::variable.variable').fetchIndexVariables();
 
       strapi.INDICES = ['26000','26009','26013','26014','26037'];
-      // strapi.webSocket.broadcast({ type: 'action', message: 'Application is restarted. Please submit values to begin trading...', status: true });  
-      // strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket()
       const currentTime = new Date();
       const currentHour = currentTime.getHours();
       const currentMinute = currentTime.getMinutes();
