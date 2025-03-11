@@ -447,7 +447,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               return { message: `Investment variables not defined for ${index}`};
             } 
             feedData.cp = comparisonPrice;
-            console.log(feedData,`Ready to buy CALL: ${buyCall}, Ready to buy PUT: ${buyPut}`);
+            strapi.log.info(feedData);
+            console.log(`Ready to buy CALL: ${buyCall}, Ready to buy PUT: ${buyPut}`);
 
             if(previousTradedPrice === 0){
               console.log(`First feed after submitting variables: Setting ${lp} as Last Traded Price for ${tk}`);
@@ -885,10 +886,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     
     //Calculate ATR
     function calculateATR(data, period) {
+      if (data.length < period) return null; // Ensure enough LP data
       let trueRanges = [];
       for (let i = 1; i < data.length; i++) {
-          let high = parseFloat(data[i].lp);
-          let low = parseFloat(data[i - 1].lp);
+          let high = Math.max(data[i].lp, data[i - 1].lp);  // Dynamic High
+          let low = Math.min(data[i].lp, data[i - 1].lp);   // Dynamic Low
           let previousClose = parseFloat(data[i - 1].lp);
           trueRanges.push(Math.max(high - low, Math.abs(high - previousClose), Math.abs(low - previousClose)));
       }
@@ -931,7 +933,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
     //Calculate SD
     function calculateStandardDeviation(data) {
-      if (!data.length) return 0; // Handle empty array case
+      if (!data.length || data.length < 2) return 0; // Handle empty array case
   
       const mean = data.reduce((sum, value) => sum + value, 0) / data.length;
       const squaredDiffs = data.map(value => Math.pow(value - mean, 2));
@@ -940,7 +942,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       return Math.sqrt(variance);
   }
 
-    //Calculate EMA
+    // Calculate EMA
     function calculateEMA(values, period) {
       if (values.length < period) return null;
       const k = 2 / (period + 1);
@@ -948,6 +950,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           i === 0 ? curr : (curr * k + prev * (1 - k))
       );
     }
+  
   
     //---------------------------------------------------------------------------------------------------------------------
 
@@ -966,7 +969,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
     //Calculate ATR, Maintain ATR Rolling Data for ATR MA calculation & Calculate ATR Moving Average (ATR MA) & RSI 
     // const atrPeriod = data.length >= 21? 21 : data.length ;  
-    const atr = calculateATR(data, data.length);      
+    const atr = calculateATR(data, data.length) || 0;      
     const rsi = calculateRSI(prices, prices.length) || 0;
     // strapi.rollingData[`${tk}`].currentRSI = rsi;
     const bbw = calculateBBW(prices, prices.length);
@@ -991,10 +994,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const bbwEma = calculateEMA(strapi.rollingData[`${tk}`].bbwValues, strapi.rollingData[`${tk}`].bbwValues.length ) || bbw;
     const bbwSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].bbwValues) || 0;
     const bbwLowerThreshold = bbwEma - bbwSD || 0;
-    const bbwHigherThreshold = parseFloat(bbwEma) + bbwSD || 0;
+    const bbwHigherThreshold = bbwEma + bbwSD || 0;
     const pcSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].pcValues) || 0;
-    const pcLowerThreshold = adaptivePCThreshold - (2 * pcSD) || 0;
-    const pcHigherThreshold = parseFloat(adaptivePCThreshold) + (2 * pcSD) || 0;
+    const deviation = Math.max(1.5,Math.min(2.5, pcSD / adaptivePCThreshold));
+    const pcLowerThreshold = adaptivePCThreshold - (deviation * pcSD) || 0;
+    const pcHigherThreshold = adaptivePCThreshold + (deviation * pcSD) || 0;
     // const dcwEma = calculateEMA(strapi.rollingData[`${tk}`].dcwValues, strapi.rollingData[`${tk}`].dcwValues.length ) || dcw;
     const atrMA = calculateEMA(strapi.rollingData[`${tk}`].atrValues, strapi.rollingData[`${tk}`].atrValues.length) || atr; 
     const adxEma = calculateEMA(strapi.rollingData[`${tk}`].adxValues, strapi.rollingData[`${tk}`].adxValues.length) || adx;
@@ -1002,7 +1006,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     let dynamicRsiHigh = rsiThresholdHigh - (atr / atrMA) * 5 || rsiThresholdHigh;
     let dynamicRsiLow = rsiThresholdLow + (atr / atrMA) * 5 || rsiThresholdLow;   
     console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${adaptivePCThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)} BBW EMA: ${bbwEma.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, Dynamic Low RSI: ${dynamicRsiLow.toFixed(4)} Dynamic High RSI: ${dynamicRsiHigh.toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, `);
-    if (data.length < 1) return null; 
+    if (data.length < lookbackPeriod) return null; 
 
     // **Step 1: High-Low Percentage Change**
     if (percentageChange < pcLowerThreshold) {
@@ -1017,7 +1021,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
     // **Step 2: BBW Check**
     if (bbw >= bbwLowerThreshold && bbw <= bbwHigherThreshold) {
-      console.info(`✅ BBW (${bbw.toFixed(4)}) is between ${bbwLowerThreshold}% and ${bbwHigherThreshold}% → Sideways Market Confirmed`);
+      console.info(`✅ BBW (${bbw.toFixed(4)}) is between ${bbwLowerThreshold.toFixed(4)}% and ${bbwHigherThreshold.toFixed(4)}% → Sideways Market Confirmed`);
       return true;
     } 
 
@@ -1027,18 +1031,18 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     }
 
     // **Step 3: ADX Check**
-    if (parseFloat(adxEma) < adxThreshold && adx < adxThreshold) {
+    if (adxEma < adxThreshold && adx < adxThreshold) {
       console.info(`✅ ADX (${adx.toFixed(4)}) < ${adxThreshold} & ADX EMA (${adxEma.toFixed(4)}) < ${adxThreshold} → Sideways Market Confirmed`);
       return true;
     }
 
-    if(parseFloat(adxEma) > 40 && adx > 40){
+    if(adxEma > 40 && adx > 40){
       console.info(`❌ ADX (${adx.toFixed(4)}) > 40 & ADX EMA (${adxEma.toFixed(4)}) > 40 → NOT Sideways`);
       return false;
     }
     // **Step 4: ATR & RSI with Dynamic RSI Adjustment**
-    if (atr < parseFloat(atrMA) * 1.05 || (rsi >= dynamicRsiLow && rsi <= dynamicRsiHigh)) {
-      console.info(`✅ Final analysis with ATR (${atr.toFixed(4)}) < ATR MA x 1.05 times (${atrMA.toFixed(4)* 1.05}) or RSI (${rsi.toFixed(4)}) within dynamic RSI threshold (${dynamicRsiLow.toFixed(4)} - ${dynamicRsiHigh.toFixed(4)}) confirms a sideways market`);
+    if (atr < atrMA * 1.05 || (rsi >= dynamicRsiLow && rsi <= dynamicRsiHigh)) {
+      console.info(`✅ Final analysis with ATR (${atr.toFixed(4)}) < ATR MA x 1.05 times (${atrMA* 1.05}) or RSI (${rsi.toFixed(4)}) within dynamic RSI threshold (${dynamicRsiLow.toFixed(4)} - ${dynamicRsiHigh.toFixed(4)}) confirms a sideways market`);
       return true;
     }
 
