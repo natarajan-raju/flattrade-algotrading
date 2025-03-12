@@ -447,7 +447,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               return { message: `Investment variables not defined for ${index}`};
             } 
             feedData.cp = comparisonPrice;
-            strapi.log.info(feedData);
+            strapi.log.info(`${feedData}`);
             console.log(`Ready to buy CALL: ${buyCall}, Ready to buy PUT: ${buyPut}`);
 
             if(previousTradedPrice === 0){
@@ -900,25 +900,25 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     
 
    
-    function calculateRSI(prices, period) {
-      let gains = [], losses = [];
-      for (let i = 1; i < prices.length; i++) {
-          let change = prices[i] - prices[i - 1];
-          gains.push(change > 0 ? change : 0);
-          losses.push(change < 0 ? Math.abs(change) : 0);
-      }
+    // function calculateRSI(prices, period) {
+    //   let gains = [], losses = [];
+    //   for (let i = 1; i < prices.length; i++) {
+    //       let change = prices[i] - prices[i - 1];
+    //       gains.push(change > 0 ? change : 0);
+    //       losses.push(change < 0 ? Math.abs(change) : 0);
+    //   }
 
-      let avgGain = gains.slice(0, period).reduce((sum, g) => sum + g, 0) / period;
-      let avgLoss = losses.slice(0, period).reduce((sum, l) => sum + l, 0) / period;
+    //   let avgGain = gains.slice(0, period).reduce((sum, g) => sum + g, 0) / period;
+    //   let avgLoss = losses.slice(0, period).reduce((sum, l) => sum + l, 0) / period;
 
-      for (let i = period; i < gains.length; i++) {
-          avgGain = (avgGain * (period - 1) + gains[i]) / period;
-          avgLoss = (avgLoss * (period - 1) + losses[i]) / period;
-      }
+    //   for (let i = period; i < gains.length; i++) {
+    //       avgGain = (avgGain * (period - 1) + gains[i]) / period;
+    //       avgLoss = (avgLoss * (period - 1) + losses[i]) / period;
+    //   }
 
-      let rs = avgGain / avgLoss;
-      return 100 - (100 / (1 + rs));
-    }
+    //   let rs = avgGain / avgLoss;
+    //   return 100 - (100 / (1 + rs));
+    // }
 
     // Calculate Bollinger Band Width (BBW)
     function calculateBBW(prices, period) {
@@ -956,8 +956,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
     //Factors & thresholds for Sideways market detection
     const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 28), 10);   
-    const rsiThresholdLow = 40;
-    const rsiThresholdHigh = 60;
+    // const rsiThresholdLow = 40;
+    // const rsiThresholdHigh = 60;
     const adxThreshold = 20;            // ADX < 20 → No strong trend
 
     //Sideways detection logic starts here....
@@ -970,7 +970,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     //Calculate ATR, Maintain ATR Rolling Data for ATR MA calculation & Calculate ATR Moving Average (ATR MA) & RSI 
     // const atrPeriod = data.length >= 21? 21 : data.length ;  
     const atr = calculateATR(data, data.length) || 0;      
-    const rsi = calculateRSI(prices, prices.length) || 0;
+    // const rsi = calculateRSI(prices, prices.length) || 0;
     // strapi.rollingData[`${tk}`].currentRSI = rsi;
     const bbw = calculateBBW(prices, prices.length);
 
@@ -993,61 +993,78 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const adaptivePCThreshold = calculateEMA(strapi.rollingData[`${tk}`].pcValues, strapi.rollingData[`${tk}`].pcValues.length) || 2;
     const bbwEma = calculateEMA(strapi.rollingData[`${tk}`].bbwValues, strapi.rollingData[`${tk}`].bbwValues.length ) || bbw;
     const bbwSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].bbwValues) || 0;
-    const bbwLowerThreshold = bbwEma - bbwSD || 0;
+    // const bbwLowerThreshold = bbwEma - bbwSD || 0;
     const bbwHigherThreshold = parseFloat(bbwEma) + bbwSD || 0;
     const pcSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].pcValues) || 0;
-    const deviation = Math.max(1.5,Math.min(2.5, pcSD / adaptivePCThreshold));
-    const pcLowerThreshold = parseFloat(adaptivePCThreshold) - (deviation * pcSD) || 0;
-    const pcHigherThreshold = parseFloat(adaptivePCThreshold) + (deviation * pcSD) || 0;
+    // const deviation = Math.max(1.5,Math.min(2.5, pcSD / adaptivePCThreshold));
+    // const pcLowerThreshold = parseFloat(adaptivePCThreshold) - (deviation * pcSD) || 0;
+    const pcHigherThreshold = parseFloat(adaptivePCThreshold) +  pcSD || 0;
     // const dcwEma = calculateEMA(strapi.rollingData[`${tk}`].dcwValues, strapi.rollingData[`${tk}`].dcwValues.length ) || dcw;
     const atrMA = calculateEMA(strapi.rollingData[`${tk}`].atrValues, strapi.rollingData[`${tk}`].atrValues.length) || atr; 
     const adxEma = calculateEMA(strapi.rollingData[`${tk}`].adxValues, strapi.rollingData[`${tk}`].adxValues.length) || adx;
+    const atrSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].atrValues) || atrMA * 0.05;
     // strapi.rollingData[`${tk}`].currentADX = adxEma > 0 ? adxEma : adx;
-    let dynamicRsiHigh = rsiThresholdHigh - (atr / atrMA) * 5 || rsiThresholdHigh;
-    let dynamicRsiLow = rsiThresholdLow + (atr / atrMA) * 5 || rsiThresholdLow;   
-    console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${adaptivePCThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)} BBW EMA: ${bbwEma.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR MA: ${atrMA.toFixed(4)}, RSI: ${rsi.toFixed(4)}, Dynamic Low RSI: ${dynamicRsiLow.toFixed(4)} Dynamic High RSI: ${dynamicRsiHigh.toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, `);
+    // let dynamicRsiHigh = rsiThresholdHigh - (atr / atrMA) * 5 || rsiThresholdHigh;
+    // let dynamicRsiLow = rsiThresholdLow + (atr / atrMA) * 5 || rsiThresholdLow;   
+    console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${pcHigherThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)} BBW Threshold: ${bbwHigherThreshold.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR Threshold: ${(parseFloat(atrMA) + atrSD).toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, `);
     if (data.length < lookbackPeriod) return null; 
 
-    // **Step 1: High-Low Percentage Change**
-    if (percentageChange < pcLowerThreshold) {
-      console.info(`✅ PC (${percentageChange.toFixed(4)}) is within adaptive range  ${pcLowerThreshold.toFixed(4)} → Sideways Market Confirmed`);
-      return true;
-    }
+    // // **Step 1: High-Low Percentage Change**
+    // if (percentageChange < pcLowerThreshold) {
+    //   console.info(`✅ PC (${percentageChange.toFixed(4)}) is within adaptive range  ${pcLowerThreshold.toFixed(4)} → Sideways Market Confirmed`);
+    //   return true;
+    // }
+    if(percentageChange > pcHigherThreshold &&
+      bbw > bbwHigherThreshold &&
+      parseFloat(adxEma) > 30 && 
+      adx > 40 &&
+      atr > (parseFloat(atrMA) + atrSD)){
+        console.log('✅ Trending Market');
+      } else {
+        console.log('❌ Sideways market waiting for a breakout');
+      }
 
-    if(percentageChange > pcHigherThreshold) {
-      console.info(`❌ Sudden spike in PC ${percentageChange.toFixed(4)} greater than PC high threshold ${pcHigherThreshold.toFixed(4)} → Not a sideways`);  
-      return false;
-    }
+    return (
+      percentageChange > pcHigherThreshold &&
+      bbw > bbwHigherThreshold &&
+      (parseFloat(adxEma) > 30 && adx > 40) &&
+      atr > parseFloat(atrMA) + atrSD
+    );
 
-    // **Step 2: BBW Check**
-    if (bbw >= bbwLowerThreshold && bbw <= bbwHigherThreshold) {
-      console.info(`✅ BBW (${bbw.toFixed(4)}) is between ${bbwLowerThreshold.toFixed(4)}% and ${bbwHigherThreshold.toFixed(4)}% → Sideways Market Confirmed`);
-      return true;
-    } 
+    // if(percentageChange > pcHigherThreshold) {
+    //   console.info(`❌ Sudden spike in PC ${percentageChange.toFixed(4)} greater than PC high threshold ${pcHigherThreshold.toFixed(4)} → Not a sideways`);  
+    //   return false;
+    // }
 
-    if(bbw > bbwHigherThreshold){
-      console.info(`❌ BBW (${bbw.toFixed(4)}) > ${bbwHigherThreshold}% → NOT Sideways`);  
-      return false;
-    }
+    // // **Step 2: BBW Check**
+    // // if (bbw >= bbwLowerThreshold && bbw <= bbwHigherThreshold) {
+    // //   console.info(`✅ BBW (${bbw.toFixed(4)}) is between ${bbwLowerThreshold.toFixed(4)}% and ${bbwHigherThreshold.toFixed(4)}% → Sideways Market Confirmed`);
+    // //   return true;
+    // // } 
 
-    // **Step 3: ADX Check**
-    if (parseFloat(adxEma) < adxThreshold && adx < adxThreshold) {
-      console.info(`✅ ADX (${adx.toFixed(4)}) < ${adxThreshold} & ADX EMA (${adxEma.toFixed(4)}) < ${adxThreshold} → Sideways Market Confirmed`);
-      return true;
-    }
+    // if(bbw > bbwHigherThreshold){
+    //   console.info(`❌ BBW (${bbw.toFixed(4)}) > ${bbwHigherThreshold}% → NOT Sideways`);  
+    //   return false;
+    // }
 
-    if(parseFloat(adxEma) > 40 && adx > 40){
-      console.info(`❌ ADX (${adx.toFixed(4)}) > 40 & ADX EMA (${adxEma.toFixed(4)}) > 40 → NOT Sideways`);
-      return false;
-    }
-    // **Step 4: ATR & RSI with Dynamic RSI Adjustment**
-    if (atr < parseFloat(atrMA) * 1.05 || (rsi >= dynamicRsiLow && rsi <= dynamicRsiHigh)) {
-      console.info(`✅ Final analysis with ATR (${atr.toFixed(4)}) < ATR MA x 1.05 times (${atrMA* 1.05}) or RSI (${rsi.toFixed(4)}) within dynamic RSI threshold (${dynamicRsiLow.toFixed(4)} - ${dynamicRsiHigh.toFixed(4)}) confirms a sideways market`);
-      return true;
-    }
+    // // **Step 3: ADX Check**
+    // if (parseFloat(adxEma) < adxThreshold && adx < adxThreshold) {
+    //   console.info(`✅ ADX (${adx.toFixed(4)}) < ${adxThreshold} & ADX EMA (${adxEma.toFixed(4)}) < ${adxThreshold} → Sideways Market Confirmed`);
+    //   return true;
+    // }
 
-    console.info(`❌ NOT Sideways`);
-    return false;
+    // if(parseFloat(adxEma) > 40 && adx > 40){
+    //   console.info(`❌ ADX (${adx.toFixed(4)}) > 40 & ADX EMA (${adxEma.toFixed(4)}) > 40 → NOT Sideways`);
+    //   return false;
+    // }
+    // // **Step 4: ATR & RSI with Dynamic RSI Adjustment**
+    // if (atr < parseFloat(atrMA) * 1.05 || (rsi >= dynamicRsiLow && rsi <= dynamicRsiHigh)) {
+    //   console.info(`✅ Final analysis with ATR (${atr.toFixed(4)}) < ATR MA x 1.05 times (${atrMA* 1.05}) or RSI (${rsi.toFixed(4)}) within dynamic RSI threshold (${dynamicRsiLow.toFixed(4)} - ${dynamicRsiHigh.toFixed(4)}) confirms a sideways market`);
+    //   return true;
+    // }
+
+    // console.info(`❌ NOT Sideways`);
+    // return false;
     
   },
 
