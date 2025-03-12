@@ -994,11 +994,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const bbwEma = calculateEMA(strapi.rollingData[`${tk}`].bbwValues, strapi.rollingData[`${tk}`].bbwValues.length ) || bbw;
     const bbwSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].bbwValues) || 0;
     const bbwLowerThreshold = bbwEma - bbwSD || 0;
-    const bbwHigherThreshold = bbwEma + bbwSD || 0;
+    const bbwHigherThreshold = parseFloat(bbwEma) + bbwSD || 0;
     const pcSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].pcValues) || 0;
     const deviation = Math.max(1.5,Math.min(2.5, pcSD / adaptivePCThreshold));
-    const pcLowerThreshold = adaptivePCThreshold - (deviation * pcSD) || 0;
-    const pcHigherThreshold = adaptivePCThreshold + (deviation * pcSD) || 0;
+    const pcLowerThreshold = parseFloat(adaptivePCThreshold) - (deviation * pcSD) || 0;
+    const pcHigherThreshold = parseFloat(adaptivePCThreshold) + (deviation * pcSD) || 0;
     // const dcwEma = calculateEMA(strapi.rollingData[`${tk}`].dcwValues, strapi.rollingData[`${tk}`].dcwValues.length ) || dcw;
     const atrMA = calculateEMA(strapi.rollingData[`${tk}`].atrValues, strapi.rollingData[`${tk}`].atrValues.length) || atr; 
     const adxEma = calculateEMA(strapi.rollingData[`${tk}`].adxValues, strapi.rollingData[`${tk}`].adxValues.length) || adx;
@@ -1031,17 +1031,17 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     }
 
     // **Step 3: ADX Check**
-    if (adxEma < adxThreshold && adx < adxThreshold) {
+    if (parseFloat(adxEma) < adxThreshold && adx < adxThreshold) {
       console.info(`✅ ADX (${adx.toFixed(4)}) < ${adxThreshold} & ADX EMA (${adxEma.toFixed(4)}) < ${adxThreshold} → Sideways Market Confirmed`);
       return true;
     }
 
-    if(adxEma > 40 && adx > 40){
+    if(parseFloat(adxEma) > 40 && adx > 40){
       console.info(`❌ ADX (${adx.toFixed(4)}) > 40 & ADX EMA (${adxEma.toFixed(4)}) > 40 → NOT Sideways`);
       return false;
     }
     // **Step 4: ATR & RSI with Dynamic RSI Adjustment**
-    if (atr < atrMA * 1.05 || (rsi >= dynamicRsiLow && rsi <= dynamicRsiHigh)) {
+    if (atr < parseFloat(atrMA) * 1.05 || (rsi >= dynamicRsiLow && rsi <= dynamicRsiHigh)) {
       console.info(`✅ Final analysis with ATR (${atr.toFixed(4)}) < ATR MA x 1.05 times (${atrMA* 1.05}) or RSI (${rsi.toFixed(4)}) within dynamic RSI threshold (${dynamicRsiLow.toFixed(4)} - ${dynamicRsiHigh.toFixed(4)}) confirms a sideways market`);
       return true;
     }
