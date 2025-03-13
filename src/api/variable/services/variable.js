@@ -447,7 +447,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               return { message: `Investment variables not defined for ${index}`};
             } 
             feedData.cp = comparisonPrice;
-            strapi.log.info(`${feedData}`);
+            strapi.log.info(JSON.stringify(feedData));
             console.log(`Ready to buy CALL: ${buyCall}, Ready to buy PUT: ${buyPut}`);
 
             if(previousTradedPrice === 0){
