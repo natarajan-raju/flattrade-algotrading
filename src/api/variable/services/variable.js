@@ -1025,10 +1025,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       }
 
     return (
-      percentageChange > pcHigherThreshold &&
-      bbw > bbwHigherThreshold &&
-      (parseFloat(adxEma) > 30 && adx > 40) &&
-      atr > parseFloat(atrMA) + atrSD
+      percentageChange < pcHigherThreshold &&
+      bbw < bbwHigherThreshold &&
+      (parseFloat(adxEma) < 30 && adx < 40) &&
+      atr < parseFloat(atrMA) + atrSD
     );
 
     // if(percentageChange > pcHigherThreshold) {
