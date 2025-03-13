@@ -320,11 +320,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       try {
         
                
-        // Sideways market detection strategy
+        // Trending market detection strategy
         if (!strapi.rollingData[`${tk}`]) {
           strapi.rollingData[`${tk}`] = {
             prices_lookback_period: [],
-            isSidewaysMarket: false,
+            isTrendingMarket: false,
             atrValues: [],
             // rsiSeries: [],
             // currentADX: 0,
@@ -344,13 +344,13 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         if(strapi.rollingData[`${tk}`].prices_lookback_period.length > lookbackPeriod){
          strapi.rollingData[`${tk}`].prices_lookback_period.shift();
         }
-        const isSidewaysMarket = await this.calculateSidewaysMarket(tk, strapi.rollingData[`${tk}`].prices_lookback_period);
+        const isTrendingMarket = await this.calculateTrendingMarket(tk, strapi.rollingData[`${tk}`].prices_lookback_period);
         const index = strapi[`${tk}`].get('index') || tk;
-        console.log('issidewaysMarket:',isSidewaysMarket)
+        console.log('isTrendingMarket:',isTrendingMarket)
       
-       if (isSidewaysMarket === true && !strapi.rollingData[`${tk}`].isSidewaysMarket) {
+       if (isTrendingMarket === false && strapi.rollingData[`${tk}`].isTrendingMarket) {
             // Send a Strapi web broadcast to client regarding sideways market detection
-            strapi.log.info(`Index ${index} entering a sideways market...`);
+            strapi.log.info(`Index ${index} entering a Sideways market...`);
             strapi.webSocket.broadcast({
               type: 'market',
               message: `Index ${index} entering a sideways market.Trading not advised.. Pause for Stop loss...`,
@@ -358,8 +358,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               status: '001',
               tk
             });
-            strapi.rollingData[`${tk}`].isSidewaysMarket = true;
-        } else if (isSidewaysMarket === false && strapi.rollingData[`${tk}`].isSidewaysMarket) {
+            strapi.rollingData[`${tk}`].isTrendingMarket = false;
+        } else if (isTrendingMarket === true && !strapi.rollingData[`${tk}`].isTrendingMarket) {
             // Broadcast sideways market end
             strapi.log.info(`Index ${index} exiting a sideways market...`);
             strapi.webSocket.broadcast({
@@ -369,8 +369,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               isSideWays: false,
               tk
             });
-            strapi.rollingData[`${tk}`].isSidewaysMarket = false;
-        }  else if(isSidewaysMarket === null ) {
+            strapi.rollingData[`${tk}`].isTrendingMarket = true;
+        }  else if(isTrendingMarket === null ) {
           console.log(`Application trying to deduct market status for Index token ${index}...`);          
           strapi.webSocket.broadcast({
             type: 'market',
@@ -501,7 +501,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             if(strapi.isTradingEnabled){
               let contractType;           
               //Buy CALL
-              if(!callOptionBought && !putOptionBought && !initialSpectatorMode && !strapi.rollingData[`${tk}`].isSidewaysMarket){                
+              if(!callOptionBought && !putOptionBought && !initialSpectatorMode && strapi.rollingData[`${tk}`].isTrendingMarket){                
                 if(((parseFloat(comparisonPrice) >= parseFloat(basePrice) + parseFloat(targetStep) && parseFloat(comparisonPrice) < parseFloat(resistance1) - parseFloat(targetStep)) 
                   || (parseFloat(comparisonPrice) >= parseFloat(resistance1) + parseFloat(targetStep) && parseFloat(comparisonPrice) < parseFloat(resistance2) - parseFloat(targetStep))
                   || (parseFloat(comparisonPrice)>= parseFloat(resistance2) + parseFloat(targetStep))
@@ -773,7 +773,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     try {
       strapi.rollingData = {
         prices_lookback_period: [],
-        isSidewaysMarket: false,
+        isTrendingMarket: false,
         atrValues: [],
         // rsiSeries: [],
         // currentRSI: 0,
@@ -843,7 +843,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   },
 
   
-  async calculateSidewaysMarket(tk, data) {
+  async calculateTrendingMarket(tk, data) {
     
 
     //Helper Functions-------------------------------------------------------------------------------------------
@@ -1025,10 +1025,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       }
 
     return (
-      percentageChange < pcHigherThreshold &&
-      bbw < bbwHigherThreshold &&
-      (parseFloat(adxEma) < 30 && adx < 40) &&
-      atr < parseFloat(atrMA) + atrSD
+      percentageChange > pcHigherThreshold &&
+      bbw > bbwHigherThreshold &&
+      (parseFloat(adxEma) > 30 && adx > 40) &&
+      atr > parseFloat(atrMA) + atrSD
     );
 
     // if(percentageChange > pcHigherThreshold) {
@@ -1120,7 +1120,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           delete strapi[`${entry.indexToken}`];
           strapi.rollingData[`${entry.indexToken}`] = {
             prices_lookback_period: [],
-            isSidewaysMarket: false,
+            isTrendingMarket: false,
             atrValues: [],
             // rsiSeries: [],
             // currentRSI: 0,
@@ -1149,7 +1149,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     }else{
       strapi.rollingData[`${indexToken}`] = {
         prices_lookback_period: [],
-        isSidewaysMarket: false,
+        isTrendingMarket: false,
         atrValues: [],
         // rsiSeries: [],
         // currentRSI: 0,
@@ -1200,7 +1200,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   async fetchIndexVariables(){
     strapi.rollingData = {
       prices_lookback_period: [],
-      isSidewaysMarket: false,
+      isTrendingMarket: false,
       atrValues: [],
       // rsiSeries: [],
       // currentRSI: 0,
