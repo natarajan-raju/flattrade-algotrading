@@ -316,7 +316,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       }           
     } else { 
       // Parse the lookback period once
-      const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 28), 10);     
+      const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 56), 10);     
       try {
         
                
@@ -427,9 +427,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   i === 0 ? curr : (curr * k + prev * (1 - k))
               );
             }
-            
+             
             let comparisonPrice;
-            if(strapi.rollingData[`${tk}`].ticks.length >  28){
+            if(strapi.rollingData[`${tk}`].ticks.length >  56){
               strapi.rollingData[`${tk}`].ticks.shift();          
             }
             // console.log(strapi.rollingData[`${tk}`].ticks);
@@ -955,7 +955,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     //---------------------------------------------------------------------------------------------------------------------
 
     //Factors & thresholds for Sideways market detection
-    const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 28), 10);   
+    const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 56), 10);   
     // const rsiThresholdLow = 40;
     // const rsiThresholdHigh = 60;
     const adxThreshold = 20;            // ADX < 20 → No strong trend
