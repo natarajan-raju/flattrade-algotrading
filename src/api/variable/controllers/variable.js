@@ -230,7 +230,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         //   }    
           const indexItem =await strapi.db.query('api::variable.variable').findOne({where: {indexToken}});
           const index = indexItem.index;
-          console.log(indexItem);
+          // console.log(indexItem);
           let avoid = null;    
           let preferredCall = null; 
           let preferredPut = null; 
@@ -255,7 +255,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                   body: payload, 
               });
               contracts = await contractsResponse.json();                                                  
-              console.log(contracts);
+              // console.log(contracts);
               if(!contracts.values || contracts.values.length == 0 ){
                   return ctx.send({ message: 'Either expiry data provided is wrong or Session token expired', status: false });
               }
