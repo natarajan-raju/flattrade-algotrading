@@ -230,6 +230,14 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         //   }    
           const indexItem =await strapi.db.query('api::variable.variable').findOne({where: {indexToken}});
           const index = indexItem.index;
+          try{
+            strapi[`${indexToken}`] && console.log(strapi[`${indexToken}`]);
+          }catch(error){
+            console.log(error);
+            strapi[`${indexToken}`] = new Map(Object.entries(indexItem));
+            console.log('TEst',strapi[`${indexToken}`].index);
+    
+          }
           // console.log(indexItem);
           let avoid = null;    
           let preferredCall = null; 
