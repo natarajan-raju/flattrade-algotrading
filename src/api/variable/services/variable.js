@@ -97,7 +97,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         // contractTokens[`${option.token}`] = tokenData;
         // console.log('Reached stage 3');
       });
-      if(strapi[`${index}`].size === 0) strapi[`${index}`] = new Map();
+      if ((strapi[`${index}`]?.size ?? 0) === 0) {
+        strapi[`${index}`] = new Map();
+      }
+    
       strapi[`${index}`].set('contractTokens', contractTokens);
       // try{
       //   strapi[`${index}`] && strapi[`${index}`].get('contractTokens');
