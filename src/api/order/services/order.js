@@ -97,7 +97,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         do{            
             let preferredContract = await this.getPreferredContract(index,contractType,amount,avoid);
             if(preferredContract.token){
-                console.log(`Found a suitable contract ${preferredContract.tsym} with price INR ${preferredContract.lp} & RSI ${strapi[`${preferredContract.token}`].get('rsi') || -1000}`);
+                console.log(`Found a suitable contract ${preferredContract.tsym} with price INR ${preferredContract.lp}}`);
                 const orderQuantity = quantity * preferredContract.ls;                
                 let orderStatus;
                 const norenordno = await this.placeOrderWithFlattrade('NFO',preferredContract.tsym,orderQuantity,'0','B','Order created from rajaapp.in');
@@ -554,11 +554,13 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             }    
     },
 
-    async placeOrderWithFlattrade(exchange,tsym,quantity,price,orderType,remarks){
-        
+    async placeOrderWithFlattrade(exchange,tsym,quantity,price,orderType,remarks="Order created from rajaapp.in",bo=false,target=0,stoploss=0){       
+       
+        let payload='';
         try{
             
-            const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${price}","prd":"M","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}"}&jKey=${strapi.sessionToken}`;
+            bo === false ?  payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${price}","prd":"M","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}"}&jKey=${strapi.sessionToken}`
+                         :  payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${price}","prd":"B","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}","bpprc":"${target}","blprc":"${stoploss}"}&jKey=${strapi.sessionToken}`;
             const orderResponse = await fetch(`${env('FLATTRADE_PLACE_ORDER_URL')}`,{
                 method: 'POST',
                 headers: {
@@ -567,8 +569,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 body: payload, 
             });
             const order = await orderResponse.json();
-            if(order.norenordno){
-                
+            if(order.norenordno){            
                     
                 return order.norenordno;
             } else {
@@ -615,7 +616,8 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
 
     async handleOrderbookFeed(feedData){
             // console.log(feedData);
-            const { norenordno,prc,status, qty } = feedData;
+        try{
+            const { norenordno,prc,status, tsym, trantype,token,ls,avgprc, remarks, rejreason, qty } = feedData;
             const order = await strapi.db.query('api::order.order').findOne({
                 where: { norenordno },
             });
@@ -633,9 +635,28 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     status: true,                   
                 });
             }else{
-                return {'status': false, message: 'Order not found'};
+                const createdOrder = await strapi.db.query('api::order.order').create({
+                    data: {
+                        index: tsym.match(/^[A-Za-z]+/)[0],
+                        orderType: trantype === 'B'? 'BUY' : 'SELL',
+                        contractType: tsym.match(/\d{2}[A-Z]{3}\d{2}([CP])/),                       
+                        contractTsym: tsym,
+                        contractToken: token,
+                        lotSize: ls,
+                        price: ls * avgprc,
+                        contractLp: avgprc,
+                        norenordno,
+                        orderStatus: status,
+                        remarks: rejreason.length > 0? rejreason : remarks,
+                        quantity: qty,                        
+                    }   
+                });
+                console.log(createdOrder);
             }
             return {'status': true, message: 'Orderbook feed processed successfully'};
+        }catch(error){
+            return {'status': false, message: `Error processing orderbook feed: ${error}`};
+        }
             
     },
 

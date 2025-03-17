@@ -10,6 +10,15 @@ const { createCoreRouter } = require('@strapi/strapi').factories;
 module.exports = {
     routes: [
         {
+          method: 'POST',
+          path: '/variables/startAmountBasedTrading',
+          handler: 'api::variable.variable.startAmountBasedTrading', // Your custom token handling logic
+          config: {
+            policies: [],
+            middlewares: [],
+          },
+      },
+        {
             method: 'POST',
             path: '/variables/handleInvestmentVariables',
             handler: 'api::variable.variable.handleInvestmentVariables', // Your custom token handling logic
@@ -35,7 +44,8 @@ module.exports = {
               policies: [],
               middlewares: [],
             },
-        },
+        },      
+
         {
             method: 'GET',
             path: '/variables',

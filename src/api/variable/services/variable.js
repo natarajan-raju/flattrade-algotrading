@@ -18,6 +18,8 @@ const { createCoreService } = require('@strapi/strapi').factories;
 
 module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
+  
+
   //Convert date to string for Scrip search
   async convertDateFormat(inputDate) {    
     const dateParts = inputDate.split('-'); // Split YYYY-MM-DD into [YYY,MM,DD]
@@ -90,6 +92,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         strapi[`${option.token}`].set('rsi', 0);
         strapi[`${option.token}`].set('rsiSeries', []);
         strapi[`${option.token}`].set('prices', []);
+        strapi[`${option.token}`].set('lp', 0);
         // contractTokens[`${option.token}`] = tokenData;
         
       });
@@ -124,7 +127,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       try{
         await strapi.service('api::variable.variable').analyzeMarketDirection(indexToken);
       }catch(error){
-        throw new Error(error);
+        console.log(error);
       }
     },30000);
     strapi[`${indexToken}`].set('intervalId', intervalId);
@@ -195,9 +198,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             //update the lp for current tk in contractTokens
             if(optt === 'CE'){
               contractTokens.ce.find(item => item.token === tk).lp = lp;
+              
             } else if(optt === 'PE'){
               contractTokens.pe.find(item => item.token === tk).lp = lp;
             }
+            strapi[`${tk}`].set('lp', lp);
             strapi[`${index}`].set('contractTokens', contractTokens);
             const contractBought = strapi[`${index}`].get('contractBought') || null;
            
@@ -344,7 +349,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         if(strapi.rollingData[`${tk}`].prices_lookback_period.length > lookbackPeriod){
          strapi.rollingData[`${tk}`].prices_lookback_period.shift();
         }
-        const isTrendingMarket = await this.calculateTrendingMarket(tk, strapi.rollingData[`${tk}`].prices_lookback_period);
+        const isTrendingMarket = await this.calculateTrendingMarket(tk, strapi.rollingData[`${tk}`].prices_lookback_period, lp);
         const index = strapi[`${tk}`].get('index') || tk;
         console.log('isTrendingMarket:',isTrendingMarket)
       
@@ -768,6 +773,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         
     }   
   },
+
+
   // Custom function to reset investment variables
   async resetInvestmentVariables() {
     try {
@@ -843,7 +850,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   },
 
   
-  async calculateTrendingMarket(tk, data) {
+  async calculateTrendingMarket(tk, data, lp) {
     
 
     //Helper Functions-------------------------------------------------------------------------------------------
@@ -928,10 +935,14 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       const stdDev = Math.sqrt(variance);
       const upperBand = sma + 2 * stdDev;
       const lowerBand = sma - 2 * stdDev;
-      return ((upperBand - lowerBand) / sma) * 100;
+      return {
+        bbw: ((upperBand - lowerBand) / sma) * 100,
+        upperBand,
+        lowerBand
+      };
     }
 
-    //Calculate SD
+    // Calculate SD
     function calculateStandardDeviation(data) {
       if (!data.length || data.length < 2) return 0; // Handle empty array case
   
@@ -958,7 +969,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const lookbackPeriod = parseInt(env('SIDEWAYS_THRESHOLD_LOOKBACKPERIOD', 56), 10);   
     // const rsiThresholdLow = 40;
     // const rsiThresholdHigh = 60;
-    const adxThreshold = 20;            // ADX < 20 → No strong trend
+    // const adxThreshold = 20;            // ADX < 20 → No strong trend
 
     //Sideways detection logic starts here....
    
@@ -972,7 +983,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     const atr = calculateATR(data, data.length) || 0;      
     // const rsi = calculateRSI(prices, prices.length) || 0;
     // strapi.rollingData[`${tk}`].currentRSI = rsi;
-    const bbw = calculateBBW(prices, prices.length);
+    const bbwCalculation = calculateBBW(prices, prices.length);
+    const bbw = bbwCalculation.bbw;
+    const upperBand = bbwCalculation.upperBand;
+    const lowerBand = bbwCalculation.lowerBand;
 
     const adx = calculateADX(data, data.length) || 0;
     
@@ -992,21 +1006,20 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
     const adaptivePCThreshold = calculateEMA(strapi.rollingData[`${tk}`].pcValues, strapi.rollingData[`${tk}`].pcValues.length) || 2;
     const bbwEma = calculateEMA(strapi.rollingData[`${tk}`].bbwValues, strapi.rollingData[`${tk}`].bbwValues.length ) || bbw;
-    const bbwSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].bbwValues) || 0;
+    // const bbwSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].bbwValues) || 0;
     // const bbwLowerThreshold = bbwEma - bbwSD || 0;
-    const bbwHigherThreshold = parseFloat(bbwEma) + bbwSD || 0;
-    const pcSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].pcValues) || 0;
-    // const deviation = Math.max(1.5,Math.min(2.5, pcSD / adaptivePCThreshold));
-    // const pcLowerThreshold = parseFloat(adaptivePCThreshold) - (deviation * pcSD) || 0;
-    const pcHigherThreshold = parseFloat(adaptivePCThreshold) +  pcSD || 0;
+    const bbwHigherThreshold = parseFloat(bbwEma) || 0;
+    const pcSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].pcValues);
+    const deviation = Math.max(1.5,Math.min(2.5, pcSD / adaptivePCThreshold));   
+    const pcHigherThreshold = Math.max(parseFloat(adaptivePCThreshold) + (deviation * pcSD), parseFloat(adaptivePCThreshold) * 1.1);
     // const dcwEma = calculateEMA(strapi.rollingData[`${tk}`].dcwValues, strapi.rollingData[`${tk}`].dcwValues.length ) || dcw;
     const atrMA = calculateEMA(strapi.rollingData[`${tk}`].atrValues, strapi.rollingData[`${tk}`].atrValues.length) || atr; 
     const adxEma = calculateEMA(strapi.rollingData[`${tk}`].adxValues, strapi.rollingData[`${tk}`].adxValues.length) || adx;
-    const atrSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].atrValues) || atrMA * 0.05;
+    const atrSD = calculateStandardDeviation(strapi.rollingData[`${tk}`].atrValues);
     // strapi.rollingData[`${tk}`].currentADX = adxEma > 0 ? adxEma : adx;
     // let dynamicRsiHigh = rsiThresholdHigh - (atr / atrMA) * 5 || rsiThresholdHigh;
     // let dynamicRsiLow = rsiThresholdLow + (atr / atrMA) * 5 || rsiThresholdLow;   
-    console.log(`PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${pcHigherThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)} BBW Threshold: ${bbwHigherThreshold.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR Threshold: ${(parseFloat(atrMA) + atrSD).toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, `);
+    console.log(`LP: ${lp} UpperBand: ${upperBand.toFixed(4)}, LowerBand: ${lowerBand.toFixed(4)}, PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${pcHigherThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)} BBW Threshold: ${bbwHigherThreshold.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR Threshold: ${(parseFloat(atrMA) + atrSD * 0.5).toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, `);
     if (data.length < lookbackPeriod) return null; 
 
     // // **Step 1: High-Low Percentage Change**
@@ -1015,10 +1028,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     //   return true;
     // }
     if(percentageChange > pcHigherThreshold &&
+      (parseFloat(lp) < lowerBand || parseFloat(lp) > upperBand) &&
       bbw > bbwHigherThreshold &&
-      parseFloat(adxEma) > 30 && 
-      adx > 40 &&
-      atr > (parseFloat(atrMA) + atrSD)){
+      (parseFloat(adxEma) > 25 && adx > 40) &&
+      atr > (parseFloat(atrMA) + atrSD * 0.5)){
         console.log('✅ Trending Market');
       } else {
         console.log('❌ Sideways market waiting for a breakout');
@@ -1026,9 +1039,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
     return (
       percentageChange > pcHigherThreshold &&
+      (parseFloat(lp) < lowerBand || parseFloat(lp) > upperBand) &&
       bbw > bbwHigherThreshold &&
-      (parseFloat(adxEma) > 30 && adx > 40) &&
-      atr > parseFloat(atrMA) + atrSD
+      (parseFloat(adxEma) > 25 && adx > 40) &&
+      atr > (parseFloat(atrMA) + atrSD * 0.5) // Volatility filter
     );
 
     // if(percentageChange > pcHigherThreshold) {
@@ -1243,6 +1257,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           strapi[`${token}`].set('rsi', 0);
           strapi[`${token}`].set('rsiSeries', []);
           strapi[`${token}`].set('prices', []);
+          strapi[`${token}`].set('lp', 0);
         });
         contractTokens.pe.forEach(contract => {
           const {token, optt, tsym, ls, index} = contract;
@@ -1254,6 +1269,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           strapi[`${token}`].set('rsi', 0);
           strapi[`${token}`].set('rsiSeries', []);
           strapi[`${token}`].set('prices', []);
+          strapi[`${token}`].set('lp', 0);
         });
         
              
@@ -1427,6 +1443,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     }
   },
 
+  
+
   //Determine Market direction
   async analyzeMarketDirection(indexToken) {
     // console.log('test');
@@ -1487,7 +1505,22 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         });
         
        
-  }
+  },
+
+  // Helper: Check if time is between 9:15 and 9:30
+  async isBetween915And930() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes();
+    return h === 9 && m >= 15 && m < 30;
+  },
+
+  // Helper: Sleep for ms
+  async sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+  },
+
+  
   
 }));
 
