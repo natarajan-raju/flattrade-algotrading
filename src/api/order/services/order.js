@@ -36,7 +36,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         });
         
 
-       if(preferredContract.lp > amount * 1.20){
+       if(preferredContract.lp > amount * 1.20 || preferredContract.lp < amount){
         return {token: null, lp: Infinity, tsym: null, lotSize: null, rsi: 0};
        }
        
