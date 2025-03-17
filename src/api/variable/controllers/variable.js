@@ -310,7 +310,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
           }
           
           await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
-          strapi.service('api::variable.variable').startAmountMonitoring();
+          strapi.service('api::variable.variable').startAmountMonitoring(index, entry);
           return ctx.send({ message: 'Amount based trading started successfully', status: true });
     
           // 2. We'll keep searching/monitoring until one contract hits +0.9
