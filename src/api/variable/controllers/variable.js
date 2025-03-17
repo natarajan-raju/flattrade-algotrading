@@ -228,7 +228,9 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         //   if (!isBetween915And930()) {
         //     return ctx.send("Trading can only start between 9:15 and 9:30 AM.");
         //   }    
-          const index = strapi.db.query('api::variable.variable').findOne({where: {indexToken}}).index;
+          const indexItem = strapi.db.query('api::variable.variable').findOne({where: {indexToken}});
+          const index = indexItem.index;
+          console.log(indexItem);
           let avoid = null;    
           let preferredCall = null; 
           let preferredPut = null; 
