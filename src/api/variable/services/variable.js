@@ -65,7 +65,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       if(!optionChain.values){
         throw new Error('Option chain processing failed...');
       }
-      console.log('Reached stage 1');
+      // console.log('Reached stage 1');
       const contractTokens = {
         ce: [],
         pe: [],        
@@ -84,7 +84,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         }else if(option.optt === 'PE'){
           contractTokens.pe.push(tokenData);
         }
-        console.log('Reached stage 2');
+        // console.log('Reached stage 2');
         strapi[`${option.token}`] = new Map();
         strapi[`${option.token}`].set('optt', option.optt);
         strapi[`${option.token}`].set('tsym', option.tsym);
@@ -95,11 +95,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         strapi[`${option.token}`].set('prices', []);
         strapi[`${option.token}`].set('lp', 0);
         // contractTokens[`${option.token}`] = tokenData;
-        console.log('Reached stage 3');
+        // console.log('Reached stage 3');
       });
       try{
         strapi[`${index}`] && strapi[`${index}`].get('contractTokens');
-        console.log('Reached stage 4');
+        // console.log('Reached stage 4');
       }catch(error){
         console.log(error);
         strapi[`${index}`] = new Map();

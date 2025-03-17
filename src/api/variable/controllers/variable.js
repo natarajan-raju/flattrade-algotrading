@@ -231,7 +231,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
           const indexItem =await strapi.db.query('api::variable.variable').findOne({where: {indexToken}});
           const index = indexItem.index;
           try{
-            strapi[`${indexToken}`] && console.log(strapi[`${indexToken}`]);
+            console.log(strapi[`${indexToken}`].get('index'));
           }catch(error){
             console.log(error);
             strapi[`${indexToken}`] = new Map(Object.entries(indexItem));
@@ -279,7 +279,8 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
           let scripItem = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken }});    
           if(!scripItem.scripList){
               try{
-                  scripList = await strapi.service('api::variable.variable').processScripList(indexToken,index,contract, strapi.sessionToken);  
+                  scripList = await strapi.service('api::variable.variable').processScripList(indexToken,index,contract, strapi.sessionToken); 
+                  console.log(scripList); 
                   strapi[`${indexToken}`].set('scripList', scripList);                    
               }catch(error){
                   return ctx.send({ message: `Error in processing scrip list with error:  ${error}`, status: false });
