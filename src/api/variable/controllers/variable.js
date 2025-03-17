@@ -230,14 +230,16 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
         //   }    
           const indexItem =await strapi.db.query('api::variable.variable').findOne({where: {indexToken}});
           const index = indexItem.index;
-          try{
-            console.log(strapi[`${indexToken}`].get('index'));
-          }catch(error){
-            console.log(error);
-            strapi[`${indexToken}`] = new Map(Object.entries(indexItem));
-            console.log('TEst',strapi[`${indexToken}`].index);
+          if(strapi[`${indexToken}`].size === 0) strapi[`${indexToken}`] = new Map(Object.entries(indexItem));
+          strapi[`${indexToken}`].set('index', index);
+          // try{
+          //   console.log(strapi[`${indexToken}`].get('index'));
+          // }catch(error){
+          //   console.log(error);
+          //   strapi[`${indexToken}`] = new Map(Object.entries(indexItem));
+          //   console.log('TEst',strapi[`${indexToken}`].index);
     
-          }
+          // }
           // console.log(indexItem);
           let avoid = null;    
           let preferredCall = null; 
@@ -308,99 +310,101 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
           }
           
           await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
+          strapi.service('api::variable.variable').startAmountMonitoring();
+          return ctx.send({ message: 'Amount based trading started successfully', status: true });
     
           // 2. We'll keep searching/monitoring until one contract hits +0.9
           //    or until the time window (9:15–9:30) ends.
-          while (true) {
-            // // Stop if time is >= 9:30
-            // if (!await strapi.service("api::variable.variable").isBetween915And930()) {
-            //   console.log("Time window ended (after 9:30). Stopping search/monitoring.");
-            //   break;
-            // }
+          // while (true) {
+          //   // // Stop if time is >= 9:30
+          //   // if (!await strapi.service("api::variable.variable").isBetween915And930()) {
+          //   //   console.log("Time window ended (after 9:30). Stopping search/monitoring.");
+          //   //   break;
+          //   // }
     
-            // Try to find a CALL contract if we don't have one yet
-            if (!preferredCall) {
-              const callCandidate = await strapi
-                .service("api::order.order")
-                .getPreferredContract(index, "CALL", entry, avoid);
-              if (callCandidate?.token) {
-                preferredCall = callCandidate;
-                callInitialLP = callCandidate.lp;
-                console.log("Found CALL contract:", callCandidate.token, "LP =", callCandidate.lp);
-              }
-            }
+          //   // Try to find a CALL contract if we don't have one yet
+          //   if (!preferredCall) {
+          //     const callCandidate = await strapi
+          //       .service("api::order.order")
+          //       .getPreferredContract(index, "CALL", entry, avoid);
+          //     if (callCandidate?.token) {
+          //       preferredCall = callCandidate;
+          //       callInitialLP = callCandidate.lp;
+          //       console.log("Found CALL contract:", callCandidate.token, "LP =", callCandidate.lp);
+          //     }
+          //   }
     
-            // Try to find a PUT contract if we don't have one yet
-            if (!preferredPut) {
-              const putCandidate = await strapi
-                .service("api::order.order")
-                .getPreferredContract(index, "PUT", entry, avoid);
-              if (putCandidate?.token) {
-                preferredPut = putCandidate;
-                putInitialLP = putCandidate.lp;
-                console.log("Found PUT contract:", putCandidate.token, "LP =", putCandidate.lp);
-              }
-            }
+          //   // Try to find a PUT contract if we don't have one yet
+          //   if (!preferredPut) {
+          //     const putCandidate = await strapi
+          //       .service("api::order.order")
+          //       .getPreferredContract(index, "PUT", entry, avoid);
+          //     if (putCandidate?.token) {
+          //       preferredPut = putCandidate;
+          //       putInitialLP = putCandidate.lp;
+          //       console.log("Found PUT contract:", putCandidate.token, "LP =", putCandidate.lp);
+          //     }
+          //   }
     
-            // If we have at least one contract, let's monitor it (them).
-            // If neither is found yet, just wait a bit and keep trying until 9:30 or we find something.
-            if (!preferredCall && !preferredPut) {
-              await strapi.service("api::variable.variable").sleep(2000);
-              continue;
-            }
+          //   // If we have at least one contract, let's monitor it (them).
+          //   // If neither is found yet, just wait a bit and keep trying until 9:30 or we find something.
+          //   if (!preferredCall && !preferredPut) {
+          //     await strapi.service("api::variable.variable").sleep(2000);
+          //     continue;
+          //   }
     
-            // 3. Refresh the LP for whichever contracts we have and see if it increased by >= 0.9
-            //    We'll do a short loop (or direct checks) so we don't hammer the service too much.
-            for (let i = 0; i < 3; i++) {
-            //   if (!strapi.service("api::variable.variable").isBetween915And930()) {
-            //     console.log("Time window ended mid-loop (after 9:30). Stopping.");
-            //     break;
-            //   }
+          //   // 3. Refresh the LP for whichever contracts we have and see if it increased by >= 0.9
+          //   //    We'll do a short loop (or direct checks) so we don't hammer the service too much.
+          //   for (let i = 0; i < 3; i++) {
+          //   //   if (!strapi.service("api::variable.variable").isBetween915And930()) {
+          //   //     console.log("Time window ended mid-loop (after 9:30). Stopping.");
+          //   //     break;
+          //   //   }
     
-              // Refresh CALL if we have it
-              if (preferredCall) {
-                const callRefreshedLP = strapi[`${preferredCall.token}`].get("lp");
-                const callGain = callRefreshedLP - callInitialLP;
-                preferredCall.lp = callRefreshedLP;
-                console.log("CALL updated LP:", callRefreshedLP, "Gain:", callGain.toFixed(2));
-                if (callGain >= 0.9) {
-                  chosenContract = preferredCall;
-                  console.log("CALL contract gained +0.9. Chosen:", chosenContract.token);
-                  break;
-                }
-              }
+          //     // Refresh CALL if we have it
+          //     if (preferredCall) {
+          //       const callRefreshedLP = strapi[`${preferredCall.token}`].get("lp");
+          //       const callGain = callRefreshedLP - callInitialLP;
+          //       preferredCall.lp = callRefreshedLP;
+          //       console.log("CALL updated LP:", callRefreshedLP, "Gain:", callGain.toFixed(2));
+          //       if (callGain >= 0.9) {
+          //         chosenContract = preferredCall;
+          //         console.log("CALL contract gained +0.9. Chosen:", chosenContract.token);
+          //         break;
+          //       }
+          //     }
     
-              // Refresh PUT if we have it
-              if (preferredPut) {
-                const putRefreshedLP = strapi[`${preferredPut.token}`].get("lp");
-                const putGain = putRefreshedLP - putInitialLP;  
-                preferredPut.lp = putRefreshedLP;              
-                console.log("PUT updated LP:", putRefreshedLP, "Gain:", putGain.toFixed(2));
-                if (putGain >= 0.9) {
-                  chosenContract = preferredPut;
-                  console.log("PUT contract gained +0.9. Chosen:", chosenContract.token);
-                  break;
-                }
-              }
+          //     // Refresh PUT if we have it
+          //     if (preferredPut) {
+          //       const putRefreshedLP = strapi[`${preferredPut.token}`].get("lp");
+          //       const putGain = putRefreshedLP - putInitialLP;  
+          //       preferredPut.lp = putRefreshedLP;              
+          //       console.log("PUT updated LP:", putRefreshedLP, "Gain:", putGain.toFixed(2));
+          //       if (putGain >= 0.9) {
+          //         chosenContract = preferredPut;
+          //         console.log("PUT contract gained +0.9. Chosen:", chosenContract.token);
+          //         break;
+          //       }
+          //     }
     
-              // If neither gained 0.9 in this pass, wait & try again
-              await strapi.service("api::variable.variable").sleep(1500);
-            }
+          //     // If neither gained 0.9 in this pass, wait & try again
+          //     await strapi.service("api::variable.variable").sleep(1500);
+          //   }
     
-            // If we found a contract that hit +0.9, break out entirely
-            if (chosenContract) {
-                strapi.webSocket.broadcast({
-                    type: 'action',
-                    message: `Application believes ${chosenContract.tsym} with current LP ${chosenContract.lp} will give profit by reaching a LP of ${target}`,
-                    status: true
-                });
-                strapi.chosenContract = chosenContract;
-                break;
-            }
+          //   // If we found a contract that hit +0.9, break out entirely
+          //   if (chosenContract) {
+          //       strapi.webSocket.broadcast({
+          //           type: 'action',
+          //           message: `Application believes ${chosenContract.tsym} with current LP ${chosenContract.lp} will give profit by reaching a LP of ${target}`,
+          //           status: true
+          //       });
+          //       strapi.chosenContract = chosenContract;
+          //       break;
+          //   }
     
-            // If still no chosen contract, wait a bit before next big iteration
-            await strapi.service("api::variable.variable").sleep(2000);
-          }
+          //   // If still no chosen contract, wait a bit before next big iteration
+          //   await strapi.service("api::variable.variable").sleep(2000);
+          // }
     
           // 4. If we ended with a chosen contract, place bracket order
         //   if (chosenContract) {
