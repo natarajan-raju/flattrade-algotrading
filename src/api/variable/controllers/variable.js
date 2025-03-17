@@ -244,6 +244,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             try{            
               const date = await strapi.service('api::variable.variable').convertDateFormat(expiry);
               const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","stext":"${index + date}","exch":"NFO"}&jKey=${strapi.sessionToken}`;
+              console.log(payload);
               const contractsResponse = await fetch(`${env('FLATTRADE_SEARCH_SCRIP_URL')}`,{
                   method: 'POST',
                   headers: {
