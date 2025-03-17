@@ -61,7 +61,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     
       // Parse the response JSON
       const optionChain = await optionChainResponse.json();
-      
+      console.log("option chain",optionChain);
       if(!optionChain.values){
         throw new Error('Option chain processing failed...');
       }
@@ -96,8 +96,16 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         // contractTokens[`${option.token}`] = tokenData;
         
       });
+      try{
+        strapi[`${index}`] && strapi[`${index}`].get('contractTokens');
+      }catch(error){
+        console.log(error);
+        strapi[`${index}`] = new Map();
+        strapi[`${index}`].get('contractTokens');
+      }
 
-      strapi[`${index}`].set('contractTokens', contractTokens);
+      
+      
       
       // Update the contract in the database with contractTokens including token and lp
       contract = await strapi.db.query('api::contract.contract').update({
