@@ -236,7 +236,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
           let putInitialLP = null;    
           let chosenContract = null; // The contract that eventually breaches +0.9
           let scripList;
-          let contracts;
+          let contracts = {};
           let contract = await strapi.db.query('api::contract.contract').findOne({where: {indexToken}})?.sampleContractTsym || null;
           console.log(`Available Sample contract for ${indexToken}: ${contract}`);
           if(!contract){
@@ -251,8 +251,8 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                           },
                   body: payload, 
               });
-              contracts = await contractsResponse.json();                                    
-              // console.log(contracts);
+              contracts = await contractsResponse.json();                                                  
+              console.log(contracts);
               if(!contracts.values || contracts.values.length == 0 ){
                   return ctx.send({ message: 'Either expiry data provided is wrong or Session token expired', status: false });
               }
