@@ -141,6 +141,14 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     if(!lp){
       return { message: 'Not a LTP message' };
     } 
+
+    // try{
+    //   if(strapi.chosenContract.token === lp){
+    //     strapi
+    //   }
+    // }catch(error){
+
+    // }
     // Tokens for buy/sell operations
     const buySellTokens = new Set(['26000', '26009', '26013', '26014', '26037']);
    

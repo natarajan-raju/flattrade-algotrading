@@ -27,6 +27,7 @@ module.exports = {
       await strapi.service('api::variable.variable').fetchIndexVariables();
 
       strapi.INDICES = ['26000','26009','26013','26014','26037'];
+      strapi.chosenContract = '';
       const currentTime = new Date();
       const currentHour = currentTime.getHours();
       const currentMinute = currentTime.getMinutes();

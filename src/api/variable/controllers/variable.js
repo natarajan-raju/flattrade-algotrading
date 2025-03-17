@@ -220,21 +220,82 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
       //Custom controller function to handle Amount based Algorthmic trading
       async startAmountBasedTrading(ctx) {
         try {
-          const { entry, target, stopLoss, indexToken } = ctx.request.body;
+          const { entry, target, stopLoss, indexToken, expiry } = ctx.request.body;
           ctx.send(`Amount based trading started with Entry price ${entry} `);
-          console.log("Amount-based trading started with:", { entry, target, stopLoss, indexToken });
+          console.log("Amount-based trading started with:", { entry, target, stopLoss, indexToken, expiry });
     
         //   // 1. Check if current time is between 9:15 and 9:30
         //   if (!isBetween915And930()) {
         //     return ctx.send("Trading can only start between 9:15 and 9:30 AM.");
         //   }    
-          const index = strapi[`${indexToken}`].get("index");
+          const index = strapi.db.query('api::variable.variable').findOne({where: {indexToken}}).index;
           let avoid = null;    
           let preferredCall = null; 
           let preferredPut = null; 
           let callInitialLP = null; 
           let putInitialLP = null;    
           let chosenContract = null; // The contract that eventually breaches +0.9
+          let scripList;
+          let contracts;
+          let contract = await strapi.db.query('api::contract.contract').findOne({where: {indexToken}})?.sampleContractTsym || null;
+          console.log(`Available Sample contract for ${indexToken}: ${contract}`);
+          if(!contract){
+            console.log(`No available Sample contract for ${indexToken}. Hence trying to fetch new contract for ${indexToken}`);
+            try{            
+              const date = await strapi.service('api::variable.variable').convertDateFormat(expiry);
+              const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","stext":"${index + date}","exch":"NFO"}&jKey=${strapi.sessionToken}`;
+              const contractsResponse = await fetch(`${env('FLATTRADE_SEARCH_SCRIP_URL')}`,{
+                  method: 'POST',
+                  headers: {
+                            'Content-Type': 'application/json'
+                          },
+                  body: payload, 
+              });
+              contracts = await contractsResponse.json();                                    
+              // console.log(contracts);
+              if(!contracts.values || contracts.values.length == 0 ){
+                  return ctx.send({ message: 'Either expiry data provided is wrong or Session token expired', status: false });
+              }
+              contract = contracts.values[0].tsym;
+              console.log(`Available Sample contract for ${indexToken}: ${contract}. Processing Scrip list......`);
+          } catch (error) {
+              return ctx.send({ message: 'Either expiry data provided is wrong or Session token expired',error: error, status: false });
+          }
+        }
+
+
+          //Find if a scripList is already subscribed for the given token or generate scripList and subscribe to Flattrade websocket
+          let scripItem = await strapi.db.query('api::web-socket.web-socket').findOne({where: { indexToken }});    
+          if(!scripItem.scripList){
+              try{
+                  scripList = await strapi.service('api::variable.variable').processScripList(indexToken,index,contract, strapi.sessionToken);  
+                  strapi[`${indexToken}`].set('scripList', scripList);                    
+              }catch(error){
+                  return ctx.send({ message: `Error in processing scrip list with error:  ${error}`, status: false });
+              }
+          } else {
+              scripList = scripItem.scripList;           
+              let contract = await strapi.db.query('api::contract.contract').findOne({where: {indexToken}});            
+              strapi[`${index}`].set('contractTokens', contract.contractTokens);
+
+          }
+          // Find all other scripLists and concatenate them with the current scripList using '#'
+          let otherScripItems = await strapi.db.query('api::web-socket.web-socket').findMany({
+              where: { 
+                  indexToken: { $ne: indexToken } // Exclude the current indexToken
+              },
+              select: ['scripList'], // Select only the scripList field
+          });
+
+          if (otherScripItems && otherScripItems.length > 0) {
+              for (const otherScripItem of otherScripItems) {
+                  if (otherScripItem.scripList) {
+                      scripList += `#${otherScripItem.scripList}`; // Concatenate with '#'
+                  }
+              }
+          }
+          
+          await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
     
           // 2. We'll keep searching/monitoring until one contract hits +0.9
           //    or until the time window (9:15–9:30) ends.
@@ -321,6 +382,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                     message: `Application believes ${chosenContract.tsym} with current LP ${chosenContract.lp} will give profit by reaching a LP of ${target}`,
                     status: true
                 });
+                strapi.chosenContract = chosenContract;
                 break;
             }
     
