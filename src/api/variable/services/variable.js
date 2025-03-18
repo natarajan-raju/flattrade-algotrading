@@ -175,49 +175,6 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       //NFO Price update received. Update lp for contract token
       if(strapi[`${tk}`]){
           const { optt, index } = Object.fromEntries(strapi[`${tk}`]);
-          // const lookbackPeriod = 28;
-          // prices.push(lp);
-          // if(prices.length > lookbackPeriod) prices.shift();
-          // //Calculate RSI
-          // function calculateRSI(prices, period) {
-          //   let gains = [], losses = [];
-          //   for (let i = 1; i < prices.length; i++) {
-          //       let change = prices[i] - prices[i - 1];
-          //       gains.push(change > 0 ? change : 0);
-          //       losses.push(change < 0 ? Math.abs(change) : 0);
-          //   }
-
-          //   let avgGain = gains.slice(0, period).reduce((sum, g) => sum + g, 0) / period;
-          //   let avgLoss = losses.slice(0, period).reduce((sum, l) => sum + l, 0) / period;
-
-          //   for (let i = period; i < gains.length; i++) {
-          //       avgGain = (avgGain * (period - 1) + gains[i]) / period;
-          //       avgLoss = (avgLoss * (period - 1) + losses[i]) / period;
-          //   }
-
-          //   let rs = avgGain / avgLoss;
-          //   return 100 - (100 / (1 + rs));
-          // }
-
-          // //Calculate EMA
-          // function calculateEMA(values, period) {
-          //   if (values.length < period) return null;
-          //   const k = 2 / (period + 1);
-          //   return values.reduce((prev, curr, i) => 
-          //       i === 0 ? curr : (curr * k + prev * (1 - k))
-          //   );
-          // }
-          
-          // if(prices.length <= lookbackPeriod){
-          //    const rsi = calculateRSI(prices, prices.length) || 0;
-          //    rsiSeries.push(rsi);
-          //    const rsiEma = calculateEMA(rsiSeries, rsiSeries.length) || rsi;
-          //    strapi[`${tk}`].set('rsi', rsiEma);
-          //    strapi[`${tk}`].set('prices', prices);
-          //    strapi[`${tk}`].set('rsiSeries', rsiSeries);
-          // }
-          // // if(prices.length > lookbackPeriod) prices.shift();
-          // if(strapi[`${tk}`].get('rsiSeries').length > lookbackPeriod) strapi[`${tk}`].get('rsiSeries').shift(); 
           
           if(strapi[`${index}`]){
             const contractTokens = strapi[`${index}`].get('contractTokens');
@@ -231,9 +188,32 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             strapi[`${tk}`].set('lp', lp);
             strapi[`${index}`].set('contractTokens', contractTokens);
             const contractBought = strapi[`${index}`].get('contractBought') || null;
-           
+              if(strapi.chosenContract.token && strapi.chosenContract.token === tk){
+                const realizedPL = lp - strapi.chosenContract.costPrice;
+                console.log(`Chosen contract price update: Current LP ${lp} Realized PL ${realizedPL}`);
+                strapi.webSocket.broadcast({
+                  type: 'action',
+                  message: `${strapi.chosenContract.token} price update: Current LP ${lp} Realized PL ${realizedPL}`,
+                  status: true
+                });
+                if(lp >= strapi.chosenContract.target){
+                  strapi.webSocket.broadcast({
+                    type: 'action',
+                    message: `${strapi.chosenContract.token} reached target of ${strapi.chosenContract.target} at ${lp}....`,
+                    status: true
+                  });
+                  strapi.chosenContract =  {token: null, lp: Infinity, tsym: null, lotSize: null, rsi: 0};
+                } else if(lp <= strapi.chosenContract.stopLoss){
+                  strapi.webSocket.broadcast({
+                    type: 'action',
+                    message: `${strapi.chosenContract.token} reached stop loss of ${strapi.chosenContract.stopLoss} at ${lp}....`,
+                    status: true
+                  });
+                  strapi.chosenContract =  {token: null, lp: Infinity, tsym: null, lotSize: null, rsi: 0};
+                }
+              }
               try{              
-                if(contractBought && contractBought.contractToken === tk){
+                if((contractBought && contractBought.contractToken === tk)){
                   let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation') || false;
                   if(!awaitingOrderConfirmation){                 
                     const currentValue = parseFloat(lp) * parseFloat(contractBought.quantity);
@@ -1133,9 +1113,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       putBoughtAt: 0,
       awaitingOrderConfirmation: false                               
     };
-    const headers = {
-      Authorization: `Bearer ${env('SPECIAL_TOKEN')}`,
-    };
+    
     if(indexToken === '1'){
         const contractEntries = await strapi.db.query('api::contract.contract').findMany();
         if(contractEntries.length > 0){
@@ -1219,7 +1197,11 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             where: { indexToken }, // Specify the condition for the update
             data: defaultValues,        // Specify the new data
           });
-          strapi[`${indexToken}`] = new Map(Object.entries(variable));
+          const entries = Object.entries(variable);
+          for (const [key, value] of entries) {
+              strapi[`${indexToken}`].set(key, value);
+          }
+          // strapi[`${indexToken}`] = new Map(Object.entries(variable));
           console.log(`Application is stopping. For sample basePrice in ${indexToken} is ${strapi[`${indexToken}`].get('basePrice')}`);
           try{
             strapi[`${indexToken}`].get('intervalId') && clearInterval(strapi[`${indexToken}`].get('intervalId'));
@@ -1546,14 +1528,15 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   return new Promise((resolve) => setTimeout(resolve, ms));
   },
 
-  async startAmountMonitoring(index,entry) {
+  async startAmountMonitoring(index,entry, target, stopLoss) {
     while (true) {
       // // Stop if time is >= 9:30
       // if (!await strapi.service("api::variable.variable").isBetween915And930()) {
       //   console.log("Time window ended (after 9:30). Stopping search/monitoring.");
       //   break;
       // }
-      let avoid = null;    
+          let avoid = null; 
+          let maxPercentage = 1.05;   
           let preferredCall = null; 
           let preferredPut = null; 
           let callInitialLP = null; 
@@ -1563,11 +1546,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       if (!preferredCall) {
         const callCandidate = await strapi
           .service("api::order.order")
-          .getPreferredContract(index, "CALL", entry, avoid);
+          .getPreferredContract(index, "CE", entry, avoid, maxPercentage);
         if (callCandidate?.token) {
           preferredCall = callCandidate;
           callInitialLP = callCandidate.lp;
           console.log("Found CALL contract:", callCandidate.token, "LP =", callCandidate.lp);
+          strapi.webSocket.broadcast
         }
       }
 
@@ -1575,7 +1559,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       if (!preferredPut) {
         const putCandidate = await strapi
           .service("api::order.order")
-          .getPreferredContract(index, "PUT", entry, avoid);
+          .getPreferredContract(index, "PE", entry, avoid, maxPercentage);
         if (putCandidate?.token) {
           preferredPut = putCandidate;
           putInitialLP = putCandidate.lp;
@@ -1604,9 +1588,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           const callGain = callRefreshedLP - callInitialLP;
           preferredCall.lp = callRefreshedLP;
           console.log("CALL updated LP:", callRefreshedLP, "Gain:", callGain.toFixed(2));
-          if (callGain >= 0.9) {
+          if (callRefreshedLP >= entry * maxPercentage * maxPercentage) {
             chosenContract = preferredCall;
-            console.log("CALL contract gained +0.9. Chosen:", chosenContract.token);
+            chosenContract.costPrice = callInitialLP;
+            console.log(`CALL contract gained ${callGain.toFixed(2)} Chosen:`, chosenContract.token);
             break;
           }
         }
@@ -1619,7 +1604,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           console.log("PUT updated LP:", putRefreshedLP, "Gain:", putGain.toFixed(2));
           if (putGain >= 0.9) {
             chosenContract = preferredPut;
-            console.log("PUT contract gained +0.9. Chosen:", chosenContract.token);
+            chosenContract.costPrice = putInitialLP;           
+            console.log(`PUT contract gained ${putGain.toFixed(2)}. Chosen:`, chosenContract.token);
             break;
           }
         }
@@ -1630,6 +1616,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
       // If we found a contract that hit +0.9, break out entirely
       if (chosenContract) {
+        chosenContract.target = target;
+        chosenContract.stopLoss = stopLoss;
           strapi.webSocket.broadcast({
               type: 'action',
               message: `Application believes ${chosenContract.tsym} with current LP ${chosenContract.lp}`,
