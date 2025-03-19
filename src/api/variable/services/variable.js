@@ -1,6 +1,7 @@
 'use strict';
 
 const { env } = require('@strapi/utils');
+const profit = require('../../profit/controllers/profit');
 
 
 
@@ -193,23 +194,26 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 console.log(`Chosen contract price update: Current LP ${lp} Realized PL ${realizedPL}`);
                 strapi.webSocket.broadcast({
                   type: 'action',
-                  message: `${strapi.chosenContract.token} price update: Current LP ${lp} Realized PL ${realizedPL}`,
+                  message: `${strapi.chosenContract.tsym} price update: Current LP ${lp} Realized PL ${realizedPL}`,
                   status: true
                 });
-                if(lp >= strapi.chosenContract.target){
+                if(lp >= 0.75 * strapi.chosenContract.target){
+                  strapi.chosenContract.profitLockMode = true;
+                }
+                if((lp <= 0.50 * strapi.chosenContract.target && strapi.chosenContract.profitLockMode) || lp >= strapi.chosenContract.target){
                   strapi.webSocket.broadcast({
                     type: 'action',
-                    message: `${strapi.chosenContract.token} reached target of ${strapi.chosenContract.target} at ${lp}....`,
+                    message: `${strapi.chosenContract.tsym} reached target of ${strapi.chosenContract.target} at ${lp}....`,
                     status: true
                   });
-                  strapi.chosenContract =  {token: null, lp: Infinity, tsym: null, lotSize: null, rsi: 0};
+                  strapi.chosenContract =  {token: null, lp: Infinity, tsym: null, lotSize: null, profitLockMode: false};
                 } else if(lp <= strapi.chosenContract.stopLoss){
                   strapi.webSocket.broadcast({
                     type: 'action',
-                    message: `${strapi.chosenContract.token} reached stop loss of ${strapi.chosenContract.stopLoss} at ${lp}....`,
+                    message: `${strapi.chosenContract.tsym} reached stop loss of ${strapi.chosenContract.stopLoss} at ${lp}....`,
                     status: true
                   });
-                  strapi.chosenContract =  {token: null, lp: Infinity, tsym: null, lotSize: null, rsi: 0};
+                  strapi.chosenContract =  {token: null, lp: Infinity, tsym: null, lotSize: null, profitLockMode: false};
                 }
               }
               try{              
@@ -1591,7 +1595,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           if (callRefreshedLP >= entry * maxPercentage * maxPercentage) {
             chosenContract = preferredCall;
             chosenContract.costPrice = callInitialLP;
-            console.log(`CALL contract gained ${callGain.toFixed(2)} Chosen:`, chosenContract.token);
+            console.log(`CALL contract gained ${callGain.toFixed(2)} Chosen:`, chosenContract.tsym);
             break;
           }
         }
@@ -1605,7 +1609,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           if (putGain >= 0.9) {
             chosenContract = preferredPut;
             chosenContract.costPrice = putInitialLP;           
-            console.log(`PUT contract gained ${putGain.toFixed(2)}. Chosen:`, chosenContract.token);
+            console.log(`PUT contract gained ${putGain.toFixed(2)}. Chosen:`, chosenContract.tsym);
             break;
           }
         }
@@ -1618,6 +1622,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       if (chosenContract) {
         chosenContract.target = target;
         chosenContract.stopLoss = stopLoss;
+        chosenContract.profitLockMode = false;
           strapi.webSocket.broadcast({
               type: 'action',
               message: `Application believes ${chosenContract.tsym} with current LP ${chosenContract.lp}`,

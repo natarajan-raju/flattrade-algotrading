@@ -585,31 +585,33 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     qty
                 } 
                 });
-                strapi.webSocket.broadcast({                
-                    type: 'order',
-                    data: updatedOrder,
-                    message: `Your order for index ${order.index} with contract ${order.contractTsym} has now a new status of ${status}`,
-                    status: true,                   
-                });
-            }else{
-                const createdOrder = await strapi.db.query('api::order.order').create({
-                    data: {
-                        index: tsym.match(/^[A-Za-z]+/)[0],
-                        orderType: trantype === 'B'? 'BUY' : 'SELL',
-                        contractType: tsym.match(/\d{2}[A-Z]{3}\d{2}([CP])/),                       
-                        contractTsym: tsym,
-                        contractToken: token,
-                        lotSize: ls,
-                        price: ls * avgprc,
-                        contractLp: avgprc,
-                        norenordno,
-                        orderStatus: status,
-                        remarks: rejreason.length > 0? rejreason : remarks,
-                        quantity: qty,                        
-                    }   
-                });
-                console.log(createdOrder);
+                // strapi.webSocket.broadcast({                
+                //     type: 'order',
+                //     data: updatedOrder,
+                //     message: `Your order for index ${order.index} with contract ${order.contractTsym} has now a new status of ${status}`,
+                //     status: true,                   
+                // });
             }
+            
+            // else{
+            //     const createdOrder = await strapi.db.query('api::order.order').create({
+            //         data: {
+            //             index: tsym.match(/^[A-Za-z]+/)[0],
+            //             orderType: trantype === 'B'? 'BUY' : 'SELL',
+            //             contractType: tsym.match(/\d{2}[A-Z]{3}\d{2}([CP])/),                       
+            //             contractTsym: tsym,
+            //             contractToken: token,
+            //             lotSize: ls,
+            //             price: ls * avgprc,
+            //             contractLp: avgprc,
+            //             norenordno,
+            //             orderStatus: status,
+            //             remarks: rejreason.length > 0? rejreason : remarks,
+            //             quantity: qty,                        
+            //         }   
+            //     });
+            //     console.log(createdOrder);
+            // }
             return {'status': true, message: 'Orderbook feed processed successfully'};
         }catch(error){
             return {'status': false, message: `Error processing orderbook feed: ${error}`};
