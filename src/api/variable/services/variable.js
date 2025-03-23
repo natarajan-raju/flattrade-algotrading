@@ -851,7 +851,22 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       !chosenContract && await strapi.service("api::variable.variable").sleep(1500);
     }
    
+    //Now lets wait for the trading to be enabled post 09:15 AM
+    async function waitForBoolean(checkFn, interval = 100) {
+      return new Promise((resolve) => {
+        const checkInterval = setInterval(() => {
+          if (checkFn()) {
+            clearInterval(checkInterval);
+            resolve();
+          }
+        }, interval);
+      });
+    }
 
+    (async () => {
+      await waitForBoolean(() => strapi.isTradingEnabled);
+      strapi.log.info("Trading is enabled. Processing order for the chosen contract...");
+    })();
     // If we found a contract that hit +0.9, break out entirely
     if (chosenContract) {
       chosenContract.target = target;
