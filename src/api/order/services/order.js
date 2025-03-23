@@ -1,6 +1,7 @@
 'use strict';
 const { env } = require('@strapi/utils');
 const order = require('../controllers/order');
+const contract = require('../../contract/controllers/contract');
 
 
 
@@ -206,11 +207,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     //     status: false,
                     //     message: 'Error placing order with Flattrade'
                     // }
-                }
-                // let awaitingOrderConfirmation = false;                
-                // strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-                // console.log('Order placed successfully. Setting awaitingOrderConfirmation to false. This runs in case if any return is not handled above');
-                // strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } });               
+                }                             
             } else {
                 let awaitingOrderConfirmation = false;                
                 strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
@@ -223,37 +220,81 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     status: 'failure',
                 });
                 retry++;
-                break;
-                // return {
-                //     status: false,
-                //     message: 'No suitable tokens found for the order.'
-                // }
+                break;               
             }
-                // try{            
-                            
-                // }catch(error){                
-                //     let awaitingOrderConfirmation = false;                
-                //     strapi[`${indexToken}`].set('awaitingOrderConfirmation', awaitingOrderConfirmation);
-                //     console.log(`Error in placeBuyOrder: ${error}. Setting awaitingOrderConfirmation to false`);
-                //     strapi.db.query('api::variable.variable').update({ where: { indexToken }, data: { awaitingOrderConfirmation } }); 
-                //     strapi.webSocket.broadcast({
-                //         type: 'order',
-                //         data: null,
-                //         message: `Buy order for index ${index} with contract ${preferredContract.tsym} failed due to some error in placeBuyOrder: ${error}`,
-                //         status: 'failure',
-                //     });
-                //     retry++;
-                //     break;
-                //     // return {
-                //     //     status: false,
-                //     //     message: 'Error in placeBuyOrder'
-                //     // }
-                // }
+               
         }while(retry > 0 && retry <= 1);
         return {
             status: false,
             message: 'Error placing order with Flattrade'
         }        
+    },
+
+    async placeBracketOrder(orderData) {
+        const { exchange, tsym, quantity, contractPrice, orderType, remarks, target, stopLoss, index} = orderData;
+        let isBracketOrder = true;    
+        strapi.log.info(`Placing bracket order for ${tsym} at price ${contractPrice}`);    
+        // const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${contractPrice}","prd":"B","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}","bpprc":"${target}","blprc":"${stoploss}"}&jKey=${strapi.sessionToken}`;
+        const orderResponse = await strapi.service('api::order.order').placeOrderWithFlattrade(exchange,tsym,quantity,contractPrice,orderType,remarks,isBracketOrder,target,stopLoss);
+        const norenordno = await orderResponse.json();
+        let orderStatus = {};
+        if(norenordno){
+            orderStatus = await this.fetchOrderStatus(norenordno);
+                if(orderStatus){
+                    console.table(orderStatus);
+                    let price;
+                    orderStatus.avgprc? price = orderStatus.qty * orderStatus.avgprc : orderStatus.qty * contractPrice;                           
+                    if(orderStatus.status.toLowerCase() === 'complete'){
+                        strapi.webSocket.broadcast({
+                            type: 'order',
+                            data: orderStatus,
+                            message: `Amount based Buy order for contract ${tsym} placed with a target price of ${target} and stop loss of ${stopLoss} has now a new status of ${orderStatus.status}`,
+                            status: 'success',
+                        });
+                        try{
+                            const createdOrder = await strapi.db.query('api::order.order').create({
+                                data: {
+                                    index,
+                                    orderType: 'BUY',
+                                    // contractType,                       
+                                    contractTsym: tsym,
+                                    // contractToken: orderStatus.token,
+                                    // indexLtp: lp,
+                                    lotSize: `${orderStatus.ls}`,
+                                    price,
+                                    contractLp: contractPrice,
+                                    norenordno,
+                                    orderStatus: orderStatus.status,
+                                    remarks: orderStatus.rejreason.length > 0? orderStatus.rejreason : orderStatus.remarks,
+                                    // indexToken,
+                                    quantity: `${orderStatus.qty}`,
+                                    realizedPL: '0',                                                        
+                                }               
+                            });
+                            // console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
+                        }catch(error){
+                            console.log(`Error in storing the order in database: ${error} `);                                    
+                        };
+                    }
+                    
+                }else{
+                    strapi.webSocket.broadcast({
+                        type: 'order',
+                        data: null,
+                        message: `Buy order for contract ${tsym} failed with reason ${orderStatus.rejreason}`,
+                        status: 'failure',
+                    });
+                }     
+            
+        }else{
+            strapi.webSocket.broadcast({
+                type: 'order',
+                data: null,
+                message: `Buy order for contract ${tsym} failed with reason ${orderResponse.message}`,
+                status: 'failure',
+            });
+        }
+        
     },
 
     //Place SELL order Service
@@ -511,13 +552,15 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             }    
     },
 
-    async placeOrderWithFlattrade(exchange,tsym,quantity,price,orderType,remarks="Order created from rajaapp.in",bo=false,target=0,stoploss=0){       
+    async placeOrderWithFlattrade(exchange,tsym,quantity,price,orderType,remarks="Order created from rajaapp.in",bo=false,target=0,stopLoss=0){       
        
         let payload='';
         try{
             
-            bo === false ?  payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${price}","prd":"M","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}"}&jKey=${strapi.sessionToken}`
-                         :  payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${price}","prd":"B","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}","bpprc":"${target}","blprc":"${stoploss}"}&jKey=${strapi.sessionToken}`;
+           !bo ? payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${price}","prd":"M","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}"}&jKey=${strapi.sessionToken}`
+                         :  payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${price}","prd":"B","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}","bpprc":"${target}","blprc":"${stopLoss}"}&jKey=${strapi.sessionToken}`;
+            bo && strapi.log.info(`Placing bracket order for ${tsym} at price ${price}`);
+            bo && console.table(payload);
             const orderResponse = await fetch(`${env('FLATTRADE_PLACE_ORDER_URL')}`,{
                 method: 'POST',
                 headers: {
