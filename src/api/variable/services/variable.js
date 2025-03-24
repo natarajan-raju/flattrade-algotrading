@@ -193,7 +193,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 const realizedPL = lp - strapi.chosenContract.costPrice;
                 console.log(`Chosen contract price update: Current LP ${lp} Realized PL ${realizedPL}`);
                 if(parseFloat(lp) >= parseFloat(strapi.chosenContract.target) || parseFloat(lp) <= parseFloat(strapi.chosenContract.stopLoss) ){
-                  strapi.chosenContract =  {token: null, lp: Infinity, tsym: null, lotSize: null, profitLockMode: false};
+                  strapi.chosenContract =  {token: null, lp: Infinity, tsym: null, ls: null, profitLockMode: false};
                 }
                 // strapi.webSocket.broadcast({
                 //   type: 'action',
@@ -881,7 +881,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         await strapi.service("api::order.order").placeBracketOrder({
           exchange: 'NFO',
           tsym: chosenContract.tsym,
-          quantity: chosenContract.lotSize,
+          quantity: chosenContract.ls,
           contractPrice: chosenContract.lp,
           orderType: 'B',
           remarks: 'Amount based order created from rajaapp.in',

@@ -15,12 +15,12 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         if(strapi[`${index}`]?.get('contractTokens')){
             contractTokens = strapi[`${index}`].get('contractTokens');
         } else {
-            return {message: 'Investment variables not entered for the day',token: null, lp: Infinity, tsym: null, lotSize: null}; 
+            return {message: 'Investment variables not entered for the day',token: null, lp: Infinity, tsym: null, ls: null}; 
         }
         
         const contracts = contractType === 'CE' ? contractTokens.ce : contractTokens.pe;
         
-        let preferredContract = {token: null, lp: Infinity, tsym: null, lotSize: null, rsi: 0};
+        let preferredContract = {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0};
         let smallestDifference = Infinity;
 
         contracts.forEach(contract => {
@@ -38,7 +38,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         
 
        if(preferredContract.lp > amount * maxPercentage || preferredContract.lp < amount){
-        return {token: null, lp: Infinity, tsym: null, lotSize: null, rsi: 0};
+        return {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0};
        }      
         
         
@@ -236,7 +236,12 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         strapi.log.info(`Placing bracket order for ${tsym} at price ${contractPrice}`);    
         // const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${contractPrice}","prd":"B","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}","bpprc":"${target}","blprc":"${stoploss}"}&jKey=${strapi.sessionToken}`;
         const orderResponse = await strapi.service('api::order.order').placeOrderWithFlattrade(exchange,tsym,quantity,contractPrice,orderType,remarks,isBracketOrder,target,stopLoss);
-        const norenordno = await orderResponse.json();
+        let norenordno = null;
+        try{
+            norenordno = await orderResponse.json();
+        }catch(error){
+            console.log(error);
+        }
         let orderStatus = {};
         if(norenordno){
             orderStatus = await this.fetchOrderStatus(norenordno);
@@ -290,7 +295,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             strapi.webSocket.broadcast({
                 type: 'order',
                 data: null,
-                message: `Buy order for contract ${tsym} failed with reason ${orderResponse.message}`,
+                message: `Buy order for contract ${tsym} failed`,
                 status: 'failure',
             });
         }
