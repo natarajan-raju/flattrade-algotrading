@@ -45,6 +45,35 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         return preferredContract;
     },
 
+    //Get preferred contracts in range
+    async getPreferredContractsInRange(index, contractType, minAmount, maxAmount, avoid = null) {
+        let contractTokens;
+        if (strapi[`${index}`]?.get('contractTokens')) {
+            contractTokens = strapi[`${index}`].get('contractTokens');
+        } else {
+            return { message: 'Investment variables not entered for the day', contracts: [] };
+        }
+    
+        const contracts = contractType === 'CE' ? contractTokens.ce : contractTokens.pe;
+        let preferredContracts = [];
+    
+        contracts.forEach(contract => {
+            // { token: option.token, optt: option.optt, tsym: option.tsym, ls: option.ls, index, lp: 0 } contract structure
+            const contractLP = contract.lp;
+            contract.initialLP = contractLP;
+    
+            // Skip contract if it matches the avoid token
+            if (contract.token === avoid) return;
+    
+            // Check if contract is within the valid price range
+            if (contractLP >= minAmount && contractLP <= maxAmount) {
+                preferredContracts.push(contract);
+            }
+        });
+    
+        return preferredContracts;
+    },
+    
 
     // Place BUY Order service
     async placeBuyOrder(orderData) {        
@@ -235,7 +264,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         let isBracketOrder = true;    
         strapi.log.info(`Placing bracket order for ${tsym} at price ${contractPrice}`);    
         // const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${contractPrice}","prd":"B","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}","bpprc":"${target}","blprc":"${stoploss}"}&jKey=${strapi.sessionToken}`;
-        const orderResponse = await strapi.service('api::order.order').placeOrderWithFlattrade(exchange,tsym,quantity,contractPrice,orderType,remarks,isBracketOrder,target,stopLoss);
+        const orderResponse = await strapi.service('api::order.order').placeOrderWithFlattrade(exchange,tsym,quantity,'0',orderType,remarks,isBracketOrder,target,stopLoss);
         let norenordno = null;
         try{
             norenordno = await orderResponse.json();

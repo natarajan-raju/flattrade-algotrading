@@ -11,7 +11,7 @@ module.exports = {
         await strapi.service('api::purge.purge').purgeOrders();    
         await strapi.service('api::profit.profit').calculateProfits();
         await strapi.service('api::authentication.authentication').clearAuthentications();
-        strapi.chosenContract = {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0};   
+        // strapi.chosenContract = {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0};   
         strapi.isTradingEnabled = false;
       },
       options: {
@@ -42,7 +42,7 @@ module.exports = {
         await strapi.service('api::contract.contract').clearContractVariables();
         await strapi.service('api::variable.variable').stopTrading('1');
         await strapi.service('api::web-socket.web-socket').resetScripList();
-        strapi.chosenContract = {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0};
+        // strapi.chosenContract = {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0};
         strapi.isTradingEnabled = false;
       },
       options: {
@@ -70,7 +70,7 @@ module.exports = {
         await strapi.service('api::variable.variable').stopTrading('1');
         await strapi.service('api::web-socket.web-socket').resetScripList();
         await strapi.service('api::purge.purge').purgeOrders();
-        strapi.chosenContract = {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0};
+        // strapi.chosenContract = {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0};
         strapi.isTradingEnabled = false;
       },
       options: {

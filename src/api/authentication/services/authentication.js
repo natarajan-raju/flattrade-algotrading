@@ -36,7 +36,7 @@ module.exports = createCoreService('api::authentication.authentication', ({ stra
       {
         where: {documentId},
         data: {
-          requestToken: '',
+          requestToken: 'DUMMY_TOKEN',
         }
       }
     );

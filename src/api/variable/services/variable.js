@@ -161,13 +161,6 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       return { message: 'Not a LTP message' };
     } 
 
-    // try{
-    //   if(strapi.chosenContract.token === lp){
-    //     strapi
-    //   }
-    // }catch(error){
-
-    // }
     // Tokens for buy/sell operations
     const buySellTokens = new Set(['26000', '26009', '26013', '26014', '26037']);
    
@@ -175,8 +168,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     if (!buySellTokens.has(tk)) {     
       //NFO Price update received. Update lp for contract token
       if(strapi[`${tk}`]){
-          const { optt, index } = Object.fromEntries(strapi[`${tk}`]);
-          
+          const { optt, index, tsym, ls } = Object.fromEntries(strapi[`${tk}`]);          
           if(strapi[`${index}`]){
             const contractTokens = strapi[`${index}`].get('contractTokens');
             //update the lp for current tk in contractTokens
@@ -189,36 +181,34 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             strapi[`${tk}`].set('lp', lp);
             strapi[`${index}`].set('contractTokens', contractTokens);
             const contractBought = strapi[`${index}`].get('contractBought') || null;
-              if(strapi.chosenContract.token && strapi.chosenContract.token === tk){
-                const realizedPL = lp - strapi.chosenContract.costPrice;
-                console.log(`Chosen contract price update: Current LP ${lp} Realized PL ${realizedPL}`);
-                if(parseFloat(lp) >= parseFloat(strapi.chosenContract.target) || parseFloat(lp) <= parseFloat(strapi.chosenContract.stopLoss) ){
-                  strapi.chosenContract =  {token: null, lp: Infinity, tsym: null, ls: null, profitLockMode: false};
-                }
-                // strapi.webSocket.broadcast({
-                //   type: 'action',
-                //   message: `${strapi.chosenContract.tsym} price update: Current LP ${lp} Realized PL ${realizedPL}`,
-                //   status: true
-                // });
-                // if(lp >= 0.95 * strapi.chosenContract.target){
-                //   strapi.chosenContract.profitLockMode = true;
-                // }
-                // if((lp <= 0.90 * strapi.chosenContract.target && strapi.chosenContract.profitLockMode) || lp >= strapi.chosenContract.target){
-                  // strapi.webSocket.broadcast({
-                  //   type: 'action',
-                  //   message: `${strapi.chosenContract.tsym} sold at ${lp} under profit lock....`,
-                  //   status: true
-                  // });
-                  // strapi.chosenContract =  {token: null, lp: Infinity, tsym: null, lotSize: null, profitLockMode: false};
-                // } else if(lp <= strapi.chosenContract.stopLoss){
-                //   strapi.webSocket.broadcast({
-                //     type: 'action',
-                //     message: `${strapi.chosenContract.tsym} reached stop loss of ${strapi.chosenContract.stopLoss} at ${lp}....`,
-                //     status: true
-                //   });
-                //   strapi.chosenContract =  {token: null, lp: Infinity, tsym: null, lotSize: null, profitLockMode: false};
-                // }
+            // { token: option.token, optt: option.optt, tsym: option.tsym, ls: option.ls, index, lp: 0, initialLP: 0 } contract structure 
+            // strapi.chosenContract = {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0}; chosen contract structure 
+            
+            //Check if this contract can be placed under Bracket order for Amount based trading
+            if(strapi.preferredContracts.has(`${tk}`)){              
+              strapi.log.info(`Price update for a preferred contract ${tsym}: ${lp}`);
+              if(parseFloat(lp) >= strapi.entry){
+                strapi.log.info(`Price for ${tsym} breached target ${strapi.target} and is now the chosen target`);
+                strapi.preferredContracts = new Set();
+                strapi.webSocket.broadcast({
+                  type: 'action',
+                  message: `${tsym} with LP ${lp} is choosen for Amount based trading`,
+                  status: true
+                });
+                await strapi.service("api::order.order").placeBracketOrder({
+                        exchange: 'NFO',
+                        tsym,
+                        quantity: ls,
+                        contractPrice:lp,
+                        orderType: 'B',
+                        remarks: 'Amount based order created from rajaapp.in',
+                        target: strapi.target,
+                        stopLoss: strapi.stopLoss,          
+                        index,
+                });
+                
               }
+            }
               try{              
                 if((contractBought && contractBought.contractToken === tk)){
                   let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation') || false;
@@ -790,115 +780,48 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   //Custom service function to handle Amount based trading
   async startAmountMonitoring(index,entry, target, stopLoss) {
     strapi.log.info('Amount-based monitoring started for ', index, ' with:', `Entry price ${entry}, Target price ${target}, Stop loss ${stopLoss}`);
+    strapi.target = target;
+    strapi.stopLoss = stopLoss;
+    strapi.entry = entry;
+    let callsNotFound = true;
+    let putsNotFound = true;
     let avoid = null; 
-    let maxPercentage = 1.05;   
-    let preferredCall = null; 
-    let preferredPut = null; 
-    let callInitialLP = 0; 
-    let putInitialLP = 0;    
-    let chosenContract = null; // The contract that eventually breaches +0.9
- 
-    // 3. Refresh the LP for whichever contracts we have and see if it increased by >= 0.9
-    //    We'll do a short loop (or direct checks) so we don't hammer the service too much.
-    while(!chosenContract && await strapi.service("api::variable.variable").isBetween900And1030()){
-      if (!preferredCall) {
-        const callCandidate = await strapi
+    let preferredCalls = []; 
+    let preferredPuts = []; 
+    let minAmount = entry * 0.90;
+    let maxAmount = entry * 0.97;
+    while(preferredCalls.length === 0 || preferredPuts.length === 0){
+      
+      if (preferredCalls.length === 0) {
+        preferredCalls = await strapi
           .service("api::order.order")
-          .getPreferredContract(index, "CE", entry * 0.93, avoid, maxPercentage);
-        if (callCandidate?.token) {
-          preferredCall = callCandidate;
-          callInitialLP = callCandidate.lp;
-          strapi.log.info("Found CALL contract:", callCandidate.contractTsym, "LP =", callCandidate.lp);           
-        }
+          .getPreferredContractsInRange(index, "CE", minAmount, maxAmount, avoid);       
+             
       }
 
-      if (!preferredPut) {
-        const putCandidate = await strapi
+      if (preferredPuts.length === 0){
+        preferredPuts = await strapi
           .service("api::order.order")
-          .getPreferredContract(index, "PE", entry * 0.93, avoid, maxPercentage);
-        if (putCandidate?.token) {
-          preferredPut = putCandidate;
-          putInitialLP = putCandidate.lp;
-          strapi.log.info("Found PUT contract:", putCandidate.token, "LP =", putCandidate.lp);
-        }
-      }
-      if (preferredCall) {
-        const callRefreshedLP = strapi[`${preferredCall.token}`].get("lp");
-        const callGain = callRefreshedLP - callInitialLP;
-        preferredCall.lp = callRefreshedLP;
-        console.log("CALL updated LP:", callRefreshedLP, "Gain:", callGain.toFixed(2));
-        if (callRefreshedLP >= entry * 1.015) {
-          chosenContract = preferredCall;
-          chosenContract.costPrice = callInitialLP;
-          console.log(`CALL contract gained ${callGain.toFixed(2)} Chosen:`, chosenContract.tsym);
-          break;
-        }
+          .getPreferredContractsInRange(index, "PE", minAmount, maxAmount, avoid);      
       }
 
-      if (preferredPut) {
-        const putRefreshedLP = strapi[`${preferredPut.token}`].get("lp");
-        const putGain = putRefreshedLP - putInitialLP;  
-        preferredPut.lp = putRefreshedLP;              
-        console.log("PUT updated LP:", putRefreshedLP, "Gain:", putGain.toFixed(2));
-        if (putGain >= entry * 1.015) {
-          chosenContract = preferredPut;
-          chosenContract.costPrice = putInitialLP;           
-          console.log(`PUT contract gained ${putGain.toFixed(2)}. Chosen:`, chosenContract.tsym);
-          break;
+      if(preferredCalls.length > 0 && callsNotFound){
+        for(const preferredCall of preferredCalls){
+          console.log(`Identified CALL candidate ${preferredCall.tsym} with LP ${preferredCall.lp}`);
+          strapi.preferredContracts.add(`${preferredCall.token}`);
         }
-      }      
+        callsNotFound = false;
+      }
 
-      !chosenContract && await strapi.service("api::variable.variable").sleep(1500);
+      if(preferredPuts.length > 0 && putsNotFound){
+        for(const preferredPut of preferredPuts){
+          console.log(`Identified PUT candidate ${preferredPut.tsym} with LP ${preferredPut.lp}`);
+          strapi.preferredContracts.add(`${preferredPut.token}`);
+        }
+        putsNotFound = false;
+      }
+      await strapi.service("api::variable.variable").sleep(1500);
     }
-   
-    //Now lets wait for the trading to be enabled post 09:15 AM
-    async function waitForBoolean(checkFn, interval = 100) {
-      return new Promise((resolve) => {
-        const checkInterval = setInterval(() => {
-          if (checkFn()) {
-            clearInterval(checkInterval);
-            resolve();
-          }
-        }, interval);
-      });
-    }
-
-    (async () => {
-      await waitForBoolean(() => strapi.isTradingEnabled);
-      strapi.log.info("Trading is enabled. Processing order for the chosen contract...");
-    })();
-    // If we found a contract that hit +0.9, break out entirely
-    if (chosenContract) {
-      chosenContract.target = target;
-      chosenContract.stopLoss = stopLoss;
-      chosenContract.profitLockMode = false;
-        strapi.webSocket.broadcast({
-            type: 'action',
-            message: `Application believes in ${chosenContract.tsym} with current LP ${chosenContract.lp}`,
-            status: true
-        });
-        strapi.chosenContract = chosenContract;
-        await strapi.service("api::order.order").placeBracketOrder({
-          exchange: 'NFO',
-          tsym: chosenContract.tsym,
-          quantity: chosenContract.ls,
-          contractPrice: chosenContract.lp,
-          orderType: 'B',
-          remarks: 'Amount based order created from rajaapp.in',
-          target,
-          stopLoss,          
-          index,
-         });
-        
-    } else {
-      strapi.webSocket.broadcast({
-        type: 'action',
-        message: `No contract found. Please try again tomorrow`,
-        status: false
-
-      });
-    }
-
     return;
   },
 
@@ -906,6 +829,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   // Custom function to reset investment variables
   async resetInvestmentVariables() {
     try {
+      strapi.preferredContracts = new Set();
       strapi.rollingData = {
         prices_lookback_period: [],
         isTrendingMarket: false,
