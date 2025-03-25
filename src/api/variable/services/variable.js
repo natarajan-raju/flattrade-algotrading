@@ -790,6 +790,29 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     let preferredPuts = []; 
     let minAmount = entry * 0.90;
     let maxAmount = entry * 0.97;
+    function delayUntil915(callback) {
+      const now = new Date().getTime(); // Get current time in milliseconds
+      const targetTime = new Date();
+      targetTime.setHours(9, 15, 0, 0); // Set target to 09:15:00 AM
+      const targetTimestamp = targetTime.getTime(); // Convert target time to milliseconds
+  
+      let delay = targetTimestamp - now; // Calculate delay in milliseconds
+  
+      if (delay <= 0) {
+          console.log("It's already past 09:15 AM. Executing immediately.");
+          callback();
+      } else {
+          console.log(`Waiting for ${Math.floor(delay / 1000)} seconds until 09:15 AM...`);
+          setTimeout(callback, delay);
+      }
+  }
+  
+  // Example usage:
+  delayUntil915(() => {
+      console.log("Executing function at 09:15 AM!");
+  });
+  
+  
     while(preferredCalls.length === 0 || preferredPuts.length === 0){
       
       if (preferredCalls.length === 0) {
