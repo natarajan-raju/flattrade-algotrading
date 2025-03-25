@@ -260,20 +260,20 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     },
 
     async placeBracketOrder(orderData) {
-        const { exchange, tsym, quantity, contractPrice, orderType, remarks, target, stopLoss, index} = orderData;
-        let isBracketOrder = true;    
+        const { exchange, tsym, quantity, contractPrice, orderType, remarks, index} = orderData;
+        // let isBracketOrder = true;    
         strapi.log.info(`Placing bracket order for ${tsym} at price ${contractPrice}`);    
         // const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${contractPrice}","prd":"B","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}","bpprc":"${target}","blprc":"${stoploss}"}&jKey=${strapi.sessionToken}`;
-        const orderResponse = await strapi.service('api::order.order').placeOrderWithFlattrade(exchange,tsym,quantity,'0',orderType,remarks,isBracketOrder,target,stopLoss);
-        let norenordno = null;
-        try{
-            norenordno = await orderResponse.json();
-        }catch(error){
-            console.log(error);
-        }
-        let orderStatus = {};
+        const norenordno = await strapi.service('api::order.order').placeOrderWithFlattrade(exchange,tsym,quantity,'0',orderType,remarks);
+        // let norenordno = null;
+        // try{
+        //     norenordno = await orderResponse.json();
+        // }catch(error){
+        //     console.log(error);
+        // }
+        // let orderStatus = {};
         if(norenordno){
-            orderStatus = await this.fetchOrderStatus(norenordno);
+            const orderStatus = await this.fetchOrderStatus(norenordno);
                 if(orderStatus){
                     console.table(orderStatus);
                     let price;
@@ -282,7 +282,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                         strapi.webSocket.broadcast({
                             type: 'order',
                             data: orderStatus,
-                            message: `Amount based Buy order for contract ${tsym} placed with a target price of ${target} and stop loss of ${stopLoss} has now a new status of ${orderStatus.status}`,
+                            message: `Amount based Buy order for contract ${tsym} placed and has now a new status of ${orderStatus.status}`,
                             status: 'success',
                         });
                         try{
@@ -305,19 +305,30 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                                     realizedPL: '0',                                                        
                                 }               
                             });
+                            
                             // console.log(`Created order: ${createdOrder.index} ${createdOrder.orderType} ${createdOrder.contractType} ${createdOrder.contractToken} ${createdOrder.indexLtp} ${createdOrder.contractTsym} ${createdOrder.quantity} ${createdOrder.price} ${createdOrder.contractLp}`);
                         }catch(error){
                             console.log(`Error in storing the order in database: ${error} `);                                    
                         };
+                        return true;
+                    } else if(orderStatus.status.toLowerCase() === 'rejected'){
+                        strapi.webSocket.broadcast({
+                            type: 'order',
+                            data: null,
+                            message: `Buy order for contract ${tsym} failed with reason ${orderStatus.rejreason}`,
+                            status: 'failure',
+                        });
+                        return false;                        
                     }
                     
                 }else{
                     strapi.webSocket.broadcast({
                         type: 'order',
                         data: null,
-                        message: `Buy order for contract ${tsym} failed with reason ${orderStatus.rejreason}`,
+                        message: `Buy order for contract ${tsym} failed`,
                         status: 'failure',
                     });
+                    return false;
                 }     
             
         }else{
@@ -327,6 +338,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 message: `Buy order for contract ${tsym} failed`,
                 status: 'failure',
             });
+            return false;
         }
         
     },
@@ -586,15 +598,10 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             }    
     },
 
-    async placeOrderWithFlattrade(exchange,tsym,quantity,price,orderType,remarks="Order created from rajaapp.in",bo=false,target=0,stopLoss=0){       
+    async placeOrderWithFlattrade(exchange,tsym,quantity,price,orderType,remarks="Order created from rajaapp.in"){       
        
-        let payload='';
         try{
-            
-           !bo ? payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${price}","prd":"M","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}"}&jKey=${strapi.sessionToken}`
-                         :  payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${price}","prd":"B","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}","bpprc":"${target}","blprc":"${stopLoss}"}&jKey=${strapi.sessionToken}`;
-            bo && strapi.log.info(`Placing bracket order for ${tsym} at price ${price}`);
-            bo && console.table(payload);
+            const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","actid":"${env('FLATTRADE_ACCOUNT_ID')}","exch":"${exchange}","tsym":"${tsym}","qty":"${quantity}","prc":"${price}","prd":"M","trantype":"${orderType}","prctyp":"MKT","ret":"DAY","ordersource":"API","remarks":"${remarks}"}&jKey=${strapi.sessionToken}`;
             const orderResponse = await fetch(`${env('FLATTRADE_PLACE_ORDER_URL')}`,{
                 method: 'POST',
                 headers: {
@@ -603,8 +610,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                 body: payload, 
             });
             const order = await orderResponse.json();
-            if(order.norenordno){            
-                    
+            if(order.norenordno){                  
                 return order.norenordno;
             } else {
                 console.log(order);

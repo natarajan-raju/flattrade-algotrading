@@ -189,26 +189,64 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               strapi.log.info(`Price update for a preferred contract ${tsym}: ${lp}`);
               if(parseFloat(lp) >= strapi.entry){
                 strapi.log.info(`Price for ${tsym} breached target ${strapi.target} and is now the chosen target`);
+                console.log(strapi.chosenContract);
                 strapi.preferredContracts = new Set();
                 strapi.webSocket.broadcast({
                   type: 'action',
                   message: `${tsym} with LP ${lp} is choosen for Amount based trading`,
                   status: true
                 });
-                await strapi.service("api::order.order").placeBracketOrder({
-                        exchange: 'NFO',
-                        tsym,
-                        quantity: ls,
-                        contractPrice:lp,
-                        orderType: 'B',
-                        remarks: 'Amount based order created from rajaapp.in',
-                        target: strapi.target,
-                        stopLoss: strapi.stopLoss,          
-                        index,
+                let isOrderPlaced = await strapi.service("api::order.order").placeBracketOrder({
+                  exchange: 'NFO',
+                  tsym,
+                  quantity: ls,
+                  contractPrice:lp,
+                  orderType: 'B',
+                  remarks: 'Amount based order created from rajaapp.in',
+                  index,
                 });
-                
+                if(isOrderPlaced){
+                  strapi.chosenContract = {token: tk, lp, tsym, ls};
+                  console.log(`${tsym} with LP ${lp} is bought through bracket order for Amount based trading. Now watching for exit`);                  
+                }               
               }
             }
+            
+            try{
+              //Check if a contract is chosen and bought
+              if(strapi.chosenContract){
+                if(strapi.chosenContract.token === tk){
+                  strapi.log.info(`Price update for a chosen contract ${tsym}: ${lp}`);
+                  if(parseFloat(lp) >= strapi.target || parseFloat(lp) <= strapi.stopLoss){
+                    strapi.log.info(`Price for ${tsym} breached and is now the exit target`);
+                    //exchange,tsym,quantity,price,orderType,remarks="Order created from rajaapp.in"
+                    // { exchange, tsym, quantity, contractPrice, orderType, remarks, index}
+                    let isOrderPlaced = await strapi.service("api::order.order").placeBracketOrder({
+                      exchange: 'NFO',
+                      tsym,
+                      quantity: ls,
+                      contractPrice:lp,
+                      orderType: 'S',
+                      remarks: 'Amount based order created from rajaapp.in',
+                      index,
+                    });
+                    if(isOrderPlaced){
+                      strapi.chosenContract = null;
+                      console.log(`${tsym} with LP ${lp} is sold through bracket order for Amount based trading`);
+                    }else{
+                      strapi.webSocket.broadcast({
+                        type: 'action',
+                        message: `${tsym} with LP ${lp} is not sold through bracket order for Amount based trading`,
+                        status: false
+                      });
+                    } 
+                  }
+                }
+              }
+            }catch(err){
+              console.log(err);
+            }
+            //Check if a contract is bought 
               try{              
                 if((contractBought && contractBought.contractToken === tk)){
                   let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation') || false;
@@ -783,6 +821,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     strapi.target = target;
     strapi.stopLoss = stopLoss;
     strapi.entry = entry;
+    strapi.chosenContract = null;
     let callsNotFound = true;
     let putsNotFound = true;
     let avoid = null; 
