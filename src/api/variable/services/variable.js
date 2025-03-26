@@ -1168,7 +1168,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         return {status: false, message: 'No token passed to stopTrading'};
     }
    
-    
+    strapi.chosenContract = null;
+    strapi.target = 0;
+    strapi.entry = 0;
+    strapi.stopLoss = 0;
+    strapi.preferredContracts = new Set();
+    strapi.amountTradingCounter = 0;
     
     const defaultValues = {
       open: 0,

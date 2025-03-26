@@ -226,7 +226,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
        
           const indexItem =await strapi.db.query('api::variable.variable').findOne({where: {indexToken}});
           const index = indexItem.index;
-          if(indexItem.basePrice === 0){
+          if(indexItem.basePrice === 0 && strapi.amountTradingCounter === 0){
                 strapi.log.info(`It seems Index based trading has not been started for ${index}. Hence trying to retrieve options data for ${index}`);
                 if ((strapi[`${indexToken}`]?.size ?? 0) === 0) {
                     strapi[`${indexToken}`] = new Map(Object.entries(indexItem));
@@ -297,6 +297,7 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                 await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
             }
           strapi.service('api::variable.variable').startAmountMonitoring(index, entry, target, stopLoss);
+          strapi.amountTradingCounter++;
           return ctx.send({ message: 'Amount based trading started successfully', status: true });
     
           

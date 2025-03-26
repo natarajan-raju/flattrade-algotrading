@@ -11,6 +11,12 @@ module.exports = {
         await strapi.service('api::purge.purge').purgeOrders();    
         await strapi.service('api::profit.profit').calculateProfits();
         await strapi.service('api::authentication.authentication').clearAuthentications();
+        strapi.chosenContract = null;
+        strapi.target = 0;
+        strapi.entry = 0;
+        strapi.stopLoss = 0;
+        strapi.preferredContracts = new Set();
+        strapi.amountTradingCounter = 0;
         // strapi.chosenContract = {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0};   
         strapi.isTradingEnabled = false;
       },
@@ -44,6 +50,12 @@ module.exports = {
         await strapi.service('api::web-socket.web-socket').resetScripList();
         // strapi.chosenContract = {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0};
         strapi.isTradingEnabled = false;
+        strapi.chosenContract = null;
+        strapi.target = 0;
+        strapi.entry = 0;
+        strapi.stopLoss = 0;
+        strapi.preferredContracts = new Set();
+        strapi.amountTradingCounter = 0;
       },
       options: {
         rule: "45 15 * * *", // Every day at 3:45 pm
@@ -72,6 +84,12 @@ module.exports = {
         await strapi.service('api::purge.purge').purgeOrders();
         // strapi.chosenContract = {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0};
         strapi.isTradingEnabled = false;
+        strapi.chosenContract = null;
+        strapi.target = 0;
+        strapi.entry = 0;
+        strapi.stopLoss = 0;
+        strapi.preferredContracts = new Set();
+        strapi.amountTradingCounter = 0;
       },
       options: {
         rule: "00 00 * * *", // Every day at Midnight
