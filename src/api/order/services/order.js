@@ -289,7 +289,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                             const createdOrder = await strapi.db.query('api::order.order').create({
                                 data: {
                                     index,
-                                    orderType: 'BUY',
+                                    orderType,
                                     // contractType,                       
                                     contractTsym: tsym,
                                     // contractToken: orderStatus.token,

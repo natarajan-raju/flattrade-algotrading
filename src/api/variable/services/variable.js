@@ -183,13 +183,15 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             const contractBought = strapi[`${index}`].get('contractBought') || null;
             // { token: option.token, optt: option.optt, tsym: option.tsym, ls: option.ls, index, lp: 0, initialLP: 0 } contract structure 
             // strapi.chosenContract = {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0}; chosen contract structure 
-            
+            if(strapi.amountTradingCounter > 0 && !strapi.preferredContracts.has(`${tk}`) && !strapi.chosenContract && (parseFloat(lp) >= 0.90 * strapi.entry) && (parseFloat(lp) <= 0.97 *strapi.entry) ){
+              strapi.preferredContracts.add(`${tk}`);
+            }
             //Check if this contract can be placed under Bracket order for Amount based trading
             if(strapi.preferredContracts.has(`${tk}`)){              
               strapi.log.info(`Price update for a preferred contract ${tsym}: ${lp}`);
               if(parseFloat(lp) >= strapi.entry){
                 strapi.log.info(`Price for ${tsym} breached target ${strapi.target} and is now the chosen target`);
-                console.log(strapi.chosenContract);
+                // console.log(strapi.chosenContract);
                 strapi.preferredContracts = new Set();
                 strapi.webSocket.broadcast({
                   type: 'action',
@@ -207,7 +209,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 });
                 if(isOrderPlaced){
                   strapi.chosenContract = {token: tk, lp, tsym, ls};
-                  console.log(`${tsym} with LP ${lp} is bought through bracket order for Amount based trading. Now watching for exit`);                  
+                  console.log(`${tsym} with LP ${lp} is bought through bracket order for Amount based trading. Now watching for exit`);                                   
                 }               
               }
             }
@@ -217,6 +219,14 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               if(strapi.chosenContract){
                 if(strapi.chosenContract.token === tk){
                   strapi.log.info(`Price update for a chosen contract ${tsym}: ${lp}`);
+                  let isProfitTrade = false;
+                  let isLossTrade = false;
+                  if(parseFloat(lp) >= strapi.target){
+                    isProfitTrade = true;
+                  }
+                  if(parseFloat(lp) <= strapi.stopLoss){
+                    isLossTrade = true;
+                  }
                   if(parseFloat(lp) >= strapi.target || parseFloat(lp) <= strapi.stopLoss){
                     strapi.log.info(`Price for ${tsym} breached and is now the exit target`);
                     //exchange,tsym,quantity,price,orderType,remarks="Order created from rajaapp.in"
@@ -233,6 +243,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     if(isOrderPlaced){
                       strapi.chosenContract = null;
                       console.log(`${tsym} with LP ${lp} is sold through bracket order for Amount based trading`);
+                      if(isLossTrade && await strapi.service('api::variable.variable').isBetween900And1030()){
+                        console.log('As this is a Stop loss sell, Application will initiate Amount based trading once again');
+                        await strapi.service('api::variable.variable').startAmountMonitoring(index, strapi.entry, strapi.target, strapi.stopLoss); 
+                      }
                     }else{
                       strapi.webSocket.broadcast({
                         type: 'action',
@@ -417,7 +431,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             });
             strapi.rollingData[`${tk}`].isTrendingMarket = true;
         }  else if(isTrendingMarket === null ) {
-          console.log(`Application trying to deduct market status for Index token ${index}...`);          
+          // console.log(`Application trying to deduct market status for Index token ${index}...`);          
           strapi.webSocket.broadcast({
             type: 'market',
             message: `Application trying to deduct market status for Index token ${index}...`,
@@ -817,7 +831,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
   //Custom service function to handle Amount based trading
   async startAmountMonitoring(index,entry, target, stopLoss) {
-    strapi.log.info('Amount-based monitoring started for ', index, ' with:', `Entry price ${entry}, Target price ${target}, Stop loss ${stopLoss}`);
+    // strapi.log.info('Amount-based monitoring started for ', index, ' with:', `Entry price ${entry}, Target price ${target}, Stop loss ${stopLoss}`);
+    console.log(`Amount based trading submitted for ${strapi.amountTradingCounter} th time`);
     strapi.target = target;
     strapi.stopLoss = stopLoss;
     strapi.entry = entry;
@@ -829,6 +844,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     let preferredPuts = []; 
     let minAmount = entry * 0.90;
     let maxAmount = entry * 0.97;
+    // strapi.tableContracts = new Map();
     function delayUntil915(callback) {
       const now = new Date().getTime(); // Get current time in milliseconds
       const targetTime = new Date();
@@ -838,7 +854,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       let delay = targetTimestamp - now; // Calculate delay in milliseconds
   
       if (delay <= 0) {
-          console.log("It's already past 09:15 AM. Executing immediately.");
+          // console.log("It's already past 09:15 AM. Executing immediately.");
           callback();
       } else {
           console.log(`Waiting for ${Math.floor(delay / 1000)} seconds until 09:15 AM...`);
@@ -848,7 +864,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   
   // Example usage:
   delayUntil915(() => {
-      console.log("Executing function at 09:15 AM!");
+      console.log("Executing Amount monitoringfunction as time above 09:15 AM!");
   });
   
   
@@ -873,6 +889,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           strapi.preferredContracts.add(`${preferredCall.token}`);
         }
         callsNotFound = false;
+        strapi.log.info('Summary of identified CALL candidates');
+        console.table(preferredCalls);
       }
 
       if(preferredPuts.length > 0 && putsNotFound){
@@ -881,9 +899,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
           strapi.preferredContracts.add(`${preferredPut.token}`);
         }
         putsNotFound = false;
+        strapi.log.info('Summary of identified PUT candidates');
+        console.table(preferredPuts);
       }
       await strapi.service("api::variable.variable").sleep(1500);
     }
+    strapi.log.info('Amount-based monitoring started for ', index, ' with:', `Entry price ${entry}, Target price ${target}, Stop loss ${stopLoss}`);
     return;
   },
 
@@ -1020,26 +1041,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
 
     
 
-   
-    // function calculateRSI(prices, period) {
-    //   let gains = [], losses = [];
-    //   for (let i = 1; i < prices.length; i++) {
-    //       let change = prices[i] - prices[i - 1];
-    //       gains.push(change > 0 ? change : 0);
-    //       losses.push(change < 0 ? Math.abs(change) : 0);
-    //   }
 
-    //   let avgGain = gains.slice(0, period).reduce((sum, g) => sum + g, 0) / period;
-    //   let avgLoss = losses.slice(0, period).reduce((sum, l) => sum + l, 0) / period;
-
-    //   for (let i = period; i < gains.length; i++) {
-    //       avgGain = (avgGain * (period - 1) + gains[i]) / period;
-    //       avgLoss = (avgLoss * (period - 1) + losses[i]) / period;
-    //   }
-
-    //   let rs = avgGain / avgLoss;
-    //   return 100 - (100 / (1 + rs));
-    // }
 
     // Calculate Bollinger Band Width (BBW)
     function calculateBBW(prices, period) {
@@ -1133,7 +1135,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     // strapi.rollingData[`${tk}`].currentADX = adxEma > 0 ? adxEma : adx;
     // let dynamicRsiHigh = rsiThresholdHigh - (atr / atrMA) * 5 || rsiThresholdHigh;
     // let dynamicRsiLow = rsiThresholdLow + (atr / atrMA) * 5 || rsiThresholdLow;   
-    console.log(`LP: ${lp} UpperBand: ${upperBand.toFixed(4)}, LowerBand: ${lowerBand.toFixed(4)}, PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${pcHigherThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)} BBW Threshold: ${bbwHigherThreshold.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR Threshold: ${(parseFloat(atrMA) + atrSD * 0.5).toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, `);
+    // console.log(`LP: ${lp} UpperBand: ${upperBand.toFixed(4)}, LowerBand: ${lowerBand.toFixed(4)}, PC: ${percentageChange.toFixed(4)}, AdaptivePC: ${pcHigherThreshold.toFixed(4)}, BBW: ${bbw.toFixed(4)} BBW Threshold: ${bbwHigherThreshold.toFixed(4)},  ATR: ${atr.toFixed(4)}, ATR Threshold: ${(parseFloat(atrMA) + atrSD * 0.5).toFixed(4)}, ADX: ${adx.toFixed(4)} ADX EMA: ${adxEma.toFixed(4)}, `);
     if (data.length < lookbackPeriod) return null; 
 
     // // **Step 1: High-Low Percentage Change**
@@ -1147,9 +1149,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
       (parseFloat(adxEma) > 25 && adx > 40) &&
       atr > (parseFloat(atrMA) + atrSD * 0.5)){
         console.log('✅ Trending Market');
-      } else {
-        console.log('❌ Sideways market waiting for a breakout');
-      }
+      } 
 
     return (
       percentageChange > pcHigherThreshold &&
@@ -1174,6 +1174,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     strapi.stopLoss = 0;
     strapi.preferredContracts = new Set();
     strapi.amountTradingCounter = 0;
+    
+
+
     
     const defaultValues = {
       open: 0,
