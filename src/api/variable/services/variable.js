@@ -230,9 +230,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             }
             
             try{
-              //Check if a contract is chosen and bought
+              //Check if a contract is chosen and bought in amount based trading
               if(strapi.chosenContract){
                 if(strapi.chosenContract.token === tk){
+                  strapi.chosenContract.lp = lp;
                   const gainOrLoss = parseFloat(lp) - strapi.chosenContract.initialLP;
                   strapi.log.info(`Price update for a chosen contract ${tsym}: ${lp} Gain/Loss: ${gainOrLoss}`);
                   let isProfitTrade = false;
@@ -243,7 +244,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   if(parseFloat(lp) <= strapi.stopLoss){
                     isLossTrade = true;
                   }
-                  const entryPrice = strapi.chosenContract.initialLP;
+                  const entryPrice = parseFloat(strapi.chosenContract.initialLP);
                   const profitStages = [
                     entryPrice + (0.30 * (strapi.target - entryPrice)),
                     entryPrice + (0.50 * (strapi.target - entryPrice)),
@@ -255,16 +256,18 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     strapi.chosenContract.highestProfitStage = 0;
                   }
 
+
                   // Determine if price reached a higher profit stage
                   for (let i = 0; i < profitStages.length; i++) {
                     if (parseFloat(lp) >= profitStages[i] && strapi.chosenContract.highestProfitStage < i + 1) {
                         strapi.chosenContract.highestProfitStage = i + 1;
-                        strapi.log.info(`Contract reached Profit Stage ${i + 1} at ${lp}`);
+                        // strapi.log.info(`Contract reached Profit Stage ${i + 1} at ${lp}`);
                     }
                   }
+                  strapi.log.info(`Price update for a chosen contract ${tsym}: ${lp} Gain/Loss: ${gainOrLoss} Current Profit Stage ${strapi.chosenContract.highestProfitStage}`);
 
                   // If price falls below a locked stage, exit the trade
-                  if (strapi.chosenContract.highestProfitStage > 0 && parseFloat(lp) <= profitStages[strapi.chosenContract.highestProfitStage - 1] - 3) {
+                  if ((strapi.chosenContract.highestProfitStage === 1 && parseFloat(lp) <= 1.01 * strapi.chosenContract.initialLP ) || (strapi.chosenContract.highestProfitStage > 1 && parseFloat(lp) <= profitStages[strapi.chosenContract.highestProfitStage - 1] * 0.98)) {
                     strapi.log.info(`Price for ${tsym} fell below locked stage, triggering exit at ${lp}`);
 
                     let isOrderPlaced = await strapi.service("api::order.order").placeBracketOrder({
@@ -282,8 +285,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                         console.log(`${tsym} with LP ${lp} is sold through bracket order for profit lock`);
                         if(await strapi.service('api::variable.variable').isBetween900And1030()){
                           strapi.log.info('Profit lock trade just happened. Will try to remonitor');
-                          await strapi.service('api::variable.variable').startAmountMonitoring(index, strapi.entry, strapi.target, strapi.stopLoss);
+                          strapi.service('api::variable.variable').startAmountMonitoring(index, strapi.entry, strapi.target, strapi.stopLoss);
                         }
+                        return { message: 'NFO Price updation received' }; 
                     } else {
                         strapi.webSocket.broadcast({
                             type: 'action',
@@ -311,7 +315,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                       console.log(`${tsym} with LP ${lp} is sold through bracket order for Amount based trading`);
                       if(isLossTrade && await strapi.service('api::variable.variable').isBetween900And1030()){
                         console.log('As this is a Stop loss sell, Application will initiate Amount based trading once again');
-                        await strapi.service('api::variable.variable').startAmountMonitoring(index, strapi.entry, strapi.target, strapi.stopLoss); 
+                        strapi.service('api::variable.variable').startAmountMonitoring(index, strapi.entry, strapi.target, strapi.stopLoss); 
+                        return { message: 'NFO Price updation received' }; 
                       }
                     }else{
                       strapi.webSocket.broadcast({
@@ -326,7 +331,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             }catch(err){
               console.log(err);
             }
-            //Check if a contract is bought 
+            //Check if a contract is bought for index based trading
               try{              
                 if((contractBought && contractBought.contractToken === tk)){
                   let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation') || false;
