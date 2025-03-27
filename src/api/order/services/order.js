@@ -46,7 +46,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     },
 
     //Get preferred contracts in range
-    async getPreferredContractsInRange(index, contractType, minAmount, maxAmount, avoid = null) {
+    async getPreferredContractsInRange(index, contractType, minAmount, maxAmount) {
         let contractTokens;
         if (strapi[`${index}`]?.get('contractTokens')) {
             contractTokens = strapi[`${index}`].get('contractTokens');
@@ -56,21 +56,41 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
     
         const contracts = contractType === 'CE' ? contractTokens.ce : contractTokens.pe;
         let preferredContracts = [];
-    
-        contracts.forEach(contract => {
-            // { token: option.token, optt: option.optt, tsym: option.tsym, ls: option.ls, index, lp: 0 } contract structure
-            const contractLP = contract.lp;
-            contract.initialLP = contractLP;
-    
-            // Skip contract if it matches the avoid token
-            if (contract.token === avoid) return;
-    
-            // Check if contract is within the valid price range
-            if (contractLP >= minAmount && contractLP <= maxAmount) {
+        for (const contract of contracts) {
+            contract.initialLP = contract.lp;
+
+            // if(contract.token === avoid) continue;
+            if (contract.lp >= minAmount && contract.lp <= maxAmount) {
                 preferredContracts.push(contract);
             }
-        });
+        }
+        // contracts.forEach(contract => {
+        //     // { token: option.token, optt: option.optt, tsym: option.tsym, ls: option.ls, index, lp: 0 } contract structure
+        //     const contractLP = contract.lp;
+        //     contract.initialLP = contractLP;
     
+        //     // Skip contract if it matches the avoid token
+        //     if (contract.token === avoid) return;
+    
+        //     // Check if contract is within the valid price range
+        //     if (contractLP >= minAmount && contractLP <= maxAmount) {
+        //         preferredContracts.push(contract);
+        //     }
+        // });
+        strapi.selectedCandidates = [];
+        // console.table(preferredContracts);
+        if(preferredContracts.length > 0){
+            for (const preferredContract of preferredContracts) {
+                const contractDetails = {
+                    token: preferredContract.token,
+                    tsym: preferredContract.tsym,
+                    lp: preferredContract.lp,
+                    ls: preferredContract.ls
+                }
+                strapi.selectedCandidates.push(contractDetails);
+            }             
+        }
+        console.table(strapi.selectedCandidates);
         return preferredContracts;
     },
     
@@ -322,10 +342,11 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     }
                     
                 }else{
+                    await strapi.service('api::variable.variable').cancelOrder(norenordno);
                     strapi.webSocket.broadcast({
                         type: 'order',
                         data: null,
-                        message: `Buy order for contract ${tsym} failed`,
+                        message: `Buy order for contract ${tsym} status pending. Application will try to cancel the order number ${norenordno} `,
                         status: 'failure',
                     });
                     return false;
@@ -702,7 +723,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             
     },
 
-    async fetchOrderStatus(norenordno,retryCount=0,maxRetries=3){
+    async fetchOrderStatus(norenordno,retryCount=0,maxRetries=5){
         try{
             const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","norenordno":"${norenordno}"}&jKey=${strapi.sessionToken}`;
             const updateResponse = await fetch(`${env('FLATTRADE_ORDER_HISTORY_URL')}`,{
@@ -723,7 +744,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     console.log(`Status is neither COMPLETE nor REJECTED. Retrying... (${retryCount + 1}/${maxRetries})`);
                     return await this.fetchOrderStatus(norenordno,retryCount + 1, maxRetries);
                 } else {
-                    console.log("Max retries reached. Aborting further attempts.");
+                    console.log("Max retries reached. Aborting further attempts and trying to cancel the order.");                    
                     return null;
                 }
             }                                
@@ -731,6 +752,27 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
             console.log(error);
             return null;                        
         }
-    }
+    },
+
+    async cancelOrder(norenordno){
+        try{
+            const payload = `jData={"uid":"${env('FLATTRADE_USER_ID')}","norenordno":"${norenordno}"}&jKey=${strapi.sessionToken}`;
+            const cancelResponse = await fetch(`${env('FLATTRADE_CANCEL_ORDER_URL')}`,{
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: payload,
+            });
+            const cancelOrder = await cancelResponse.json();
+            if(cancelOrder.stat === 'Ok' || cancelOrder.stat === 'ok'){
+                return cancelOrder;
+            }
+            return null;
+        }catch(error){
+            console.log(error);
+            return null;
+        }
+    },
 
 }));
