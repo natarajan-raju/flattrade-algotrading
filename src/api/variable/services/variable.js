@@ -186,6 +186,13 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             if(strapi.amountTradingCounter > 0 && !strapi.preferredContracts.has(`${tk}`) && !strapi.chosenContract && (parseFloat(lp) >= 0.85 * strapi.entry) && (parseFloat(lp) <= 0.95 *strapi.entry) ){
               console.log(`New Contract ${tk} with current price ${lp} is added to preferred contracts`);
               strapi.preferredContracts.add(`${tk}`);
+              const selectedCandidate = {
+                token: tk,
+                lp,
+                tsym,
+                ls
+              }
+              strapi.selectedCandidates.push(selectedCandidate);
             }
             const foundContract = strapi.selectedCandidates.find(contract => contract.token === tk);
             if(foundContract){

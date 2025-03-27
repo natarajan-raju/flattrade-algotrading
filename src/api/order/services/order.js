@@ -763,7 +763,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     'Content-Type': 'application/json'
                 },
                 body: payload,
-            });
+            });            
             const cancelOrder = await cancelResponse.json();
             if(cancelOrder.stat === 'Ok' || cancelOrder.stat === 'ok'){
                 return cancelOrder;
