@@ -246,9 +246,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   }
                   const entryPrice = parseFloat(strapi.chosenContract.initialLP);
                   const profitStages = [
-                    entryPrice + (0.30 * (strapi.target - entryPrice)),
-                    entryPrice + (0.50 * (strapi.target - entryPrice)),
-                    entryPrice + (0.75 * (strapi.target - entryPrice)),
+                    entryPrice + (0.30 * (strapi.target - entryPrice)) + 1,
+                    entryPrice + (0.50 * (strapi.target - entryPrice)) + 1,
+                    entryPrice + (0.75 * (strapi.target - entryPrice)) + 1,
                   ];
 
                     // Track highest stage reached
@@ -903,7 +903,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
   //Custom service function to handle Amount based trading
   async startAmountMonitoring(index,entry, target, stopLoss) {
     // strapi.log.info('Amount-based monitoring started for ', index, ' with:', `Entry price ${entry}, Target price ${target}, Stop loss ${stopLoss}`);
-    console.log(`Amount based trading submitted for ${strapi.amountTradingCounter} th time`);
+    console.log(`Amount based trading submitted for ${strapi.amountTradingCounter + 1} th time`);
     strapi.target = target;
     strapi.stopLoss = stopLoss;
     strapi.entry = entry;
@@ -911,7 +911,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     strapi.selectedCandidates = [];
     let callsNotFound = true;
     let putsNotFound = true;
-    let avoid = null; 
+    // let avoid = null; 
     let preferredCalls = []; 
     let preferredPuts = []; 
     let minAmount = entry * 0.85;
@@ -976,6 +976,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         putsNotFound = false;
         
       }
+
+      if(strapi.chosenContract) return;
       await strapi.service("api::variable.variable").sleep(1500);
     }
     strapi.log.info('Amount-based monitoring started for ', index, ' with:', `Entry price ${entry}, Target price ${target}, Stop loss ${stopLoss}`);
