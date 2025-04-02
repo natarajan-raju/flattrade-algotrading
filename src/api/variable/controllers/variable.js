@@ -168,13 +168,13 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
     //Get Time price data from Flattrade
     async getTimePriceData(ctx) {
         try{
-        const { indexToken, interval, days } = ctx.request.body;
+        let { indexToken, interval, days, exchange } = ctx.request.body;
         
         // Calculate startDate and interval based on days
         const currentDate = new Date();
         let calculatedInterval = interval;
         let calculatedStartDate;
-    
+        if(!exchange) exchange = 'NSE';    
         if (days) {
             const dayToMs = 24 * 60 * 60 * 1000; // Milliseconds in a day
             calculatedStartDate = new Date(currentDate.getTime() - days * dayToMs);
@@ -210,7 +210,8 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
             return ctx.send(await strapi.service('api::variable.variable').getTimePriceData(
                 indexToken,
                 calculatedInterval,
-                calculatedStartDate.toISOString()
+                calculatedStartDate.toISOString(),
+                exchange
             ));
         }catch(error){
             return ctx.send({ message: `Error in getting time price data with error:  ${error}`, status: false });
@@ -296,8 +297,8 @@ module.exports = createCoreController('api::variable.variable', ({ strapi }) => 
                 }
                 await strapi.service('api::web-socket.web-socket').connectFlattradeWebSocket(scripList);
             }
-          strapi.service('api::variable.variable').startAmountMonitoring(index, entry, target, stopLoss);
           strapi.amountTradingCounter++;
+          strapi.service('api::variable.variable').startAmountMonitoring(index, entry, target, stopLoss);
           return ctx.send({ message: 'Amount based trading started successfully', status: true });
     
           

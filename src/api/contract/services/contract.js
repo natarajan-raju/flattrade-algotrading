@@ -14,5 +14,14 @@ module.exports = createCoreService('api::contract.contract', ({ strapi }) => ({
         strapi.log.info('Contract variables cleared');
     },
 
+    async getPreferredContractsInRange(index, minAmount, maxAmount) {
+        const contractTokens = strapi[`${index}`].get('contractTokens');
+        const allTokens = [...contractTokens.ce, ...contractTokens.pe];
+        if(allTokens.length === 0) return {status: false, data: []};
+
+        
+
+    }
+
 
 }));

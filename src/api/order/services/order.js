@@ -57,10 +57,10 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         const contracts = contractType === 'CE' ? contractTokens.ce : contractTokens.pe;
         let preferredContracts = [];
         for (const contract of contracts) {
-            contract.initialLP = contract.lp;
+            // contract.initialLP = contract.lp;
 
             // if(contract.token === avoid) continue;
-            if (contract.lp >= minAmount && contract.lp <= maxAmount) {
+            if (contract.initialLP >= minAmount && contract.initialLP <= maxAmount) {
                 preferredContracts.push(contract);
             }
         }
@@ -77,7 +77,7 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
         //         preferredContracts.push(contract);
         //     }
         // });
-        strapi.selectedCandidates = [];
+        
         // console.table(preferredContracts);
         if(preferredContracts.length > 0){
             for (const preferredContract of preferredContracts) {
@@ -85,12 +85,13 @@ module.exports = createCoreService('api::order.order', ({ strapi }) => ({
                     token: preferredContract.token,
                     tsym: preferredContract.tsym,
                     lp: preferredContract.lp,
-                    ls: preferredContract.ls
+                    ls: preferredContract.ls,
+                    initialLP: preferredContract.initialLP
                 }
                 strapi.selectedCandidates.push(contractDetails);
             }             
         }
-        console.table(strapi.selectedCandidates);
+        if(strapi.selectedCandidates.length > 0) console.table(strapi.selectedCandidates);
         return preferredContracts;
     },
     
