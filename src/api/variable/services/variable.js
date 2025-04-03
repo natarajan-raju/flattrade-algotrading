@@ -170,7 +170,10 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     if (!buySellTokens.has(tk)) {     
       //NFO Price update received. Update lp for contract token
       if(strapi[`${tk}`]){
-          let { optt, index, tsym, ls, initialLP } = Object.fromEntries(strapi[`${tk}`]);          
+          let { optt, index, tsym, ls, initialLP } = Object.fromEntries(strapi[`${tk}`]);
+          if(parseFloat(lp) <= strapi.target && parseFloat(lp) >= strapi.entry * 0.80){
+            strapi.log.info(`Price update for ${tsym}: ${lp} which has initialLP ${initialLP}`);
+          }          
           if(strapi[`${index}`]){
             const contractTokens = strapi[`${index}`].get('contractTokens');
             let contractToken;
@@ -188,17 +191,17 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             contractToken.lp = lp;
             strapi[`${tk}`].set('lp', lp);
             strapi[`${index}`].set('contractTokens', contractTokens);
-            const contractBought = strapi[`${index}`].get('contractBought') || null;
+            
             // { token: option.token, optt: option.optt, tsym: option.tsym, ls: option.ls, index, lp: 0, initialLP: 0 } contract structure 
             // strapi.chosenContract = {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0}; chosen contract structure 
             if(!strapi.preferredContracts.has(`${tk}`) 
               && !strapi.chosenContract 
-              && (parseFloat(lp) >= 0.85 * strapi.entry) 
+              && (parseFloat(lp) >= 0.80 * strapi.entry) 
               && (parseFloat(lp) <= 0.95 *strapi.entry 
-              && (parseFloat(initialLP) >= 0.85 * strapi.entry) 
+              && (parseFloat(initialLP) >= 0.80 * strapi.entry) 
               && (parseFloat(initialLP) <= 0.95 *strapi.entry)
             )){
-              console.log(`New Contract ${tk} with current price ${lp} is added to preferred contracts`);
+              console.log(`${tsym} with current price ${lp} is added to preferred contracts & is under watchlist`);
               strapi.preferredContracts.add(`${tk}`);
               const selectedCandidate = {
                 token: tk,
@@ -215,9 +218,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             }
             //Check if this contract can be placed under Bracket order for Amount based trading
             if(strapi.preferredContracts.has(`${tk}`)){              
-              strapi.log.info(`Price update for a preferred contract ${tsym}: ${lp}`);
+              // strapi.log.info(`Price update for a preferred contract ${tsym}: ${lp}`);
               console.table(strapi.selectedCandidates);
-              if(parseFloat(lp) >= strapi.entry){
+              if(parseFloat(lp) >= strapi.entry && strapi.isTradingEnabled && parseFloat(lp) <= strapi.target * 1.05){
                 strapi.log.info(`Price for ${tsym} breached target ${strapi.entry} and is now the chosen target`);
                 // // console.log(strapi.chosenContract);
                 // strapi.preferredContracts = new Set();
@@ -248,6 +251,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             try{
               //Check if a contract is chosen and bought in amount based trading
               if(strapi.chosenContract){
+                strapi.preferredContracts = new Set();
+                strapi.selectedCandidates = [];
                 if(strapi.chosenContract.token === tk){
                   strapi.chosenContract.lp = lp;
                   const gainOrLoss = parseFloat(lp) - strapi.chosenContract.initialLP;
@@ -348,7 +353,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               console.log(err);
             }
             //Check if a contract is bought for index based trading
-              try{              
+              try{  
+                const contractBought = strapi[`${index}`].get('contractBought') || null;            
                 if((contractBought && contractBought.contractToken === tk)){
                   let awaitingOrderConfirmation = strapi[`${contractBought.indexToken}`].get('awaitingOrderConfirmation') || false;
                   if(!awaitingOrderConfirmation){                 
@@ -493,7 +499,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
         }
         const isTrendingMarket = await this.calculateTrendingMarket(tk, strapi.rollingData[`${tk}`].prices_lookback_period, lp);
         const index = strapi[`${tk}`].get('index') || tk;
-        console.log('isTrendingMarket:',isTrendingMarket)
+        // console.log('isTrendingMarket:',isTrendingMarket)
       
        if (isTrendingMarket === false && strapi.rollingData[`${tk}`].isTrendingMarket) {
             // Send a Strapi web broadcast to client regarding sideways market detection
@@ -925,80 +931,80 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     strapi.entry = entry;
     strapi.chosenContract = null;
     strapi.selectedCandidates = [];
-    let callsNotFound = true;
-    let putsNotFound = true;
+    // let callsNotFound = true;
+    // let putsNotFound = true;
     // strapi.selectedCandidates = [];
     // let avoid = null; 
-    let preferredCalls = []; 
-    let preferredPuts = []; 
-    let minAmount = entry * 0.85;
-    let maxAmount = entry * 0.95;
-    // strapi.tableContracts = new Map();
-    function delayUntil915(callback) {
-      const now = new Date().getTime(); // Get current time in milliseconds
-      const targetTime = new Date();
-      targetTime.setHours(9, 15, 0, 0); // Set target to 09:15:00 AM
-      const targetTimestamp = targetTime.getTime(); // Convert target time to milliseconds
+    // let preferredCalls = []; 
+    // let preferredPuts = []; 
+    // let minAmount = entry * 0.85;
+    // let maxAmount = entry * 0.95;
+  //   // strapi.tableContracts = new Map();
+  //   function delayUntil915(callback) {
+  //     const now = new Date().getTime(); // Get current time in milliseconds
+  //     const targetTime = new Date();
+  //     targetTime.setHours(9, 15, 0, 0); // Set target to 09:15:00 AM
+  //     const targetTimestamp = targetTime.getTime(); // Convert target time to milliseconds
   
-      let delay = targetTimestamp - now; // Calculate delay in milliseconds
+  //     let delay = targetTimestamp - now; // Calculate delay in milliseconds
   
-      if (delay <= 0) {
-          // console.log("It's already past 09:15 AM. Executing immediately.");
-          callback();
-      } else {
-          console.log(`Waiting for ${Math.floor(delay / 1000)} seconds until 09:15 AM...`);
-          setTimeout(callback, delay);
-      }
-  }
+  //     if (delay <= 0) {
+  //         // console.log("It's already past 09:15 AM. Executing immediately.");
+  //         callback();
+  //     } else {
+  //         console.log(`Waiting for ${Math.floor(delay / 1000)} seconds until 09:15 AM...`);
+  //         setTimeout(callback, delay);
+  //     }
+  // }
   
-  // Example usage:
-  delayUntil915(() => {
-      console.log("Executing Amount monitoringfunction as time above 09:15 AM!");
-  });
+  // // Example usage:
+  // delayUntil915(() => {
+  //     console.log("Executing Amount monitoringfunction as time above 09:15 AM!");
+  // });
 
-  const contracts = await strapi.service('api::contract.contract').getPreferredContractsInRange(index, minAmount, maxAmount);
+  // const contracts = await strapi.service('api::contract.contract').getPreferredContractsInRange(index, minAmount, maxAmount);
   
   
-    while(preferredCalls.length === 0 || preferredPuts.length === 0){
+  //   while(preferredCalls.length === 0 || preferredPuts.length === 0){
       
-      if (preferredCalls.length === 0) {
-        preferredCalls = await strapi
-          .service("api::order.order")
-          .getPreferredContractsInRange(index, "CE", minAmount, maxAmount);       
+  //     if (preferredCalls.length === 0) {
+  //       preferredCalls = await strapi
+  //         .service("api::order.order")
+  //         .getPreferredContractsInRange(index, "CE", minAmount, maxAmount);       
              
-      }
+  //     }
 
-      if (preferredPuts.length === 0){
-        preferredPuts = await strapi
-          .service("api::order.order")
-          .getPreferredContractsInRange(index, "PE", minAmount, maxAmount);      
-      }
+  //     if (preferredPuts.length === 0){
+  //       preferredPuts = await strapi
+  //         .service("api::order.order")
+  //         .getPreferredContractsInRange(index, "PE", minAmount, maxAmount);      
+  //     }
 
-      if(preferredCalls.length > 0 && callsNotFound){
-        strapi.log.info('Summary of identified CALL candidates');
-        console.table(preferredCalls);
-        for(const preferredCall of preferredCalls){
-          console.log(`Identified CALL candidate ${preferredCall.tsym} with LP ${preferredCall.lp}`);
-          strapi.preferredContracts.add(`${preferredCall.token}`);
-        }
-        callsNotFound = false;
+  //     if(preferredCalls.length > 0 && callsNotFound){
+  //       strapi.log.info('Summary of identified CALL candidates');
+  //       console.table(preferredCalls);
+  //       for(const preferredCall of preferredCalls){
+  //         console.log(`Identified CALL candidate ${preferredCall.tsym} with LP ${preferredCall.lp}`);
+  //         strapi.preferredContracts.add(`${preferredCall.token}`);
+  //       }
+  //       callsNotFound = false;
         
-      }
+  //     }
 
-      if(preferredPuts.length > 0 && putsNotFound){
-        strapi.log.info('Summary of identified PUT candidates');
-        console.table(preferredPuts);
-        for(const preferredPut of preferredPuts){
-          console.log(`Identified PUT candidate ${preferredPut.tsym} with LP ${preferredPut.lp}`);
-          strapi.preferredContracts.add(`${preferredPut.token}`);
-        }
-        putsNotFound = false;
+  //     if(preferredPuts.length > 0 && putsNotFound){
+  //       strapi.log.info('Summary of identified PUT candidates');
+  //       console.table(preferredPuts);
+  //       for(const preferredPut of preferredPuts){
+  //         console.log(`Identified PUT candidate ${preferredPut.tsym} with LP ${preferredPut.lp}`);
+  //         strapi.preferredContracts.add(`${preferredPut.token}`);
+  //       }
+  //       putsNotFound = false;
         
-      }
+  //     }
 
-      if(strapi.chosenContract) return;
-      await strapi.service("api::variable.variable").sleep(1500);
-    }
+  //     if(strapi.chosenContract) return;
+  //     await strapi.service("api::variable.variable").sleep(1500);
+  //   }
     strapi.log.info('Amount-based monitoring started for ', index, ' with:', `Entry price ${entry}, Target price ${target}, Stop loss ${stopLoss}`);
     return;
   },
