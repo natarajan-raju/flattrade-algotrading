@@ -220,7 +220,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             if(strapi.preferredContracts.has(`${tk}`)){              
               // strapi.log.info(`Price update for a preferred contract ${tsym}: ${lp}`);
               console.table(strapi.selectedCandidates);
-              if(parseFloat(lp) >= strapi.entry && strapi.isTradingEnabled && parseFloat(lp) <= strapi.target * 1.05){
+              if(parseFloat(lp) >= strapi.entry && strapi.isTradingEnabled && parseFloat(lp) <= strapi.entry * 1.07){
                 strapi.log.info(`Price for ${tsym} breached target ${strapi.entry} and is now the chosen target`);
                 // // console.log(strapi.chosenContract);
                 // strapi.preferredContracts = new Set();
