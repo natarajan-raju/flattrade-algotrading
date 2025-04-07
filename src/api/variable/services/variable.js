@@ -185,8 +185,12 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             }
             if(initialLP === 0){
               contractToken.initialLP = lp;
+              contractToken.lp = lp;
               strapi[`${tk}`].set('initialLP', lp);
+              strapi[`${tk}`].set('lp', lp);
               initialLP = lp;
+              strapi[`${index}`].set('contractTokens', contractTokens);
+              return;
             }
             contractToken.lp = lp;
             strapi[`${tk}`].set('lp', lp);
@@ -200,8 +204,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               && (parseFloat(lp) <= 0.95 *strapi.entry 
               && (parseFloat(initialLP) >= 0.80 * strapi.entry) 
               && (parseFloat(initialLP) <= 0.95 *strapi.entry)
+              && strapi.amountBasedTradingEnabled
             )){
-              console.log(`${tsym} with current price ${lp} is added to preferred contracts & is under watchlist`);
+              console.log(`${tsym} with current price ${lp} & Initial LP ${initialLP} is added to preferred contracts & is under watchlist`);
               strapi.preferredContracts.add(`${tk}`);
               const selectedCandidate = {
                 token: tk,
@@ -211,14 +216,15 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                 initialLP
               }
               strapi.selectedCandidates.push(selectedCandidate);
+              console.table(strapi.selectedCandidates);
+              return;
             }
-            const foundContract = strapi.selectedCandidates.find(contract => contract.token === tk);
-            if(foundContract){
-              foundContract.lp = lp;
-            }
+            
             //Check if this contract can be placed under Bracket order for Amount based trading
             if(strapi.preferredContracts.has(`${tk}`)){              
-              // strapi.log.info(`Price update for a preferred contract ${tsym}: ${lp}`);
+              strapi.log.info(`Price update for a preferred contract ${tsym}: ${lp}`);
+              const foundContract = strapi.selectedCandidates.find(item => item.token === tk);
+              foundContract.lp = lp;
               console.table(strapi.selectedCandidates);
               if(parseFloat(lp) >= strapi.entry && strapi.isTradingEnabled && parseFloat(lp) <= strapi.entry * 1.07){
                 strapi.log.info(`Price for ${tsym} breached target ${strapi.entry} and is now the chosen target`);
@@ -243,7 +249,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   strapi.chosenContract = {token: tk, lp, tsym, ls, initialLP: lp, highestProfitStage: 0};
                   strapi.preferredContracts = new Set();
                   strapi.selectedCandidates = [];
-                  console.log(`${tsym} with LP ${lp} is bought through bracket order for Amount based trading. Now watching for exit`);                                   
+                  console.log(`${tsym} with LP ${lp} is bought through bracket order for Amount based trading. Now watching for exit`);
+                  return;                                   
                 }               
               }
             }
@@ -931,6 +938,8 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     strapi.entry = entry;
     strapi.chosenContract = null;
     strapi.selectedCandidates = [];
+    strapi.preferredContracts = new Set();
+    strapi.amountBasedTradingEnabled = true;
     // let callsNotFound = true;
     // let putsNotFound = true;
     // strapi.selectedCandidates = [];
@@ -1268,7 +1277,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
     if(!indexToken){
         return {status: false, message: 'No token passed to stopTrading'};
     }
-   
+    strapi.amountBasedTradingEnabled = false;
     strapi.chosenContract = null;
     strapi.target = 0;
     strapi.entry = 0;

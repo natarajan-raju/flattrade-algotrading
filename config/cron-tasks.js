@@ -16,6 +16,7 @@ module.exports = {
         strapi.entry = 0;
         strapi.stopLoss = 0;
         strapi.preferredContracts = new Set();
+        strapi.amountBasedTradingEnabled = false;
         strapi.amountTradingCounter = 0;
         // strapi.chosenContract = {token: null, lp: Infinity, tsym: null, ls: null, rsi: 0};   
         strapi.isTradingEnabled = false;
@@ -55,6 +56,7 @@ module.exports = {
         strapi.entry = 0;
         strapi.stopLoss = 0;
         strapi.preferredContracts = new Set();
+        strapi.amountBasedTradingEnabled = false;
         strapi.amountTradingCounter = 0;
       },
       options: {
