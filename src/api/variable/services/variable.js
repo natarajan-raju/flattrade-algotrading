@@ -201,9 +201,9 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
             if(!strapi.preferredContracts.has(`${tk}`) 
               && !strapi.chosenContract 
               && (parseFloat(lp) >= 0.80 * strapi.entry) 
-              && (parseFloat(lp) <= 0.95 *strapi.entry 
+              && (parseFloat(lp) <= 0.99 *strapi.entry 
               && (parseFloat(initialLP) >= 0.80 * strapi.entry) 
-              && (parseFloat(initialLP) <= 0.95 *strapi.entry)
+              && (parseFloat(initialLP) <= 0.97 *strapi.entry)
               && strapi.amountBasedTradingEnabled
             )){
               console.log(`${tsym} with current price ${lp} & Initial LP ${initialLP} is added to preferred contracts & is under watchlist`);
