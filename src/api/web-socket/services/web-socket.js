@@ -133,10 +133,10 @@ module.exports = ({ strapi }) => ({
 
   async handleIncomingMessage(message,scripList) {
     // Define the specific touchline tokens to deduplicate
-    const touchlineTokens = ['26000', '26014', '26037', '26013', '26009'];
+    // const touchlineTokens = ['26000', '26014', '26037', '26013', '26009'];
   
     // Apply deduplication only if the message is a touchline feed and the token matches one of the specified ones
-    if (message.t === 'tf' && touchlineTokens.includes(message.tk) && message.lp) {
+    if (message.t === 'tf' && message.lp) {
       if (this.processingTokens.has(message.tk)) {
         // Token is already in processing, ignore the message (duplicate)
         strapi[`${message.tk}`].set('previousTradedPrice', message.lp);      
@@ -170,7 +170,7 @@ module.exports = ({ strapi }) => ({
       case 'tf':
         // Handle Touchline Feed and after it's processed, remove the token
         if(message.lp){
-          if(touchlineTokens.includes(message.tk)){
+          // if(touchlineTokens.includes(message.tk)){
               if(!this.processingTokens.has(message.tk)){
                 this.processingTokens.add(message.tk);
                 try {
@@ -183,16 +183,16 @@ module.exports = ({ strapi }) => ({
                 }
               } else {
                 console.log(`Preventing concurrent action for token: ${message.tk} due to incoming data burst`);
-                strapi[`${message.tk}`].set('previousTradedPrice', message.lp);
+                // strapi[`${message.tk}`].set('previousTradedPrice', message.lp);
                 
               }
-          }else {
-            try {
-              await strapi.service('api::variable.variable').handleFeed(message);
-            } catch (error) {
-              console.error(`Error handling feed for token ${message.tk}:`, error);
-            }          
-          }
+          // }else {
+          //   try {
+          //     await strapi.service('api::variable.variable').handleFeed(message);
+          //   } catch (error) {
+          //     console.error(`Error handling feed for token ${message.tk}:`, error);
+          //   }          
+          // }
         }
         break;
   

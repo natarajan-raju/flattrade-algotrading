@@ -1,8 +1,6 @@
 'use strict';
 
 const { env } = require('@strapi/utils');
-const profit = require('../../profit/controllers/profit');
-const contract = require('../../contract/controllers/contract');
 
 
 
