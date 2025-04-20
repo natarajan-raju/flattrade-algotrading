@@ -224,7 +224,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               const foundContract = strapi.selectedCandidates.find(item => item.token === tk);
               foundContract.lp = lp;
               console.table(strapi.selectedCandidates);
-              if(parseFloat(lp) >= strapi.entry && strapi.isTradingEnabled && parseFloat(lp) <= strapi.entry * 1.07){
+              if(parseFloat(lp) >= strapi.entry && strapi.isTradingEnabled && parseFloat(lp) <= strapi.entry * 1.03){
                 strapi.log.info(`Price for ${tsym} breached target ${strapi.entry} and is now the chosen target`);
                 // // console.log(strapi.chosenContract);
                 // strapi.preferredContracts = new Set();
@@ -258,6 +258,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
               if(strapi.chosenContract){
                 strapi.preferredContracts = new Set();
                 strapi.selectedCandidates = [];
+                const stopLoss = parseFloat(strapi.stopLoss) + (parseFloat(strapi.chosenContract.initialLP) - parseFloat(strapi.entry));
                 if(strapi.chosenContract.token === tk){
                   strapi.chosenContract.lp = lp;
                   const gainOrLoss = parseFloat(lp) - strapi.chosenContract.initialLP;
@@ -267,7 +268,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                   if(parseFloat(lp) >= strapi.target){
                     isProfitTrade = true;
                   }
-                  if(parseFloat(lp) <= strapi.stopLoss){
+                  if(parseFloat(lp) <= stopLoss){
                     isLossTrade = true;
                   }
                   const entryPrice = parseFloat(strapi.chosenContract.initialLP);
@@ -290,7 +291,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                         // strapi.log.info(`Contract reached Profit Stage ${i + 1} at ${lp}`);
                     }
                   }
-                  strapi.log.info(`Price update for a chosen contract ${tsym}: ${lp} Gain/Loss: ${gainOrLoss} Current Profit Stage ${strapi.chosenContract.highestProfitStage}`);
+                  strapi.log.info(`Price update for a chosen contract ${tsym}: ${lp} Gain/Loss: ${gainOrLoss} Current Profit Stage ${strapi.chosenContract.highestProfitStage} Stop loss trigger ${stopLoss}`);
 
                   // If price falls below a locked stage, exit the trade
                   if ((strapi.chosenContract.highestProfitStage === 1 && parseFloat(lp) <= 1.01 * strapi.chosenContract.initialLP ) || (strapi.chosenContract.highestProfitStage > 1 && parseFloat(lp) <= profitStages[strapi.chosenContract.highestProfitStage - 1] * 0.98)) {
@@ -323,7 +324,7 @@ module.exports = createCoreService('api::variable.variable', ({ strapi }) => ({
                     }
                   }
 
-                  if(parseFloat(lp) >= strapi.target || parseFloat(lp) <= strapi.stopLoss){
+                  if(parseFloat(lp) >= strapi.target || parseFloat(lp) <= stopLoss){
                     strapi.log.info(`Price for ${tsym} breached and is now the exit target`);
                     //exchange,tsym,quantity,price,orderType,remarks="Order created from rajaapp.in"
                     // { exchange, tsym, quantity, contractPrice, orderType, remarks, index}
